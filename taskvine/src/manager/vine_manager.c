@@ -3711,7 +3711,7 @@ static int send_one_task(struct vine_manager *q)
 {
 	double now_secs = ((double)timestamp_get()) / ONE_SECOND;
 	int iter_depth = MIN(skip_list_size(q->ready_tasks), q->attempt_schedule_depth);
-
+	
 	// if ready_tasks_cr is not pointing at a task
 	// (e.g it is at the end of the list, or first time through)
 	// set it to the beginning of the ready list.
@@ -3719,8 +3719,31 @@ static int send_one_task(struct vine_manager *q)
 		skip_list_seek(q->ready_tasks_cr, 0);
 	}
 
+
 	int sent = 0;
 	sent = send_one_task_with_cr(q, q->ready_tasks_cr, iter_depth, now_secs);
+
+
+	// find the magnitude of the highest-priority region. Adjust sched depth so we at least
+	// consider all of it plus a minimum factor of additional tasks. 	
+	if (q->hungry_internal) {
+		skip_list_seek(q->ready_tasks_cr, 0);
+
+		int depth = 0;
+		const struct vine_task *t;
+		
+		t = skip_list_peek_head(q->ready_tasks);
+	       	char *lead_region = t->semantic_category; 	
+		SKIP_LIST_ITERATE(q->ready_tasks_cr, t){
+			if (!strcmp(lead_region, t->semantic_category)){
+				depth++;
+			}	
+		}
+
+		if (depth) {
+			q->attempt_schedule_depth = depth * q->hungry_minimum_factor;
+		}
+	}
 
 	return sent;
 }
@@ -4218,6 +4241,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 
 	q->hungry_minimum = 10;
 	q->hungry_minimum_factor = 2;
+	q->hungry_internal = 0;
 
 	q->wait_for_workers = 0;
 	q->max_workers = -1;
@@ -6011,6 +6035,9 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 	} else if (!strcmp(name, "hungry-minimum-factor")) {
 		q->hungry_minimum_factor = MAX(1, (int)value);
 		q->time_last_hungry = 0;
+
+	} else if (!strcmp(name, "hungry-internal")) {
+		q->hungry_internal = !!((int)value);
 
 	} else if (!strcmp(name, "immediate-recovery")) {
 		q->immediate_recovery = !!((int)value);

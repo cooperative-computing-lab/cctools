@@ -446,6 +446,14 @@ have similar resources requirements (e.g. to disconnect slow workers).
 */
 void vine_task_set_category(struct vine_task *t, const char *category);
 
+
+/** Label the task with semantic category. Tasks in the same semantic category are likely
+to possess data locality and parallelism opportunities.
+@param t A task object.
+@param category The name of the category to use.
+*/
+void vine_task_set_semantic_category(struct vine_task *t, const char *category);
+
 /** Label the task with a user-defined feature. The task will only run on a worker that provides (--feature option) such
 feature.
 @param t A task object.

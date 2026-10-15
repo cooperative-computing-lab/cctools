@@ -58,7 +58,7 @@ class Task(object):
         attributes = [
             "library_required",
             "library_provided",
-            "scheduler", "tag", "category",
+            "scheduler", "tag", "category", "semantic_category",
             "snapshot_file", "retries", "cores", "memory",
             "disk", "gpus", "priority", "time_end",
             "time_start", "time_max", "time_min", "monitor_output"
@@ -326,6 +326,14 @@ class Task(object):
     # @param name       The name of the category
     def set_category(self, name):
         return cvine.vine_task_set_category(self._task, name)
+
+    ##
+    # Label the task with the given semantic category. Tasks in the same semantic category
+    # are related and may possess data locality and parallelism opportunities.
+    # @param self       Reference to the current task object.
+    # @param name       The name of the category
+    def set_semantic_category(self, name):
+        return cvine.vine_task_set_semantic_category(self._task, name)
 
     ##
     # Label the task with the given user-defined feature. Tasks with the
