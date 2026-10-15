@@ -1103,8 +1103,9 @@ class Manager(object):
     # @param self   Reference to the current manager object.
     # @param name   Name of the library to be removed.
     def remove_library(self, name):
+        libtask = self._library_table.pop(name)
         cvine.vine_manager_remove_library(self._taskvine, name)
-        del self._library_table[name]
+        libtask._task = None
 
     ##
     # Check whether a libray exists on the manager or not
