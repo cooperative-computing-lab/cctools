@@ -8,6 +8,7 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <assert.h>
 
 #include "list.h"
 #include "debug.h"
