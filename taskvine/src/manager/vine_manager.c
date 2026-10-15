@@ -5443,7 +5443,6 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 			update_resource_report(q);
 		}
 
-		vine_perf_log_write_update(q, 0);
 		END_ACCUM_TIME(q, time_internal);
 
 		// break loop if there is a task to be returned to the user; or if prefering dispatching, if there
