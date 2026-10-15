@@ -481,22 +481,12 @@ Send a message to the manager with my current resources.
 
 static void send_resource_update(struct link *manager)
 {
-	struct vine_resources *r = total_resources;
-
 	// if workers are set to expire in some time, send the expiration time to manager
 	if (options->manual_wall_time_option > 0) {
 		options->end_time = worker_start_time + (options->manual_wall_time_option * 1e6);
 	}
 
-	/* The same lines as vine_resources_send(), queued as one message. */
-	send_async_message(manager,
-			"resources\ncores %lf\nmemory %lf\ndisk %lf\ngpus %lf\nworkers %lf\ntag %" PRId64 "\nend\n",
-			r->cores.total,
-			r->memory.total,
-			r->disk.total,
-			r->gpus.total,
-			r->workers.total,
-			r->tag);
+	vine_resources_send(manager, total_resources, send_async_message);
 }
 
 /*
