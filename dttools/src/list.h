@@ -241,6 +241,14 @@ pointers in both lists point to the same places.
 
 struct list *list_duplicate(struct list *list);
 
+/** Copy a list and its items.
+@param list The list to copy.
+@param copy A function that copies one item.
+@return A new list with a copy of each item.
+*/
+
+struct list *list_copy(struct list *list, void *(*copy)(void *item));
+
 /** Delete a linked list.
 Note that this function only deletes the list itself,
 it does not delete the items referred to by the list.
