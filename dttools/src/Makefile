@@ -12,10 +12,14 @@ SOURCES = \
 	auth_ticket.c \
 	auth_unix.c \
 	b64.c \
-	bitmap.c \
 	bucketing.c \
 	bucketing_exhaust.c \
 	bucketing_greedy.c \
+	bucketing_quantized.c \
+	bucketing_det_exhaust.c \
+	bucketing_det_greedy.c \
+	bucketing_exhaust_common.c \
+	bucketing_greedy_common.c \
 	bucketing_manager.c \
 	buffer.c \
 	catalog_query.c \
@@ -123,6 +127,7 @@ SOURCES = \
 	url_encode.c \
 	username.c \
 	uuid.c \
+	xpu_tracker.c \
 	xxmalloc.c \
 
 HEADERS_PUBLIC = \
@@ -134,10 +139,14 @@ HEADERS_PUBLIC = \
 	auth_kerberos.h \
 	auth_ticket.h \
 	auth_unix.h \
-	bitmap.h \
 	bucketing.h \
 	bucketing_exhaust.h \
 	bucketing_greedy.h \
+	bucketing_quantized.h \
+	bucketing_det_exhaust.h \
+	bucketing_det_greedy.h \
+	bucketing_exhaust_common.h \
+	bucketing_greedy_common.h \
 	bucketing_manager.h \
 	buffer.h \
 	category.h \
@@ -174,6 +183,7 @@ HEADERS_PUBLIC = \
 	text_list.h \
 	timestamp.h \
 	unlink_recursive.h \
+	xpu_tracker.h \
 	xxmalloc.h \
 
 LIBRARIES = libdttools.a

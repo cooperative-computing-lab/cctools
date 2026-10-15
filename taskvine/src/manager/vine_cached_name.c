@@ -130,7 +130,10 @@ static vine_url_cache_t get_url_properties(const char *url, char *tag)
 		ssize_t totalsize;
 		char *hash = vine_checksum_any(&url[7], &totalsize);
 		if (hash) {
-			strcpy(tag, hash);
+			/* snprintf, not strcpy: tag is a bare char* here with no size
+			 * of its own; bound the copy to what the sole caller of
+			 * get_url_properties actually allocated for it. */
+			snprintf(tag, VINE_LINE_MAX, "%s", hash);
 			free(hash);
 			return VINE_FOUND_MD5;
 		} else {

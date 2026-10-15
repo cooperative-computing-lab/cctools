@@ -57,6 +57,7 @@ void chirp_stats_collect(const char *addr, const char *subject, UINT64_T ops, UI
 
 void chirp_stats_summary( struct jx *j )
 {
+	int iteration;
 	char *addr;
 	struct chirp_stats *s;
 
@@ -69,8 +70,7 @@ void chirp_stats_summary( struct jx *j )
 
 	struct jx *arr = jx_array(0);
 
-	hash_table_firstkey(stats_table);
-	while(hash_table_nextkey(stats_table, &addr, (void **) &s)) {
+	HASH_TABLE_ITERATE(stats_table, iteration, addr, s) {
 		// there may be a large number of clients,
 		// so we used a brief notation to keep the doc size down.
 		struct jx *c = jx_object(0);

@@ -19,6 +19,15 @@ int find_executable(const char *exe_name, const char *env_path_var, char *exe_pa
 
 int env_replace( const char *infile, const char *outfile );
 
+/** If the environment variable named by src is set, copy its value into
+  the environment variable named by dst (see setenv(3) for the meaning of
+  overwrite). Does nothing if src is unset.
+  @param dst Name of the destination environment variable.
+  @param src Name of the source environment variable.
+  @param overwrite Whether to overwrite dst if it is already set.
+  */
+void setenv_compat(const char *dst, const char *src, int overwrite);
+
 
 /* Return the first temporary directory found in the following order:
    override_tmp_dir argument value, CCTOOLS_TEMP env var, _CONDOR_SCRATCH_DIR

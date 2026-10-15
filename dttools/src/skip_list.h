@@ -72,6 +72,14 @@ struct skip_list *skip_list_create(unsigned priority_size, double probability);
  */
 bool skip_list_delete(struct skip_list *sl);
 
+/** Remove every item contained within a skip list.
+ * Each removed item is passed to delete_func, if given. Pass NULL when the
+ * items are not owned by the skip list. This does not delete the skip list itself.
+ * @param sl The skip list to clear.
+ * @param delete_func The function to delete items with, or NULL.
+ */
+void skip_list_clear(struct skip_list *sl, void (*delete_func)(void *item));
+
 /** Get the number of items in a skip list.
  * @param sl The skip list to examine.
  * @returns The number of items in the skip list.

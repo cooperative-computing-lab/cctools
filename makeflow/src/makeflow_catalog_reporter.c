@@ -5,6 +5,7 @@ See the file COPYING for details.
 */
 
 #include "dag.h"
+#include "debug.h"
 #include "timestamp.h"
 #include "stringtools.h"
 #include "list.h"
@@ -14,6 +15,7 @@ See the file COPYING for details.
 #include "batch_queue.h"
 #include "jx_print.h"
 
+#include <errno.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdarg.h>
@@ -124,6 +126,10 @@ int makeflow_file_summary (struct dag *d, char *name, batch_queue_type_t type, t
 
   	FILE *fp;
   	fp = fopen (status_file_name, "w");
+  	if (!fp) {
+  		debug (D_ERROR, "could not open status file %s: %s", status_file_name, strerror (errno));
+  		return 0;
+  	}
   	fprintf (fp, "<!DOCTYPE html>\n");
   	fprintf (fp, "<html>\n");
   	fprintf (fp, "<body>\n");

@@ -66,14 +66,14 @@ void work_queue_resources_measure_locally( struct work_queue_resources *r, const
 
 static void work_queue_resource_debug( struct work_queue_resource *r, const char *name )
 {
-	debug(D_WQ,"%8s %6"PRId64" inuse %6"PRId64" total %6"PRId64" smallest %6"PRId64" largest",name, r->inuse, r->total, r->smallest, r->largest);
+	debug(D_WQ,"%8s %lf inuse %lf total %lf smallest %lf largest",name, r->inuse, r->total, r->smallest, r->largest);
 }
 
 
 static void work_queue_resource_send( struct link *manager, struct work_queue_resource *r, const char *name, time_t stoptime )
 {
 	work_queue_resource_debug(r, name);
-	link_printf(manager, stoptime, "resource %s %"PRId64" %"PRId64" %"PRId64"\n", name, r->total, r->smallest, r->largest );
+	link_printf(manager, stoptime, "resource %s %lf %lf %lf\n", name, r->total, r->smallest, r->largest );
 }
 
 void work_queue_resources_send( struct link *manager, struct work_queue_resources *r, time_t stoptime )

@@ -137,7 +137,11 @@ typedef enum {
 
 	VINE_ALLOCATION_MODE_GREEDY_BUCKETING = CATEGORY_ALLOCATION_MODE_GREEDY_BUCKETING,
 
-	VINE_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING = CATEGORY_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING
+	VINE_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING = CATEGORY_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING,
+	VINE_ALLOCATION_MODE_DET_GREEDY_BUCKETING = CATEGORY_ALLOCATION_MODE_DET_GREEDY_BUCKETING,
+
+	VINE_ALLOCATION_MODE_DET_EXHAUSTIVE_BUCKETING = CATEGORY_ALLOCATION_MODE_DET_EXHAUSTIVE_BUCKETING,
+	VINE_ALLOCATION_MODE_QUANTIZED_BUCKETING = CATEGORY_ALLOCATION_MODE_QUANTIZED_BUCKETING,
 } vine_category_mode_t;
 
 /** The type of an input or output file to attach to a task. */
@@ -1014,6 +1018,13 @@ void vine_manager_remove_library(struct vine_manager *m, const char *name);
 */
 struct vine_task *vine_manager_find_library_template(struct vine_manager *m, const char *library_name);
 
+/** Release a random worker for failure-injection tests.
+This is a testing support hook, not a normal manager control operation.
+@param m A manager object.
+@return Non-zero if a worker was released.
+*/
+int vine_manager_release_random_worker(struct vine_manager *m);
+
 /** Wait for a task to complete.
 This call will block until either a task has completed, the timeout has expired, or the manager is empty.
 If a task has completed, the corresponding task object will be returned by this function.
@@ -1537,6 +1548,12 @@ void vine_counters_print();
 @return A string.
  */
 char *vine_version_string();
+
+/** Absolute path of this run's workflow runtime directory.
+@param m The manager.
+@return Owned by the manager until @ref vine_delete.
+ */
+const char *vine_get_runtime_directory(struct vine_manager *m);
 
 /** Returns path relative to the logs runtime directory
 @param m Reference to the current manager object.

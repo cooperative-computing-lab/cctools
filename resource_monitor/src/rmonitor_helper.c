@@ -304,6 +304,10 @@ int open(const char *path, int flags, ...)
 
 	debug(D_RMON, "open %s from %d.\n", path, getpid());
 
+	/* Consider file as input by default. Must be set before START(msg):
+	START reads msg.type to decide whether to record a start timestamp. */
+	msg.type = OPEN_INPUT;
+
 	START(msg)
 	fd = original_open(path, flags, mode);
 	END(msg)
@@ -311,9 +315,6 @@ int open(const char *path, int flags, ...)
 	/* With ENOENT we do not send a message, simply to reduce spam. */
 	if (msg.error == ENOENT)
 		return fd;
-
-	/* Consider file as input by default. */
-	msg.type = OPEN_INPUT;
 
 	if (fd > -1 && open_for_writing(fd)) {
 		msg.type = OPEN_OUTPUT;
@@ -347,6 +348,10 @@ int open64(const char *path, int flags, ...)
 
 	debug(D_RMON, "open64 %s from %d.\n", path, getpid());
 
+	/* Consider file as input by default. Must be set before START(msg):
+	START reads msg.type to decide whether to record a start timestamp. */
+	msg.type = OPEN_INPUT;
+
 	START(msg)
 	fd = original_open64(path, flags, mode);
 	END(msg)
@@ -354,9 +359,6 @@ int open64(const char *path, int flags, ...)
 	/* With ENOENT we do not send a message, simply to reduce spam. */
 	if (msg.error == ENOENT)
 		return fd;
-
-	/* Consider file as input by default. */
-	msg.type = OPEN_INPUT;
 
 	if (fd > -1 && open_for_writing(fd)) {
 		msg.type = OPEN_OUTPUT;

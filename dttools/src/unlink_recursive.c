@@ -49,7 +49,6 @@ int unlinkat_recursive(int dirfd, const char *path)
 					}
 				}
 				closedir(dir);
-				close(subdirfd);
 			} else {
 				close(subdirfd);
 				return -1;
@@ -90,7 +89,6 @@ int unlink_dir_contents(const char *path)
 				}
 			}
 			closedir(dir);
-			close(dirfd);
 		} else {
 			rcs = -1;
 			close(dirfd);

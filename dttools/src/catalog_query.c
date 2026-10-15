@@ -156,8 +156,9 @@ struct list *catalog_query_sort_hostlist(const char *hosts)
 		h->port = port;
 		h->down = 0;
 
-		set_first_element(down_hosts);
-		while ((n = set_next_element(down_hosts))) {
+		int iteration;
+		SET_ITERATE(down_hosts, iteration, n)
+		{
 			if (!strcmp(n, host)) {
 				h->down = 1;
 			}
@@ -202,8 +203,9 @@ struct catalog_query *catalog_query_create(const char *hosts, struct jx *filter_
 
 			if (h->down) {
 				debug(D_DEBUG, "catalog server at %s is back up", h->host);
-				set_first_element(down_hosts);
-				while ((n = set_next_element(down_hosts))) {
+				int iteration;
+				SET_ITERATE(down_hosts, iteration, n)
+				{
 					if (!strcmp(n, h->host)) {
 						set_remove(down_hosts, n);
 						free(n);

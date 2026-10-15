@@ -214,7 +214,7 @@ int string_match_regex(const char *text, const char *pattern)
 
 int string_match(const char *pattern, const char *text)
 {
-	char *w;
+	const char *w;
 	int headlen, taillen;
 
 	w = strchr(pattern, '*');
@@ -959,8 +959,8 @@ char *string_wrap_command(const char *command, const char *wrapper_command)
 	if (!wrapper_command)
 		return xxstrdup(command);
 
-	char *braces = strstr(wrapper_command, "{}");
-	char *square = strstr(wrapper_command, "[]");
+	const char *braces = strstr(wrapper_command, "{}");
+	const char *square = strstr(wrapper_command, "[]");
 	char *new_command;
 
 	if (braces) {
@@ -994,7 +994,7 @@ char *string_wrap_command(const char *command, const char *wrapper_command)
 
 char *strnchr(const char *s, int c)
 {
-	char *next = strchr(s, c);
+	char *next = (char *)strchr(s, c);
 	if (next)
 		next += 1;
 	return next;

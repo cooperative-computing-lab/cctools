@@ -12,6 +12,17 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 
+typedef int (*sort_dir_compare_t)(const char *a, const char *b);
+
+static sort_dir_compare_t sort_dir_compare = strcmp;
+
+static int sort_dir_qsort_compare(const void *a, const void *b)
+{
+	/* qsort passes pointers to the array elements (char **),
+	 * not the strings themselves. */
+	return sort_dir_compare(*(const char *const *)a, *(const char *const *)b);
+}
+
 int sort_dir(const char *dirname, char ***list, int (*sort)(const char *a, const char *b))
 {
 	DIR *dir;
@@ -32,9 +43,8 @@ int sort_dir(const char *dirname, char ***list, int (*sort)(const char *a, const
 		return 0;
 	}
 
-	if (sort) {
-		qsort(*list, n, sizeof(char *), (int (*)(const void *, const void *))sort);
-	}
+	sort_dir_compare = sort ? sort : strcmp;
+	qsort(*list, n, sizeof(char *), sort_dir_qsort_compare);
 
 	return 1;
 }

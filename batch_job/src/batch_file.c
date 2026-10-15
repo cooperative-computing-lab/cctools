@@ -140,13 +140,19 @@ char *batch_file_generate_id_dir(char *file_name)
 	}
 	char *check_sum_value = hash_table_lookup(check_sums, file_name);
 	if (check_sum_value == NULL) {
-		char *hash_sum = "";
+		/* Must be heap-allocated, not a string literal: if file_name is an
+		empty directory (only "." and ".." entries), the loop below never
+		reassigns hash_sum, and it would otherwise reach free(hash_sum) at
+		the end of this block still pointing at a string literal --
+		undefined behavior (glibc aborts on it). */
+		char *hash_sum = xxstrdup("");
 		struct dirent **dp;
 		int num;
 		// Scans directory and sorts in reverse order
 		num = scandir(file_name, &dp, NULL, alphasort);
 		if (num < 0) {
 			debug(D_MAKEFLOW, "Unable to scan %s", file_name);
+			free(hash_sum);
 			return NULL;
 		} else {
 			int i;
@@ -154,7 +160,11 @@ char *batch_file_generate_id_dir(char *file_name)
 				if (strcmp(dp[i]->d_name, ".") != 0 && strcmp(dp[i]->d_name, "..") != 0) {
 					char *file_path = string_format("%s/%s", file_name, dp[i]->d_name);
 					if (path_is_dir(file_path) == 1) {
-						hash_sum = string_format("%s%s", hash_sum, batch_file_generate_id_dir(file_path));
+						char *sub_hash = batch_file_generate_id_dir(file_path);
+						char *new_hash_sum = string_format("%s%s", hash_sum, sub_hash);
+						free(hash_sum);
+						free(sub_hash);
+						hash_sum = new_hash_sum;
 					} else {
 						unsigned char hash[SHA1_DIGEST_LENGTH];
 						struct timeval start_time;
@@ -172,7 +182,9 @@ char *batch_file_generate_id_dir(char *file_name)
 							free(dp[i]);
 							continue;
 						}
-						hash_sum = string_format("%s%s:%s", hash_sum, file_name, sha1_string(hash));
+						char *new_hash_sum = string_format("%s%s:%s", hash_sum, file_name, sha1_string(hash));
+						free(hash_sum);
+						hash_sum = new_hash_sum;
 					}
 					free(file_path);
 				}

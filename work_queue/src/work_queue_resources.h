@@ -11,10 +11,10 @@ See the file COPYING for details.
 #include "jx.h"
 
 struct work_queue_resource {
-	int64_t inuse;
-	int64_t total;
-	int64_t smallest;
-	int64_t largest;
+	double inuse;
+	double total;
+	double smallest;
+	double largest;
 };
 
 struct work_queue_resources {

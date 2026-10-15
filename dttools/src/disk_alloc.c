@@ -186,6 +186,10 @@ int disk_alloc_delete(char *loc)
 	FILE *loop_find;
 	losetup_args = string_format("losetup -j %s", device_loc);
 	loop_find = popen(losetup_args, "r");
+	if (!loop_find) {
+		debug(D_NOTICE, "Failed to run losetup: %s.\n", strerror(errno));
+		goto error;
+	}
 	fscanf(loop_find, "%s %s %s", loop_dev, loop_info, loop_mount);
 	pclose(loop_find);
 	int loop_dev_path_length = strlen(loop_mount);

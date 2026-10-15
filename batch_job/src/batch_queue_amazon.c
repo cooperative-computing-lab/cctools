@@ -173,6 +173,8 @@ static int log_instance_state(const char *instance_id, const char *config_file, 
 {
 	FILE *fp;
 	fp = fopen(config_file, "a");
+	if (!fp)
+		return 0;
 	fprintf(fp, "%s %s %" PRIu64 "\n", instance_state, instance_id, timestamp_get());
 	fclose(fp);
 	return 1;
@@ -700,6 +702,13 @@ static batch_queue_id_t batch_queue_amazon_submit(struct batch_queue *q, struct 
 	info->aws_config = aws_config;
 	info->instance_id = strdup(instance_id);
 	info->instance_type = strdup(instance_type);
+	/* instance_id itself is always a strdup'd string owned by us here
+	(both fetch_aws_instance()/aws_instance_delete() and
+	aws_create_instance() hand back memory "that must be freed", per
+	their own doc comments); now that it's been copied into info, free
+	the original instead of leaking one string per instance created or
+	reused. */
+	free((char *)instance_id);
 	info->info.submitted = time(0);
 	info->info.started = time(0);
 
@@ -724,7 +733,9 @@ static batch_queue_id_t batch_queue_amazon_submit(struct batch_queue *q, struct 
 		signal(SIGQUIT, SIG_DFL);
 		signal(SIGABRT, SIG_DFL);
 
-		_exit(batch_queue_amazon_subprocess(aws_config, instance_id, j));
+		/* use info->instance_id, not the (now-freed) local instance_id
+		-- info holds its own strdup'd copy that's still valid. */
+		_exit(batch_queue_amazon_subprocess(aws_config, info->instance_id, j));
 	}
 	return -1;
 }

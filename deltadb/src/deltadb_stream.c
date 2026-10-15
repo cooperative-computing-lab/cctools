@@ -94,7 +94,6 @@ int deltadb_process_stream( struct deltadb_query *query, struct deltadb_event_ha
 			if(!jvalue) {
 				/* backwards compatibility with old format */
 				jvalue = jx_string(value);
-				continue;
 			}
 
 			if(!handlers->deltadb_update_event(query,key,name,jvalue)) break;

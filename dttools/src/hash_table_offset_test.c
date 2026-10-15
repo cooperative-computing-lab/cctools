@@ -32,9 +32,10 @@ int main(int argc, char **argv) {
 	for (i = 0; i < 127; i++) {
 		int offset;
 		char *key;
+		int iteration;
 		struct boxed_int *box;
 		int sum = 0;
-		HASH_TABLE_ITERATE_RANDOM_START(h, offset, key, box) {
+		HASH_TABLE_ITERATE_RANDOM_START(h, iteration, offset, key, box) {
 			sum += box->value;
 		}
 

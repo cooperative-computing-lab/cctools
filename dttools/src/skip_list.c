@@ -239,6 +239,19 @@ bool skip_list_delete(struct skip_list *sl)
 	return true;
 }
 
+void skip_list_clear(struct skip_list *sl, void (*delete_func)(void *item))
+{
+	if (!sl)
+		return;
+
+	void *item;
+
+	while ((item = skip_list_pop_head(sl))) {
+		if (delete_func)
+			delete_func(item);
+	}
+}
+
 struct skip_list_cursor *skip_list_cursor_create(struct skip_list *sl)
 {
 	debug_assert(sl);

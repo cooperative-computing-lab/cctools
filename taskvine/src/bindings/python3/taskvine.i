@@ -68,4 +68,15 @@ into a swig function f(data) */
 
 %include "stdint.i"
 %include "int_sizes.h"
+%include "timestamp.h"
+
+/* Return timestamp_t values as Python integers instead of leaking pointers. */
+%typemap(in) timestamp_t {
+  unsigned long long temp = PyLong_AsUnsignedLongLong($input);
+  $1 = (timestamp_t)temp;
+}
+%typemap(out) timestamp_t {
+  $result = PyLong_FromUnsignedLongLong((unsigned long long)$1);
+}
+
 %include "taskvine.h"

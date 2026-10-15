@@ -96,9 +96,10 @@ int check_worker_have_enough_resources(struct vine_manager *q, struct vine_worke
 	 * This matches the assumption in @vine_manager.c:commit_task_to_worker(), where empty libraries are being killed right before a task is committed. */
 	uint64_t task_id;
 	struct vine_task *ti;
-	ITABLE_ITERATE(w->current_tasks, task_id, ti)
+	int iteration;
+	ITABLE_ITERATE(w->current_tasks, iteration, task_id, ti)
 	{
-		if (ti->provides_library && ti->function_slots_inuse == 0) {
+		if (ti->state == VINE_TASK_RUNNING && ti->provides_library && ti->function_slots_inuse == 0) {
 			worker_net_resources->disk.inuse -= ti->current_resource_box->disk;
 			worker_net_resources->cores.inuse -= ti->current_resource_box->cores;
 			worker_net_resources->memory.inuse -= ti->current_resource_box->memory;
@@ -132,25 +133,20 @@ int check_worker_have_enough_resources(struct vine_manager *q, struct vine_worke
  * taking into account that some files may be already at the worker. */
 int check_worker_have_enough_disk_with_inputs(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
-	int ok = 1;
 	double available = w->resources->disk.total - MAX(0, t->resources_requested->disk) - w->resources->disk.inuse;
 
+	int64_t missing = 0;
 	struct vine_mount *m;
 	LIST_ITERATE(t->input_mounts, m)
 	{
-		if (hash_table_lookup(w->current_files, m->file->cached_name)) {
-			continue;
-		}
-
-		available -= m->file->size;
-
-		if (available < 0) {
-			ok = 1;
-			break;
+		if (!hash_table_lookup(w->current_files, m->file->cached_name)) {
+			missing += m->file->size;
 		}
 	}
 
-	return ok;
+	/* available is in MB, file sizes are in bytes. Rounding the sum once keeps many small inputs from counting as a
+	 * megabyte each. */
+	return BYTES_TO_MEGABYTES(missing) <= available;
 }
 
 /* Check if this worker has committable resources for any type of task.
@@ -165,7 +161,8 @@ static int check_worker_have_committable_resources(struct vine_manager *q, struc
 	if (w->current_libraries && itable_size(w->current_libraries) > 0) {
 		uint64_t task_id;
 		struct vine_task *t;
-		ITABLE_ITERATE(w->current_libraries, task_id, t)
+		int iteration;
+		ITABLE_ITERATE(w->current_libraries, iteration, task_id, t)
 		{
 			if (t->function_slots_inuse < t->function_slots_total) {
 				return 1;
@@ -210,8 +207,10 @@ int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w
 		return 0;
 	}
 
-	/* Don't send tasks to this worker if it is in draining mode (no more tasks). */
-	if (w->draining) {
+	/* Don't send tasks to this worker if it is in draining mode (no more tasks), or it is going to be removed. */
+	/* Probably we don't need to check pending_removal here as the worker shouldn't be in worker's table
+	 * anyway, but just in case that changes in the future. */
+	if (w->draining || w->pending_removal) {
 		return 0;
 	}
 
@@ -323,7 +322,8 @@ struct vine_task *vine_schedule_find_library(struct vine_manager *q, struct vine
 {
 	uint64_t task_id;
 	struct vine_task *library_task;
-	ITABLE_ITERATE(w->current_libraries, task_id, library_task)
+	int iteration;
+	ITABLE_ITERATE(w->current_libraries, iteration, task_id, library_task)
 	{
 		if (!strcmp(library_task->provides_library, library_name) && (library_task->function_slots_inuse < library_task->function_slots_total)) {
 			return library_task;
@@ -342,7 +342,8 @@ static int count_worker_free_cores(struct vine_manager *q, struct vine_worker_in
 	/* library tasks may themselves consume many cores but can have free slots */
 	uint64_t task_id;
 	struct vine_task *t;
-	ITABLE_ITERATE(w->current_libraries, task_id, t)
+	int iteration;
+	ITABLE_ITERATE(w->current_libraries, iteration, task_id, t)
 	{
 		free_cores += t->function_slots_total - t->function_slots_inuse;
 	}
@@ -375,7 +376,8 @@ struct vine_worker_info *vine_schedule_task_to_worker(struct vine_manager *q, st
 
 	char *key;
 	struct vine_worker_info *w;
-	HASH_TABLE_ITERATE(q->worker_table, key, w)
+	int iteration;
+	HASH_TABLE_ITERATE(q->worker_table, iteration, key, w)
 	{
 		/* briefly skip uninitialized workers, more detailed checks are performed in @check_worker_against_task */
 		if (!w || !w->resources || w->type != VINE_WORKER_TYPE_WORKER || w->draining) {
@@ -384,11 +386,12 @@ struct vine_worker_info *vine_schedule_task_to_worker(struct vine_manager *q, st
 
 		/* if task groups are enabled, skip workers that are running a group task */
 		if (q->task_groups_enabled) {
-			if (w->current_tasks && itable_size(w->current_tasks) > 0) {
+			if (w->tasks_committed > 0) {
+				int iteration_group;
 				uint64_t tidg;
 				struct vine_task *tg;
 				int running_group_task = 0;
-				ITABLE_ITERATE(w->current_tasks, tidg, tg)
+				ITABLE_ITERATE(w->current_tasks, iteration_group, tidg, tg)
 				{
 					if (tg->group_id) {
 						running_group_task = 1;
@@ -445,7 +448,7 @@ struct vine_worker_info *vine_schedule_task_to_worker(struct vine_manager *q, st
 			break;
 		case VINE_SCHEDULE_TIME:
 			/* Find the worker that produced the fastest runtime of prior tasks. */
-			priority = w->total_tasks_complete == 0 ? HUGE_VAL : -(w->total_task_time + w->total_transfer_time) / w->total_tasks_complete;
+			priority = w->total_tasks_complete == 0 ? HUGE_VAL : -(double)(w->total_task_time + w->total_transfer_time) / w->total_tasks_complete;
 			break;
 		case VINE_SCHEDULE_FCFS:
 			/* Deprecated, same as random */
@@ -507,6 +510,9 @@ static vine_resource_bitmask_t is_task_larger_than_worker(struct vine_manager *q
 
 	if ((double)w->resources->disk.total < l->disk) {
 		set = set | DISK_BIT;
+	} else if ((double)w->resources->disk.total - w->resources->disk.inuse < l->disk && itable_size(w->current_tasks) < 1) {
+		/* also trigger disk if worker's cache does not allow to run any task anymore */
+		set = set | DISK_BIT;
 	}
 
 	if ((double)w->resources->gpus.total < l->gpus) {
@@ -527,9 +533,10 @@ static vine_resource_bitmask_t is_task_larger_than_any_worker(struct vine_manage
 {
 	char *key;
 	struct vine_worker_info *w;
+	int iteration;
 
 	int bit_set = 0;
-	HASH_TABLE_ITERATE(q->worker_table, key, w)
+	HASH_TABLE_ITERATE(q->worker_table, iteration, key, w)
 	{
 		vine_resource_bitmask_t new_set = is_task_larger_than_worker(q, t, w);
 		if (new_set == 0) {
@@ -603,7 +610,7 @@ void vine_schedule_check_for_large_tasks(struct vine_manager *q)
 	}
 
 	if (unfit_disk) {
-		notice(D_VINE, "    %d waiting task(s) need more than %s of disk", unfit_disk, rmsummary_resource_to_str("disk", largest_unfit_task->disk, 1));
+		notice(D_VINE, "    %d waiting task(s) need more than %s of disk (workers' disk cache may be full)", unfit_disk, rmsummary_resource_to_str("disk", largest_unfit_task->disk, 1));
 	}
 
 	if (unfit_gpu) {
@@ -618,10 +625,11 @@ Determine whether there is a worker that can fit the task and that has all its s
 */
 int vine_schedule_check_fixed_location(struct vine_manager *q, struct vine_task *t)
 {
+	int iteration;
 	char *key;
 	struct vine_worker_info *w;
 
-	HASH_TABLE_ITERATE(q->worker_table, key, w)
+	HASH_TABLE_ITERATE(q->worker_table, iteration, key, w)
 	{
 		if (check_fixed_location_worker(q, w, t)) {
 			return 1;

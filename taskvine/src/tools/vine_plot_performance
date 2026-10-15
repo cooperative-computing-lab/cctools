@@ -281,7 +281,7 @@ class VinePlot:
 
         plt.title(self.title)
         plt.xlabel("manager lifetime in {}".format(unit_labels[self.x_units]))
-        plt.legend(loc="upper left")
+        plt.legend(loc="upper right")
         plt.savefig(output)
         plt.close()
 

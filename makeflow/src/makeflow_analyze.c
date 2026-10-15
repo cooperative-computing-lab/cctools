@@ -182,11 +182,11 @@ char *bundler_rename(struct dag_node *n, const char *filename)
 
 void dag_show_output_files(struct dag *d)
 {
+	int iteration;
 	struct dag_file *f;
 	char *filename;
 
-	hash_table_firstkey(d->files);
-	while(hash_table_nextkey(d->files, &filename, (void **) &f)) {
+	HASH_TABLE_ITERATE(d->files, iteration, filename, f) {
 		if(f->created_by)
 			fprintf(stdout, "%s\n", filename);
 	}

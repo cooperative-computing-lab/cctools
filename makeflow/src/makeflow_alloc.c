@@ -280,6 +280,12 @@ int makeflow_alloc_commit_space( struct makeflow_alloc *a, struct dag_node *n)
 				|| (n == node1 && set_size(n->descendants) < 2 &&
 					makeflow_alloc_grow_alloc(alloc2, node1->footprint->self_res)))){
 				dynamic_alloc += timestamp_get() - start;
+				/* alloc2 was never linked into alloc1->residuals on
+				this failure path, unlike the success path just below
+				-- free it here instead of leaking it, matching how
+				makeflow_alloc_check_space() already handles the
+				identical failure case. */
+				makeflow_alloc_delete(alloc2);
 				return 0;
 			}
 			list_push_tail(alloc1->residuals, alloc2);
@@ -432,12 +438,24 @@ int makeflow_alloc_release_space( struct makeflow_alloc *a, struct dag_node *n, 
 
 	makeflow_alloc_shrink_alloc(alloc1, size, release);
 
+	/* alloc1 can be a itself (makeflow_alloc_traverse_to_node returns a
+	unchanged when n releases its own allocation rather than a residual
+	child's -- a normal, common case). If that allocation's storage drops
+	to 0, makeflow_alloc_delete() frees it, which means a may now be a
+	dangling pointer; the print_stats(a, ...) call below must be skipped
+	in that case instead of using it after free. */
+	int a_was_freed = 0;
 	if(alloc1->storage->total == 0){
+		if(alloc1 == a){
+			a_was_freed = 1;
+		}
 		makeflow_alloc_delete(alloc1);
 	}
 
 	dynamic_alloc += timestamp_get() - start;
-	makeflow_alloc_print_stats(a, "RELEASE");
+	if(!a_was_freed){
+		makeflow_alloc_print_stats(a, "RELEASE");
+	}
 	return 1;
 }
 

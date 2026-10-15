@@ -8,7 +8,6 @@ See the file COPYING for details.
 #include "vine_cache_file.h"
 #include "vine_catalog.h"
 #include "vine_file.h"
-#include "vine_gpus.h"
 #include "vine_manager.h"
 #include "vine_mount.h"
 #include "vine_process.h"
@@ -56,6 +55,7 @@ See the file COPYING for details.
 #include "trash.h"
 #include "unlink_recursive.h"
 #include "url_encode.h"
+#include "xpu_tracker.h"
 #include "xxmalloc.h"
 
 #include <assert.h>
@@ -70,8 +70,6 @@ See the file COPYING for details.
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
-
-#include <signal.h>
 
 #include <sys/mman.h>
 #include <sys/resource.h>
@@ -126,6 +124,10 @@ static int64_t cores_allocated = 0;
 static int64_t memory_allocated = 0;
 static int64_t disk_allocated = 0;
 static int64_t gpus_allocated = 0;
+
+/* Trackers for specific cores and gpus units in use. */
+struct xpu_tracker *gpu_tracker = 0;
+struct xpu_tracker *core_tracker = 0;
 
 /***************************************************************/
 /*     State of Interactions Between Manager and Worker        */
@@ -212,6 +214,7 @@ __attribute__((format(printf, 2, 3))) void send_message(struct link *l, const ch
 	link_vprintf(l, time(0) + options->active_timeout, fmt, va);
 
 	va_end(va);
+	va_end(debug_va);
 }
 
 /*
@@ -276,7 +279,9 @@ void send_async_message(struct link *l, const char *fmt, ...)
 	va_list va;
 	char *message = malloc(VINE_LINE_MAX);
 	va_start(va, fmt);
-	vsprintf(message, fmt, va);
+	/* Use vsnprintf (not vsprintf) so an over-length message is truncated
+	 * rather than overflowing this fixed-size heap buffer. */
+	vsnprintf(message, VINE_LINE_MAX, fmt, va);
 	va_end(va);
 
 	list_push_tail(pending_async_messages, message);
@@ -383,8 +388,9 @@ static int64_t measure_worker_disk()
 
 		struct vine_process *p;
 		uint64_t task_id;
+		int iteration;
 
-		ITABLE_ITERATE(procs_table, task_id, p)
+		ITABLE_ITERATE(procs_table, iteration, task_id, p)
 		{
 			if (p->sandbox_size > 0) {
 				disk_measured += p->sandbox_size;
@@ -435,7 +441,11 @@ static void measure_worker_resources()
 	r->disk.inuse = measure_worker_disk();
 	r->tag = last_task_received;
 
-	vine_gpus_init(r->gpus.total);
+	/* Create a tracker for specific gpus and cores, if not already created. */
+	if (!gpu_tracker)
+		gpu_tracker = xpu_tracker_create("gpus", r->gpus.total);
+	if (!core_tracker)
+		core_tracker = xpu_tracker_create("cores", r->cores.total);
 
 	last_resources_measurement = time(0);
 }
@@ -448,8 +458,9 @@ static void send_features(struct link *manager)
 {
 	char *f;
 	void *dummy;
+	int iteration;
 
-	HASH_TABLE_ITERATE(options->features, f, dummy)
+	HASH_TABLE_ITERATE(options->features, iteration, f, dummy)
 	{
 		char feature_encoded[VINE_LINE_MAX];
 		url_encode(f, feature_encoded, VINE_LINE_MAX);
@@ -636,8 +647,14 @@ static int start_process(struct vine_process *p, struct link *manager)
 	memory_allocated += t->resources_requested->memory;
 	disk_allocated += t->resources_requested->disk;
 	gpus_allocated += t->resources_requested->gpus;
+
+	/* Mark which specific cores and gpus are assigned. */
+	if (t->resources_requested->cores > 0) {
+		xpu_tracker_alloc(core_tracker, t->resources_requested->cores, t->task_id);
+	}
+
 	if (t->resources_requested->gpus > 0) {
-		vine_gpus_allocate(t->resources_requested->gpus, t->task_id);
+		xpu_tracker_alloc(gpu_tracker, t->resources_requested->gpus, t->task_id);
 	}
 
 	/* Now start the process (or function) running. */
@@ -679,7 +696,8 @@ static void reap_process(struct vine_process *p, struct link *manager)
 	disk_allocated -= p->task->resources_requested->disk;
 	gpus_allocated -= p->task->resources_requested->gpus;
 
-	vine_gpus_free(p->task->task_id);
+	xpu_tracker_free(gpu_tracker, p->task->task_id);
+	xpu_tracker_free(core_tracker, p->task->task_id);
 
 	if (manager) {
 		vine_sandbox_stageout(p, cache_manager, manager);
@@ -712,10 +730,11 @@ static void expire_procs_running()
 {
 	struct vine_process *p;
 	uint64_t task_id;
+	int iteration;
 
 	double current_time = timestamp_get() / USECOND;
 
-	ITABLE_ITERATE(procs_running, task_id, p)
+	ITABLE_ITERATE(procs_running, iteration, task_id, p)
 	{
 		if (p->task->resources_requested->end > 0 && current_time > p->task->resources_requested->end) {
 			p->result = VINE_RESULT_MAX_END_TIME;
@@ -738,10 +757,34 @@ static void finish_running_tasks(vine_result_t result)
 {
 	struct vine_process *p;
 	uint64_t task_id;
+	int iteration;
 
-	ITABLE_ITERATE(procs_running, task_id, p)
+	ITABLE_ITERATE(procs_running, iteration, task_id, p)
 	{
 		finish_running_task(p, result);
+	}
+}
+
+/*
+Reap the functions running in a library process that ends. They run in children of the library and end with it, so
+they are forsaken, and the manager runs them again. A function thus never runs without its library, and no process
+refers to a library process after it is gone.
+*/
+
+static void reap_library_functions(struct vine_process *library)
+{
+	struct vine_process *p;
+	uint64_t task_id;
+	int iteration;
+
+	ITABLE_ITERATE(procs_running, iteration, task_id, p)
+	{
+		if (p->library_process == library) {
+			debug(D_VINE, "killing function task %d running on library task %d", (int)task_id, library->task->task_id);
+			finish_running_task(p, VINE_RESULT_FORSAKEN);
+			reap_process(p, /* do not stage out */ NULL);
+			p->library_process = NULL;
+		}
 	}
 }
 
@@ -764,18 +807,9 @@ static void handle_failed_library_process(struct vine_process *p, struct link *m
 
 	/* Forsake the tasks that are running on this library */
 	/* It no available libraries on this worker, tasks waiting for this library will be forsaken */
+	reap_library_functions(p);
 
-	struct vine_process *p_running;
-	uint64_t task_id;
-
-	ITABLE_ITERATE(procs_running, task_id, p_running)
-	{
-		if (p_running->library_process == p) {
-			debug(D_VINE, "killing function task %d running on library task %d", (int)task_id, p->task->task_id);
-			finish_running_task(p_running, VINE_RESULT_FORSAKEN);
-			reap_process(p_running, /* do not stage out */ NULL);
-		}
-	}
+	reap_process(p, manager);
 }
 
 /*
@@ -789,43 +823,43 @@ static int handle_completed_tasks(struct link *manager)
 	struct vine_process *p;
 	struct vine_process *fp;
 	uint64_t task_id;
+	int iteration;
 	uint64_t done_task_id;
 	int done_exit_code;
 
-	ITABLE_ITERATE(procs_running, task_id, p)
-	{
-		int result_retrieved = 0;
+	struct list *failed_libraries = list_create();
 
+	ITABLE_ITERATE(procs_running, iteration, task_id, p)
+	{
 		/* Check to see if this process itself is completed. */
 
 		if (vine_process_is_complete(p)) {
 			if (p->type == VINE_PROCESS_TYPE_LIBRARY) {
 				/* Kill the library process if it completes. */
 				debug(D_VINE, "Library %s task id %d is detected to be failed. Killing it.", p->task->provides_library, p->task->task_id);
-				handle_failed_library_process(p, manager);
+
+				/* collect the library process here as we need to iterate procs_running */
+				list_push_tail(failed_libraries, p);
+			} else {
+				reap_process(p, manager);
 			}
-			/* simply reap this process */
-			reap_process(p, manager);
-			result_retrieved++;
 		}
 
 		/* If p is a library, check to see if any results waiting. */
-
 		while (vine_process_library_get_result(p, &done_task_id, &done_exit_code)) {
 			fp = itable_lookup(procs_table, done_task_id);
 			if (fp) {
 				fp->exit_code = done_exit_code;
 				reap_process(fp, manager);
-				result_retrieved++;
 			}
 		}
-
-		/* If any items were removed, reset the iterator to get back to a known position */
-
-		if (result_retrieved) {
-			itable_firstkey(procs_running);
-		}
 	}
+
+	while ((p = list_pop_head(failed_libraries))) {
+		handle_failed_library_process(p, manager);
+	}
+
+	list_delete(failed_libraries);
 
 	return 1;
 }
@@ -1093,6 +1127,10 @@ static int do_kill(int task_id)
 	}
 
 	if (itable_remove(procs_running, task_id)) {
+		/* The functions of a library end with it, so they are reaped while the library process still exists. */
+		if (p->type == VINE_PROCESS_TYPE_LIBRARY) {
+			reap_library_functions(p);
+		}
 		vine_process_kill_and_wait(p);
 		reap_process(p, /* do not stage out */ NULL);
 	}
@@ -1119,8 +1157,9 @@ static void kill_all_tasks()
 {
 	struct vine_process *p;
 	uint64_t task_id;
+	int iteration;
 
-	ITABLE_ITERATE(procs_table, task_id, p)
+	ITABLE_ITERATE(procs_table, iteration, task_id, p)
 	{
 		do_kill(task_id);
 	}
@@ -1166,6 +1205,7 @@ static int enforce_processes_sandbox_limits()
 
 	struct vine_process *p;
 	uint64_t task_id;
+	int iteration;
 
 	int ok = 1;
 
@@ -1173,7 +1213,7 @@ static int enforce_processes_sandbox_limits()
 	if ((time(0) - last_check_time) < options->check_resources_interval)
 		return 1;
 
-	ITABLE_ITERATE(procs_running, task_id, p)
+	ITABLE_ITERATE(procs_running, iteration, task_id, p)
 	{
 		if (!enforce_process_sanbox_limits(p)) {
 			finish_running_task(p, VINE_RESULT_SANDBOX_EXHAUSTION);
@@ -1197,10 +1237,11 @@ static void enforce_processes_max_running_time()
 {
 	struct vine_process *p;
 	uint64_t task_id;
+	int iteration;
 
 	timestamp_t now = timestamp_get();
 
-	ITABLE_ITERATE(procs_running, task_id, p)
+	ITABLE_ITERATE(procs_running, iteration, task_id, p)
 	{
 
 		/* If the task did not set wall_time, return right away. */
@@ -1369,6 +1410,12 @@ static int task_resources_fit_now(struct vine_task *t)
 	       (memory_allocated + t->resources_requested->memory <= total_resources->memory.total) &&
 	       ((t->needs_library || disk_allocated + t->resources_requested->disk <= total_resources->disk.total)) && (gpus_allocated + t->resources_requested->gpus <= total_resources->gpus.total);
 	// XXX Disk is constantly shrinking, and library disk requests are currently static. Once we generate some files things will hang.
+	// Known limitation: the disk check above is skipped entirely whenever t->needs_library is
+	// true, so library/function-call tasks are never weighed against total_resources->disk.total.
+	// As functions write output/temp files, worker disk keeps shrinking with no enforcement for
+	// this task class. A real fix needs a real (even approximate) per-function disk accounting
+	// so this branch can re-enable the disk.total check for library/function tasks instead of
+	// bypassing it. Left as a known gap rather than a tracked issue for now.
 }
 
 /*
@@ -1396,8 +1443,9 @@ static struct vine_process *find_running_library_for_function(const char *librar
 {
 	uint64_t task_id;
 	struct vine_process *p;
+	int iteration;
 
-	ITABLE_ITERATE(procs_running, task_id, p)
+	ITABLE_ITERATE(procs_running, iteration, task_id, p)
 	{
 		if (p->task->provides_library && !strcmp(p->task->provides_library, library_name)) {
 			if (p->library_ready && p->functions_running < p->task->function_slots_total) {
@@ -1405,6 +1453,7 @@ static struct vine_process *find_running_library_for_function(const char *librar
 			}
 		}
 	}
+
 	return 0;
 }
 
@@ -1439,8 +1488,9 @@ static struct vine_process *find_future_library_for_function(const char *library
 {
 	uint64_t task_id;
 	struct vine_process *p;
+	int iteration;
 
-	ITABLE_ITERATE(procs_table, task_id, p)
+	ITABLE_ITERATE(procs_table, iteration, task_id, p)
 	{
 		if (p->task->provides_library && !strcmp(p->task->provides_library, library_name)) {
 			return p;
@@ -1502,13 +1552,13 @@ static int enforce_worker_limits(struct link *manager)
 {
 	if (options->disk_total > 0 && total_resources->disk.inuse > options->disk_total) {
 		fprintf(stderr,
-				"vine_worker: %s used more than declared disk space (--disk - < disk used) %" PRIu64 " < %" PRIu64 " MB\n",
+				"vine_worker: %s used more than declared disk space (--disk - < disk used) %" PRIu64 " < %lf MB\n",
 				workspace->workspace_dir,
 				options->disk_total,
 				total_resources->disk.inuse);
 
 		if (manager) {
-			send_message(manager, "info disk_exhausted %lld\n", (long long)total_resources->disk.inuse);
+			send_message(manager, "info disk_exhausted %lf\n", total_resources->disk.inuse);
 		}
 
 		return 0;
@@ -1516,12 +1566,12 @@ static int enforce_worker_limits(struct link *manager)
 
 	if (options->memory_total > 0 && total_resources->memory.inuse > options->memory_total) {
 		fprintf(stderr,
-				"vine_worker: used more than declared memory (--memory < memory used) %" PRIu64 " < %" PRIu64 " MB\n",
+				"vine_worker: used more than declared memory (--memory < memory used) %" PRIu64 " < %lf MB\n",
 				options->memory_total,
 				total_resources->memory.inuse);
 
 		if (manager) {
-			send_message(manager, "info memory_exhausted %lld\n", (long long)total_resources->memory.inuse);
+			send_message(manager, "info memory_exhausted %lf\n", total_resources->memory.inuse);
 		}
 
 		return 0;
@@ -1546,12 +1596,12 @@ static int enforce_worker_promises(struct link *manager)
 
 	if (options->disk_total > 0 && total_resources->disk.total < options->disk_total) {
 		fprintf(stderr,
-				"vine_worker: has less than the promised disk space (--disk > disk total) %" PRIu64 " < %" PRIu64 " MB\n",
+				"vine_worker: has less than the promised disk space (--disk > disk total) %" PRIu64 " < %lf MB\n",
 				options->disk_total,
 				total_resources->disk.total);
 
 		if (manager) {
-			send_message(manager, "info disk_error %lld\n", (long long)total_resources->disk.total);
+			send_message(manager, "info disk_error %lf\n", total_resources->disk.total);
 		}
 
 		return 0;
@@ -1622,13 +1672,15 @@ static void check_libraries_ready(struct link *manager)
 {
 	uint64_t library_task_id;
 	struct vine_process *library_process;
+	int iteration;
+	struct list *failed_libraries = list_create();
 
 	struct link_info library_link_info;
 	library_link_info.events = LINK_READ;
 	library_link_info.revents = 0;
 
 	/* Loop through all processes to find libraries and check if they are alive. */
-	ITABLE_ITERATE(procs_running, library_task_id, library_process)
+	ITABLE_ITERATE(procs_running, iteration, library_task_id, library_process)
 	{
 		/* Skip non-library processes or libraries that are already ready */
 		if (library_process->type != VINE_PROCESS_TYPE_LIBRARY || library_process->library_ready)
@@ -1642,12 +1694,12 @@ static void check_libraries_ready(struct link *manager)
 				debug(D_VINE, "Library %s reports ready to execute functions.", library_process->task->provides_library);
 				library_process->library_ready = 1;
 			} else {
-				/* Kill library if it fails the startup check. */
+				/* Collect failed libraries so procs_running is not re-iterated here. */
 				debug(D_VINE,
 						"Library %s task id %" PRIu64 " verification failed (unexpected response). Killing it.",
 						library_process->task->provides_library,
 						library_task_id);
-				handle_failed_library_process(library_process, manager);
+				list_push_tail(failed_libraries, library_process);
 			}
 		} else {
 			/* The library is running and the link has no readable data, do nothing until the
@@ -1656,6 +1708,12 @@ static void check_libraries_ready(struct link *manager)
 
 		library_link_info.revents = 0;
 	}
+
+	while ((library_process = list_pop_head(failed_libraries))) {
+		handle_failed_library_process(library_process, manager);
+	}
+
+	list_delete(failed_libraries);
 }
 
 /* Start working for the (newly connected) manager on this given link. */
@@ -1726,7 +1784,7 @@ static void vine_worker_serve_manager(struct link *manager)
 		expire_procs_running();
 
 		ok &= handle_completed_tasks(manager);
-		ok &= vine_cache_check_files(cache_manager, manager);
+		ok &= vine_cache_check_xfer_files(cache_manager, manager);
 
 		measure_worker_resources();
 
@@ -1963,7 +2021,12 @@ static struct list *interfaces_to_list(const char *canonical_host_or_addr, int p
 		for (void *i = NULL; (host_alias = jx_iterate_array(host_aliases, &i));) {
 			const char *address = jx_lookup_string(host_alias, "address");
 
-			if (address && strcmp(canonical_host_or_addr, address) == 0) {
+			if (!address) {
+				warn(D_NOTICE, "Skipping interface entry with missing or invalid 'address' field.");
+				continue;
+			}
+
+			if (strcmp(canonical_host_or_addr, address) == 0) {
 				found_canonical = 1;
 			}
 
@@ -2327,7 +2390,7 @@ int main(int argc, char *argv[])
 
 	/* Display the available resources once at startup. */
 	measure_worker_resources();
-	printf("vine_worker: using %" PRId64 " cores, %" PRId64 " MB memory, %" PRId64 " MB disk, %" PRId64 " gpus\n",
+	printf("vine_worker: using %lf cores, %lf MB memory, %lf MB disk, %lf gpus\n",
 			total_resources->cores.total,
 			total_resources->memory.total,
 			total_resources->disk.total,

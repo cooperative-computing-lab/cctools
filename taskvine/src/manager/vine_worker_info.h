@@ -50,6 +50,9 @@ struct vine_worker_info {
 
 	/* Worker condition that may affect task start or cancellation. */
 	int  draining;                          // if 1, worker does not accept anymore tasks. It is shutdown if no task running.
+	int  pending_removal;                   // if not 0, the vine_worker_disconnect_reason_t with which the worker will be removed
+	                                        // by disconnect_failed_workers. Such a worker is not in worker_table, but may still be
+	                                        // reachable from tasks and replica sets, which should skip it.
 	int  alarm_slow_worker;                 // if 1, no task has finished since a slow running task triggered a disconnection.
 	                                        // 0 otherwise. A 2nd task triggering disconnection will cause the worker to disconnect
 	int64_t     end_time;                   // epoch time (in seconds) at which the worker terminates
@@ -64,8 +67,11 @@ struct vine_worker_info {
 	struct itable       *current_tasks;
 	struct itable		*current_libraries;
 
-	/* The number of tasks running last reported by the worker */
-	int         dynamic_tasks_running;
+	/* Dynamic information summed by count_worker_resources. */
+	int	    tasks_committed;         /* # tasks at worker in any state. */
+	int	    tasks_running;           /* # tasks at worker in RUNNING state */
+	int	    tasks_waiting_retrieval; /* # tasks at worker in the WAITING_RETRIEVAL state */
+	int         dynamic_tasks_running;   /* # tasks last reported by worker actually executing. */
 	
 	/* Accumulated stats about tasks about this worker. */
 	int         finished_tasks;

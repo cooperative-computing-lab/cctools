@@ -5,7 +5,6 @@ See the file COPYING for details.
 */
 
 #include "vine_process.h"
-#include "vine_gpus.h"
 #include "vine_manager.h"
 #include "vine_protocol.h"
 #include "vine_sandbox.h"
@@ -29,6 +28,7 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "timestamp.h"
 #include "trash.h"
+#include "xpu_tracker.h"
 #include "xxmalloc.h"
 
 #include "jx.h"
@@ -50,6 +50,8 @@ See the file COPYING for details.
 #include <sys/wait.h>
 
 extern struct vine_cache *cache_manager;
+extern struct xpu_tracker *core_tracker;
+extern struct xpu_tracker *gpu_tracker;
 
 /*
 Give the letter code used for the process sandbox dir.
@@ -132,6 +134,10 @@ void vine_process_delete(struct vine_process *p)
 	if (p->tmpdir)
 		free(p->tmpdir);
 
+	if (p->disk_measurement_state) {
+		path_disk_size_info_delete_state(p->disk_measurement_state);
+	}
+
 	free(p);
 }
 
@@ -179,10 +185,18 @@ static void set_integer_env_var(struct vine_process *p, const char *name, int64_
 	free(value_str);
 }
 
+static void set_tracker_env_var(struct vine_process *p, const char *name, struct xpu_tracker *tracker)
+{
+	char *str = xpu_tracker_to_string(tracker, p->task->task_id);
+	vine_task_set_env_var(p->task, name, str);
+	free(str);
+}
+
 static void set_resources_vars(struct vine_process *p)
 {
 	if (p->task->resources_requested->cores > 0) {
 		set_integer_env_var(p, "CORES", p->task->resources_requested->cores);
+		set_tracker_env_var(p, "CORES_LIST", core_tracker);
 		set_integer_env_var(p, "OMP_NUM_THREADS", p->task->resources_requested->cores);
 		set_integer_env_var(p, "OPENBLAS_NUM_THREADS", p->task->resources_requested->cores);
 		set_integer_env_var(p, "VECLIB_NUM_THREADS", p->task->resources_requested->cores);
@@ -200,9 +214,8 @@ static void set_resources_vars(struct vine_process *p)
 
 	if (p->task->resources_requested->gpus > 0) {
 		set_integer_env_var(p, "GPUS", p->task->resources_requested->gpus);
-		char *str = vine_gpus_to_string(p->task->task_id);
-		vine_task_set_env_var(p->task, "CUDA_VISIBLE_DEVICES", str);
-		free(str);
+		set_tracker_env_var(p, "GPUS_LIST", gpu_tracker);
+		set_tracker_env_var(p, "CUDA_VISIBLE_DEVICES", gpu_tracker);
 	}
 }
 
@@ -391,22 +404,29 @@ int vine_process_execute(struct vine_process *p)
 		/* Finally, add things that were explicitly given in the task description. */
 		export_environment(p);
 
-		/* Library task passes the file descriptors to talk to the manager via
-		 * the command line plus the worker pid to wake the worker up
-		 * so it requires a special execl. */
-		if (p->type != VINE_PROCESS_TYPE_LIBRARY) {
-			execl("/bin/sh", "sh", "-c", p->task->command_line, (char *)0);
-		} else {
-			char *final_command = string_format("%s --in-pipe-fd %d --out-pipe-fd %d --task-id %d --library-cores %d --function-slots %d --worker-pid %d",
-					p->task->command_line,
+		/* All process types begin with the provided command line */
+		char *final_command = strdup(p->task->command_line);
+
+		/* Library tasks get additional arguments to configure communication and convey resources. */
+		if (p->type == VINE_PROCESS_TYPE_LIBRARY) {
+			final_command = string_format("%s --in-pipe-fd %d --out-pipe-fd %d --task-id %d --library-cores %d --function-slots %d --worker-pid %d",
+					final_command,
 					in_pipe_fd,
 					out_pipe_fd,
 					p->task->task_id,
 					(int)p->task->resources_requested->cores,
 					p->task->function_slots_total,
 					getppid());
-			execl("/bin/sh", "sh", "-c", final_command, (char *)0);
 		}
+
+		/* Only standard and library processes are affected by task wrappers. */
+		if (p->type == VINE_PROCESS_TYPE_STANDARD || p->type == VINE_PROCESS_TYPE_LIBRARY) {
+			if (options->task_wrapper) {
+				final_command = string_wrap_command(final_command, options->task_wrapper);
+			}
+		}
+
+		execl("/bin/sh", "sh", "-c", final_command, (char *)0);
 		_exit(127); // Failed to execute the cmd.
 
 		/* NOTREACHED */

@@ -1,4 +1,5 @@
 #include "bucketing_exhaust.h"
+#include "bucketing_exhaust_common.h"
 #include "debug.h"
 #include "list.h"
 #include "xxmalloc.h"
@@ -6,30 +7,6 @@
 #include <stdlib.h>
 
 /** Begin: internals **/
-
-/* Convert a list of bucketing_bucket_t to an array of those
- * @param bucket_list list of bucketing_bucket_t
- * @return pointer to array of bucketing_bucket_t
- * @return 0 if failure */
-static bucketing_bucket_t **bucketing_bucket_list_to_array(struct list *bucket_list)
-{
-	if (!bucket_list) {
-		fatal("No bucket list\n");
-		return 0;
-	}
-
-	list_first_item(bucket_list);
-	bucketing_bucket_t *tmp_buck;
-	bucketing_bucket_t **bucket_array = xxmalloc(list_size(bucket_list) * sizeof(*bucket_array));
-
-	int i = 0;
-	while ((tmp_buck = list_next_item(bucket_list))) {
-		bucket_array[i] = tmp_buck;
-		++i;
-	}
-
-	return bucket_array;
-}
 
 /* Reweight the probabilities of a range of buckets to 1
  * @param bucket_array the array of bucketing_bucket_t*

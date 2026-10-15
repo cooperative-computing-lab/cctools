@@ -85,8 +85,12 @@ struct chunk_set *chunk_parse_file(char *file_name, char *ln_prefix, char *fc_pr
 		fc_prefix_len = strlen(fc_prefix);
 
 	FILE *fp = fopen(file_name, "r");
-	if (fp == NULL)
+	if (fp == NULL) {
+		free(chunk_set->physical_file_name);
+		hash_table_delete(chunk_set->file_table);
+		free(chunk_set);
 		return NULL;
+	}
 
 	long pos = 0;
 	char *line;
@@ -127,6 +131,15 @@ struct chunk_set *chunk_parse_file(char *file_name, char *ln_prefix, char *fc_pr
 			/* we are before all the chunks... just ignore */
 			continue;
 		}
+	}
+
+	if (new_chunk) {
+		/* the last chunk found is still open -- it was only ever
+		finalized and linked in when the *next* chunk's start line
+		was seen, so without this it (and thus its logical file's
+		data) was silently dropped from every parse. */
+		new_chunk->len = ftell(fp) - new_chunk->pos;
+		chunk_set_add_chunk(chunk_set, new_chunk);
 	}
 
 	if (!chunk_set->head) {

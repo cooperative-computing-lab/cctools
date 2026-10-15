@@ -27,8 +27,7 @@ End user may only use the API described in taskvine.h
 typedef enum {
       VINE_TASK_TYPE_STANDARD,    /**< A normal task that should be returned to the user. */
       VINE_TASK_TYPE_RECOVERY,    /**< An internally-created recovery task that should not be returned to the user. */
-      VINE_TASK_TYPE_LIBRARY_TEMPLATE,     /**< An internally-created library task that should not be returned to the user. */
-      VINE_TASK_TYPE_LIBRARY_INSTANCE,     /**< An internally-created library task that should not be returned to the user. */
+      VINE_TASK_TYPE_LIBRARY,     /**< An internally-created library task that should not be returned to the user. */
 } vine_task_type_t;
 
 typedef enum {

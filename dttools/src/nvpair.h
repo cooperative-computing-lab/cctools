@@ -126,19 +126,21 @@ This function begins a new iteration over an nvpair,
 allowing you to visit every name and value in the table.
 Next, invoke @ref nvpair_next_item to retrieve each value in order.
 @param nv A pointer to an nvpair.
+@return Iteration index
 */
 
-void nvpair_first_item(struct nvpair *nv);
+int nvpair_first_item(struct nvpair *nv);
 
 /** Continue iteration over all items.
 This function returns the next name and value in the iteration.
 @param nv A pointer to an nvpair.
+@param Iteration index
 @param name A pointer to a name pointer.
 @param value A pointer to a value pointer.
 @return Zero if there are no more elements to visit, one otherwise.
 */
 
-int nvpair_next_item(struct nvpair *nv, char **name, char **value);
+int nvpair_next_item(struct nvpair *nv, int iteration, char **name, char **value);
 
 /** } **/
 

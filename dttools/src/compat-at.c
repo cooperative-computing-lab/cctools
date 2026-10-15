@@ -74,7 +74,10 @@ DIR *cctools_fdopendir(int dirfd)
 	char fullpath[PATH_MAX];
 	if (getfullpath(dirfd, ".", fullpath) == -1)
 		return NULL;
-	return opendir(fullpath);
+	DIR *dir = opendir(fullpath);
+	if (dir)
+		close(dirfd);
+	return dir;
 }
 
 int cctools_fstatat(int dirfd, const char *path, struct stat *buf, int flag)
