@@ -24,7 +24,7 @@ jobs:
     steps:
       - name: Checkout master branch
         if: ${{ (github.event_name == 'push') }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
       - name: Tag latest commit as devel
@@ -53,7 +53,7 @@ jobs:
     steps:
       - name: checkout CCTools from branch head
         if: github.event_name != 'workflow_dispatch'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Set branch tag, and draft status
         id: branch
         shell: bash
@@ -67,7 +67,7 @@ jobs:
           fi
       - name: checkout CCTools from tag
         if: github.event_name == 'workflow_dispatch'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ github.event.inputs.tag }}
       - name: Get sha of tag
@@ -94,21 +94,15 @@ jobs:
   build-conda-linux:
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    env:
-      CCTOOLS_OUTPUT: ${{ format('cctools-{0}-x86_64-linux-conda.tar.gz', github.event.inputs.version) }}
     steps:
       - name: Checkout CCTools from branch head
         if: github.event_name != 'workflow_dispatch'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Checkout CCTools from tag
         if: github.event_name == 'workflow_dispatch'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ github.event.inputs.tag }}
-      - name: Get sha of tag
-        id: vars
-        shell: bash
-        run: echo "{tag_sha}=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
       - name: Conda-Setup
         run: ${GITHUB_WORKSPACE}/packaging/build-conda/setup.sh
       - name: Configure
@@ -119,21 +113,6 @@ jobs:
         run: ${GITHUB_WORKSPACE}/packaging/build-conda/install.sh
       - name: Test
         run: ${GITHUB_WORKSPACE}/packaging/build-conda/test.sh
-      - name: Deploy
-        uses: ncipollo/release-action@v1
-        if: github.event_name == 'workflow_dispatch'
-        with:
-          artifacts: /tmp/${{ env.CCTOOLS_OUTPUT }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          allowUpdates: true
-          artifactContentType: application/gzip
-          draft: true
-          omitBody: true
-          omitBodyDuringUpdate: true
-          prerelease: true
-          replacesArtifacts: true
-          commit: ${{ steps.vars.output.tag_sha }}
-          tag: ${{ github.event.inputs.tag }}
 
   build-pixi-linux:
     runs-on: ubuntu-latest
@@ -141,10 +120,10 @@ jobs:
     steps:
       - name: Checkout CCTools from branch head
         if: github.event_name != 'workflow_dispatch'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Checkout CCTools from tag
         if: github.event_name == 'workflow_dispatch'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ github.event.inputs.tag }}
       - name: Pixi-Setup
@@ -170,18 +149,13 @@ jobs:
     runs-on: ${{ matrix.os-name }}
     strategy:
       matrix:
-        os-name: ['macos-14','macos-15-intel']
+        os-name: ['macos-15-intel']
     timeout-minutes: 30
     env:
-      CCTOOLS_OUTPUT: ${{ format('cctools-{0}-x86_64-{1}.tar.gz', github.event.inputs.version, matrix.os-name) }}
       CCTOOLS_SOURCE_PROFILE: yes
     steps:
       - name: checkout CCTools from branch head
-        uses: actions/checkout@v4
-      - name: Get sha of tag
-        id: vars
-        shell: bash
-        run: echo "{tag_sha}=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+        uses: actions/checkout@v5
       - name: Conda-Setup
         run: ${GITHUB_WORKSPACE}/packaging/build-conda/setup.sh
       - name: Configure
@@ -192,38 +166,18 @@ jobs:
         run: ${GITHUB_WORKSPACE}/packaging/build-conda/install.sh
       - name: Test
         run: ${GITHUB_WORKSPACE}/packaging/build-conda/test.sh
-      - name: deploy
-        uses: ncipollo/release-action@v1
-        if: github.event_name == 'workflow_dispatch'
-        with:
-          artifacts: /tmp/${{ env.CCTOOLS_OUTPUT }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          allowUpdates: true
-          artifactContentType: application/gzip
-          draft: true
-          omitBody: true
-          omitBodyDuringUpdate: true
-          prerelease: true
-          replacesArtifacts: true
-          commit: ${{ steps.vars.output.tag_sha }}
-          tag: ${{ github.event.inputs.tag }}
 
   build-conda-macos-arm64:
     runs-on: ${{ matrix.os-name }}
     strategy:
       matrix:
-        os-name: ['macos-14', 'macos-15']
+        os-name: ['macos-15']
     timeout-minutes: 30
     env:
-      CCTOOLS_OUTPUT: ${{ format('cctools-{0}-arm64-{1}.tar.gz', github.event.inputs.version, matrix.os-name) }}
       CCTOOLS_SOURCE_PROFILE: yes
     steps:
       - name: checkout CCTools from branch head
-        uses: actions/checkout@v4
-      - name: Get sha of tag
-        id: vars
-        shell: bash
-        run: echo "{tag_sha}=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+        uses: actions/checkout@v5
       - name: Conda-Setup
         run: ${GITHUB_WORKSPACE}/packaging/build-conda/setup.sh
       - name: Configure
@@ -234,21 +188,6 @@ jobs:
         run: ${GITHUB_WORKSPACE}/packaging/build-conda/install.sh
       - name: Test
         run: ${GITHUB_WORKSPACE}/packaging/build-conda/test.sh
-      - name: deploy
-        uses: ncipollo/release-action@v1
-        if: github.event_name == 'workflow_dispatch'
-        with:
-          artifacts: /tmp/${{ env.CCTOOLS_OUTPUT }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          allowUpdates: true
-          artifactContentType: application/gzip
-          draft: true
-          omitBody: true
-          omitBodyDuringUpdate: true
-          prerelease: true
-          replacesArtifacts: true
-          commit: ${{ steps.vars.output.tag_sha }}
-          tag: ${{ github.event.inputs.tag }}
 
   lint:
     runs-on: ubuntu-latest
@@ -256,10 +195,10 @@ jobs:
     steps:
       - name: checkout CCTools from branch head
         if: github.event_name != 'workflow_dispatch'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: checkout CCTools from tag
         if: github.event_name == 'workflow_dispatch'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ github.event.inputs.tag }}
       - name: lint code
@@ -274,7 +213,7 @@ jobs:
     steps:
       - name: checkout CCTools from branch head
         if: github.event_name != 'workflow_dispatch'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           # scan-build.sh diffs against the PR's base commit / the push's
           # previous commit to scope the gate to only the lines this
@@ -283,7 +222,7 @@ jobs:
           fetch-depth: 0
       - name: checkout CCTools from tag
         if: github.event_name == 'workflow_dispatch'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ github.event.inputs.tag }}
       - name: install clang static analyzer
@@ -306,15 +245,15 @@ jobs:
         run: ${GITHUB_WORKSPACE}/packaging/lint/scan-build.sh
 
   valgrind:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - name: checkout CCTools from branch head
         if: github.event_name != 'workflow_dispatch'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: checkout CCTools from tag
         if: github.event_name == 'workflow_dispatch'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ github.event.inputs.tag }}
       - name: install valgrind
