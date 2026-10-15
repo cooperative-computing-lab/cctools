@@ -1000,9 +1000,7 @@ int vine_submit(struct vine_manager *m, struct vine_task *t);
 
 /** Indicate the library to be installed on all workers connected to the manager.
 The library is expected to run on all workers until they disconnect from the manager.
-The manager owns the task from now on, and deletes it when the library is removed,
-either by @ref vine_manager_remove_library or after the library fails too many times,
-or when the manager is deleted. The caller must not use the task afterwards.
+The manager owns the task from now on.
 @param m A manager object
 @param t A task object.
 @param name The library to be installed

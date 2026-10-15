@@ -1103,10 +1103,8 @@ class Manager(object):
     # @param self   Reference to the current manager object.
     # @param name   Name of the library to be removed.
     def remove_library(self, name):
-        libtask = self._library_table.pop(name)
         cvine.vine_manager_remove_library(self._taskvine, name)
-        # The manager freed the installed library task, so the Python object must not reach it again.
-        libtask._task = None
+        del self._library_table[name]
 
     ##
     # Check whether a libray exists on the manager or not
@@ -1214,6 +1212,7 @@ class Manager(object):
             t = LibraryTask(f"{init_command} python {library_code_name}", library_name)
         else:
             t = LibraryTask(f"python {library_code_name}", library_name)
+        t.manager = self
 
         # Declare the environment if needed.
         if add_env:
@@ -1223,7 +1222,6 @@ class Manager(object):
         # Declare the library code as an input.
         f = self.declare_file(library_code_path, cache=True, peer_transfer=True)
         t.add_input(f, library_code_name)
-        t.manager = self
         t._library_files.append(f)
         f = self.declare_file(library_info_path, cache=True, peer_transfer=True)
         t.add_input(f, library_info_name)

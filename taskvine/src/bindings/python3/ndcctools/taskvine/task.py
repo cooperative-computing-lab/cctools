@@ -1229,19 +1229,15 @@ class LibraryTask(Task):
     # @param library_name       The name of this Library.
     def __init__(self, fn, library_name):
         Task.__init__(self, fn)
-        # Code files generated for this library, which live as long as this object.
         self._library_files = []
         self.provides_library(library_name)
 
-    # remove the code files generated for this library, as PythonTask does for its arguments
     def __del__(self):
         try:
             for f in self._library_files:
                 self.manager.undeclare_file(f)
-            self._library_files = []
             super().__del__()
         except TypeError:
-            # in case the interpreter is shuting down. staging files will be deleted by manager atexit function.
             pass
 
 

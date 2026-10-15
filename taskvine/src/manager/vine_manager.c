@@ -5086,7 +5086,6 @@ void vine_manager_remove_library(struct vine_manager *q, const char *name)
 	}
 	list_delete(instances);
 
-	/* The manager owns a template once it is installed, so removing the library frees it. */
 	struct vine_task *library_template = hash_table_remove(q->library_templates, name);
 	vine_task_delete(library_template);
 	debug(D_VINE, "All instances and the template for library %s have been removed", name);
