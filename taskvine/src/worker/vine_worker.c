@@ -486,7 +486,9 @@ static void send_resource_update(struct link *manager)
 		options->end_time = worker_start_time + (options->manual_wall_time_option * 1e6);
 	}
 
-	vine_resources_send(manager, total_resources, send_async_message);
+	char *message = vine_resources_message(total_resources);
+	send_async_message(manager, "%s", message);
+	free(message);
 }
 
 /*

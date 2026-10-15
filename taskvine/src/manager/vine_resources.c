@@ -10,10 +10,10 @@ See the file COPYING for details.
 #include "gpu_info.h"
 #include "host_disk_info.h"
 #include "host_memory_info.h"
-#include "link.h"
 #include "load_average.h"
 #include "macros.h"
 #include "nvpair.h"
+#include "stringtools.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -75,27 +75,18 @@ static void vine_resource_debug(struct vine_resource *r, const char *name)
 	debug(D_VINE, "%8s %lf inuse %lf total", name, r->inuse, r->total);
 }
 
-static void vine_resource_send(struct link *manager, struct vine_resource *r, const char *name, vine_resources_send_t send)
-{
-	vine_resource_debug(r, name);
-	send(manager, "%s %lf\n", name, r->total);
-}
-
-void vine_resources_send(struct link *manager, struct vine_resources *r, vine_resources_send_t send)
+char *vine_resources_message(struct vine_resources *r)
 {
 	debug(D_VINE, "Sending resource description to manager:");
+	vine_resources_debug(r);
 
-	send(manager, "resources\n");
-
-	vine_resource_send(manager, &r->cores, "cores", send);
-	vine_resource_send(manager, &r->memory, "memory", send);
-	vine_resource_send(manager, &r->disk, "disk", send);
-	vine_resource_send(manager, &r->gpus, "gpus", send);
-	vine_resource_send(manager, &r->workers, "workers", send);
-
-	send(manager, "tag %" PRId64 "\n", r->tag);
-
-	send(manager, "end\n");
+	return string_format("resources\ncores %lf\nmemory %lf\ndisk %lf\ngpus %lf\nworkers %lf\ntag %" PRId64 "\nend\n",
+			r->cores.total,
+			r->memory.total,
+			r->disk.total,
+			r->gpus.total,
+			r->workers.total,
+			r->tag);
 }
 
 void vine_resources_debug(struct vine_resources *r)
