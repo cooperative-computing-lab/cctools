@@ -21,6 +21,7 @@ struct list {
 	struct list_item *head;
 	struct list_item *tail;
 	struct list_cursor *iter; // global iterator for backwards compatibility
+	int iteration_index;
 };
 
 struct list_item {
@@ -294,6 +295,7 @@ void list_insert(struct list_cursor *cur, void *item)
 	node->data = item;
 	debug_assert(cur->list->length < UINT_MAX);
 	++cur->list->length;
+	++cur->list->iteration_index;
 
 	if (cur->target) {
 		struct list_item *right = cur->target;
@@ -508,6 +510,8 @@ void *list_rotate(struct list *l)
 		return list_rotate(l);
 	}
 
+	l->iteration_index++;
+
 	// Change head to next item.
 	l->head = node->next;
 	l->head->prev = 0;
@@ -638,14 +642,16 @@ int list_iterate_reverse(struct list *l, list_op_t operator, const void *arg)
 	return alltheway;
 }
 
-void list_first_item(struct list *list)
+int list_first_item(struct list *list)
 {
 	list_seek(list->iter, 0);
+	return ++list->iteration_index;
 }
 
-void list_last_item(struct list *list)
+int list_last_item(struct list *list)
 {
 	list_seek(list->iter, -1);
+	return ++list->iteration_index;
 }
 
 void *list_next_item(struct list *list)
@@ -654,6 +660,14 @@ void *list_next_item(struct list *list)
 	list_get(list->iter, &item);
 	list_next(list->iter);
 	return item;
+}
+
+void *list_next_item_with_iteration(struct list *list, int iteration)
+{
+	if (iteration != list->iteration_index) {
+		fatal("cctools bug: the list iteration has not been reset since last modification");
+	}
+	return list_next_item(list);
 }
 
 void *list_prev_item(struct list *list)
