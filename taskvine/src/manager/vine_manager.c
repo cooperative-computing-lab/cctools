@@ -5345,6 +5345,10 @@ struct vine_task *find_task_to_return(struct vine_manager *q, const char *tag, i
 
 		/* The task was given a reference when added to the table, so delete a reference on removal. */
 		itable_remove(q->tasks, t->task_id);
+		if (type == VINE_TASK_TYPE_RECOVERY && q->external_recovery_handling) {
+			/* The application receives the table's reference and deletes the task when it is done. */
+			return t;
+		}
 		vine_task_delete(t);
 
 		/* CAREFUL: a non-standard task *may* no longer exist following vine_delete! */
@@ -5357,10 +5361,6 @@ struct vine_task *find_task_to_return(struct vine_manager *q, const char *tag, i
 			break;
 
 		case VINE_TASK_TYPE_RECOVERY:
-			/* If configured for external recovery handling, return it to the user. */
-			if (q->external_recovery_handling) {
-				return t;
-			}
 
 			/*
 			If this is a recovery task, it is owned by the manager,

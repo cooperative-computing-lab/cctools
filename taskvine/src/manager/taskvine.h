@@ -1137,6 +1137,7 @@ int vine_enable_peer_transfers(struct vine_manager *m);
 int vine_disable_peer_transfers(struct vine_manager *m);
 
 /** Enable external recovery handling by returning recovery tasks from vine_wait.
+The application deletes each returned recovery task with @ref vine_task_delete.
 By default, recovery tasks are handled internally by the manager. **/
 int vine_enable_external_recovery_handling(struct vine_manager *m);
 
