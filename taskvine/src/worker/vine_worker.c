@@ -565,7 +565,7 @@ Send an asynchronous message to the manager indicating where the worker is liste
 static void send_transfer_address(struct link *manager)
 {
 	if (!vine_transfer_server_running()) {
-		send_async_message(manager, "info transfer_port_bind_failed\n");
+		send_async_message(manager, "info transfer_port_bind_failed %d-%d\n", options->transfer_port_min, options->transfer_port_max);
 		return;
 	}
 	char addr[LINK_ADDRESS_MAX];
