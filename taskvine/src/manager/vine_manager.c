@@ -4357,6 +4357,20 @@ int vine_disable_peer_transfers(struct vine_manager *q)
 	return 1;
 }
 
+int vine_enable_external_recovery_handling(struct vine_manager *q)
+{
+	debug(D_VINE, "External recovery handling enabled");
+	q->external_recovery_handling = 1;
+	return 1;
+}
+
+int vine_disable_external_recovery_handling(struct vine_manager *q)
+{
+	debug(D_VINE, "External recovery handling disabled");
+	q->external_recovery_handling = 0;
+	return 1;
+}
+
 int vine_enable_proportional_resources(struct vine_manager *q)
 {
 	debug(D_VINE, "Proportional resources enabled");
@@ -5343,6 +5357,10 @@ struct vine_task *find_task_to_return(struct vine_manager *q, const char *tag, i
 			break;
 
 		case VINE_TASK_TYPE_RECOVERY:
+			/* If configured for external recovery handling, return it to the user. */
+			if (q->external_recovery_handling) {
+				return t;
+			}
 
 			/*
 			If this is a recovery task, it is owned by the manager,
