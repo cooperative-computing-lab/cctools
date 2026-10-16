@@ -475,27 +475,19 @@ static void send_features(struct link *manager)
 	}
 }
 
-static void vine_resource_send(struct link *manager, struct vine_resource *r, const char *name)
-{
-	send_async_message(manager, "%s %lf\n", name, r->total);
-}
-
 static void vine_resources_send(struct link *manager, struct vine_resources *r)
 {
 	debug(D_VINE, "Sending resource description to manager:");
 	vine_resources_debug(r);
 
-	send_async_message(manager, "resources\n");
-
-	vine_resource_send(manager, &r->cores, "cores");
-	vine_resource_send(manager, &r->memory, "memory");
-	vine_resource_send(manager, &r->disk, "disk");
-	vine_resource_send(manager, &r->gpus, "gpus");
-	vine_resource_send(manager, &r->workers, "workers");
-
-	send_async_message(manager, "tag %" PRId64 "\n", r->tag);
-
-	send_async_message(manager, "end\n");
+	send_async_message(manager,
+			"resources\ncores %lf\nmemory %lf\ndisk %lf\ngpus %lf\nworkers %lf\ntag %" PRId64 "\nend\n",
+			r->cores.total,
+			r->memory.total,
+			r->disk.total,
+			r->gpus.total,
+			r->workers.total,
+			r->tag);
 }
 
 /*
