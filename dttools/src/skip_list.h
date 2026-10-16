@@ -114,6 +114,7 @@ struct skip_list_cursor *skip_list_cursor_create(struct skip_list *sl);
  * @param cur The cursor to free.
  */
 void skip_list_cursor_delete(struct skip_list_cursor *cur);
+void skip_list_cursor_delete_vpp(struct skip_list_cursor **cur);
 
 /** Get a copy of an existing cursor.
  * @param cur The cursor to clone.
@@ -267,41 +268,38 @@ void skip_list_insert_arr(struct skip_list *lst, void *item, double *priority);
 	skip_list_insert_arr(lst, item, (double[]){__VA_ARGS__})
 
 
-/** Iterate over all items in a skip list (highest to lowest priority).
- *
- * These macros provide a convenient way to iterate over all items while
- * maintaining a cursor that points to the current item during each iteration.
- *
- * @param cursor A pre-existing cursor (struct skip_list_cursor *) that will be
- *               positioned at each item during iteration. Can be used to modify
- *               or remove the current item. Iteration starts at the position
- *               of that the cursor is currently at.
- * @param item A pointer variable that will receive each item's data.
- *
- * <b>Example usage:</b>
- * <pre>
- * struct skip_list *sl = skip_list_create(1, 0.5);
- * struct skip_list_cursor *cur = skip_list_cursor_create(sl);
- * struct my_data *data;
- *
- * // Insert some items...
- *
- * skip_list_seek(cur, 0);
- * SKIP_LIST_ITERATE_START(cur, data)
- *     printf("Processing: %s\n", data->name);
- *     if (should_remove(data)) {
- *         skip_list_remove_here(cur);
- *     }
- * SKIP_LIST_ITERATE_END(cur)
- *
- * skip_list_cursor_delete(cur);
- * </pre>
- *
- * @note The cursor is valid during each iteration and can be used with
- *       skip_list_remove_here(), skip_list_get_priority(), etc.
- * @note Safe to use break/continue within the loop body.
- */
-#define SKIP_LIST_ITERATE(cursor, item) \
-	for(; skip_list_get(cursor, (void **)&item); skip_list_next(cursor))
+/** Macro to iterate over a list in the most common case.
+A statement or code block must follow the macro containing
+the code to be iterated over.  The macro internally makes
+use of a fresh cursor, allowing iterations to be nested,
+and for the containing code to invoke break, continue,
+or return as needed.
+
+<pre>
+char *s;
+
+SKIP_LIST_ITERATE( sl, s ) {
+	printf("%s\n",s);
+}
+</pre>
+*/
+
+#define SKIP_LIST_ITERATE( list, item ) \
+  for( struct skip_list_cursor *cursor  __attribute__((cleanup(skip_list_cursor_delete_vpp))) = skip_list_cursor_create(list), *__keep_going=cursor; __keep_going; __keep_going=0) \
+    for( skip_list_seek(cursor,0); skip_list_get(cursor,(void**)&item); skip_list_next(cursor) )
+
+/*
+Notes about the details of SKIP_LIST_ITERATE:
+
+The outer for-loop exists to create a variable scope corresponding to the iteration.
+Within that scope, the cursor is created, and declared with a gcc cleanup extension,
+which will delete the cursor using skip_list_cursor_delete_vpp when it goes out of scope.
+The _keep_going variable is there to ensure the outer for-loop executes only once.
+The declaration clause in the for-loop can declare multiple variables, but they
+must be of the same type, and so __keep_going is incidentally a pointer to a cursor,
+getting set to null to halt the loop.
+
+The inner for-loop performs the actual iteration over the cursor values.
+*/
 
 #endif
