@@ -81,7 +81,7 @@ static double bucketing_greedy_policy(bucketing_bucket_range_t *range, int break
 	/* Compute final cost */
 	double cost = cost_lower_hit + cost_lower_miss + cost_upper_miss + cost_upper_hit;
 
-	list_cursor_destroy(iter);
+	list_cursor_delete(iter);
 
 	return cost;
 }
@@ -268,7 +268,7 @@ static struct list *bucketing_greedy_find_break_points(bucketing_state_t *s)
 	}
 
 	/* Destroy bucket range list */
-	list_cursor_destroy(lc);
+	list_cursor_delete(lc);
 	bucketing_bucket_range_list_clear(bucket_range_list, bucketing_bucket_range_delete);
 
 	list_delete(bucket_range_list);

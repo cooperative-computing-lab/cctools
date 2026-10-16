@@ -50,7 +50,7 @@ static void bucketing_insert_point_to_sorted_list(struct list *l, bucketing_poin
 	/* If list is empty, append new point to list */
 	if (list_length(l) == 0) {
 		list_insert(lc, p);
-		list_cursor_destroy(lc);
+		list_cursor_delete(lc);
 		return;
 	}
 
@@ -80,7 +80,7 @@ static void bucketing_insert_point_to_sorted_list(struct list *l, bucketing_poin
 		list_insert(lc, p);
 	}
 
-	list_cursor_destroy(lc);
+	list_cursor_delete(lc);
 }
 
 static void generate_next_task_sig(bucketing_state_t *s)
@@ -337,11 +337,11 @@ double bucketing_predict(bucketing_state_t *s, double prev_val)
 				ret_val = bb_ptr->val;
 				if (ret_val <= prev_val) {
 					exp = floor(log(prev_val / s->default_value) / log(s->increase_rate)) + 1;
-					list_cursor_destroy(lc);
+					list_cursor_delete(lc);
 					return s->default_value * pow(s->increase_rate, exp);
 				}
 
-				list_cursor_destroy(lc);
+				list_cursor_delete(lc);
 				return ret_val;
 			}
 
@@ -357,7 +357,7 @@ double bucketing_predict(bucketing_state_t *s, double prev_val)
 			{
 				ret_val = bb_ptr->val;
 
-				list_cursor_destroy(lc);
+				list_cursor_delete(lc);
 				return ret_val;
 			}
 		}
@@ -383,18 +383,18 @@ double bucketing_predict(bucketing_state_t *s, double prev_val)
 
 				if (ret_val <= prev_val) {
 					exp = floor(log(prev_val / s->default_value) / log(s->increase_rate)) + 1;
-					list_cursor_destroy(lc);
+					list_cursor_delete(lc);
 					return s->default_value * pow(s->increase_rate, exp);
 				}
 
-				list_cursor_destroy(lc);
+				list_cursor_delete(lc);
 				return ret_val;
 			}
 
 			// return upon the first value larger than this one
 			if (bb_ptr->val > prev_val) {
 				ret_val = bb_ptr->val;
-				list_cursor_destroy(lc);
+				list_cursor_delete(lc);
 				return ret_val;
 			}
 		}

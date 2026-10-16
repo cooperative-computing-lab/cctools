@@ -200,7 +200,7 @@ char *batch_job_generate_id(struct batch_job *t)
 		sha1_update(&context, "\0", 1);
 		free(file_id);
 	}
-	list_cursor_destroy(cur);
+	list_cursor_delete(cur);
 
 	/* Sort outputs for consistent hashing */
 	list_sort(t->output_files, (void *)batch_file_outer_compare);
@@ -212,7 +212,7 @@ char *batch_job_generate_id(struct batch_job *t)
 		sha1_update(&context, f->outer_name, strlen(f->outer_name));
 		sha1_update(&context, "\0", 1);
 	}
-	list_cursor_destroy(cur);
+	list_cursor_delete(cur);
 
 	sha1_final(hash, &context);
 	t->hash = xxstrdup(sha1_string(hash));
