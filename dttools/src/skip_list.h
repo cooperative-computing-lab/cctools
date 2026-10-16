@@ -302,4 +302,8 @@ getting set to null to halt the loop.
 The inner for-loop performs the actual iteration over the cursor values.
 */
 
+/* Macro to iterate over a skip list, starting from an existing cursor. */
+
+#define SKIP_LIST_ITERATE_CURSOR( cursor, item ) for( ; skip_list_get(cursor,(void**)&item); skip_list_next(cursor) )
+
 #endif

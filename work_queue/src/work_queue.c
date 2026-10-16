@@ -4583,7 +4583,7 @@ static int send_one_task_with_cr( struct work_queue *q , struct skip_list_cursor
 
 	int iter_count = 0;
 
-	for( ; skip_list_get(cr,(void**)&t) ; skip_list_next(cr) ) {
+	SKIP_LIST_ITERATE_CURSOR(cr,t) {
 		if(iter_count >= iter_depth) {
 			break;
 		}
