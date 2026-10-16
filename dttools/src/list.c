@@ -151,6 +151,16 @@ void list_cursor_destroy(struct list_cursor *cur)
 	free(cur);
 }
 
+/*
+Helper function to simplify the use of __attribute__((cleanup))
+which passes around a void double-pointer to the object to be freed.
+*/
+
+void list_cursor_destroy_vpp( struct list_cursor **cursor )
+{
+	list_cursor_destroy(*cursor);
+}
+
 bool list_get(struct list_cursor *cur, void **item)
 {
 	debug_assert(cur);
@@ -611,23 +621,6 @@ int list_iterate(struct list *l, list_op_t operator, const void *arg)
 
 	struct list_cursor *cur = list_cursor_create(l);
 	for (list_seek(cur, 0); list_get(cur, &item); list_next(cur)) {
-		if (!operator(item, arg)) {
-			alltheway = 0;
-			break;
-		}
-	}
-	list_cursor_destroy(cur);
-
-	return alltheway;
-}
-
-int list_iterate_reverse(struct list *l, list_op_t operator, const void *arg)
-{
-	void *item;
-	int alltheway = 1;
-
-	struct list_cursor *cur = list_cursor_create(l);
-	for (list_seek(cur, -1); list_get(cur, &item); list_prev(cur)) {
 		if (!operator(item, arg)) {
 			alltheway = 0;
 			break;

@@ -40,7 +40,7 @@ See the file COPYING for details.
 
 /*
 It turns out that many libraries and tools make use of
-symbols like "debug" and "fatal".  This causes strange
+symbols like "list_create" and "list_length".  This causes strange
 failures when we link against such codes.  Rather than change
 all of our code, we simply insert these defines to
 transparently modify the linker namespace we are using.
@@ -53,6 +53,7 @@ transparently modify the linker namespace we are using.
 #define list_length			cctools_list_length
 #define list_cursor_create		cctools_list_cursor_create
 #define list_cursor_destroy		cctools_list_cursor_destroy
+#define list_cursor_destroy_vpp		cctools_list_cursor_destroy_vpp
 #define list_cursor_clone		cctools_list_cursor_clone
 #define list_reset			cctools_list_reset
 #define list_seek			cctools_list_seek
@@ -80,7 +81,6 @@ transparently modify the linker namespace we are using.
 #define list_push_tail			cctools_list_push_tail
 #define list_push_priority		cctools_list_push_priority
 #define list_iterate			cctools_list_iterate
-#define list_iterate_reverse		cctools_list_iterate_reverse
 #define list_first_item			cctools_list_first_item
 #define list_next_item			cctools_list_next_item
 #define list_remove_item                cctools_list_remove_item
@@ -124,6 +124,7 @@ struct list_cursor *list_cursor_create(struct list *list);
  * @param cur The cursor to free.
  */
 void list_cursor_destroy(struct list_cursor *cur);
+void list_cursor_destroy_vpp( struct list_cursor **cursor_vpp );
 
 /** Get a copy of an existing cursor.
  * The returned cursor is independent from the original, but initially
@@ -428,14 +429,6 @@ Invokes op on every member of the list.
 
 int list_iterate(struct list *list, list_op_t op, const void *arg);
 
-/** Apply a function to a list in reverse.
-Invokes op on every member of the list in reverse.
-@param list The list to operate on.
-@param op The operator to apply.
-@param arg An optional parameter to send to op.
-*/
-int list_iterate_reverse(struct list *list, list_op_t op, const void *arg);
-
 /** Sort a list using a comparator function
 @param list The list to sort.
 @param comparator The comparison function used in the sort.  The function should take in pointers to two objects casted as void* and return an integer indicating whether the first is less than (negative), equal to (0), or greater than (positive) the second.
@@ -444,7 +437,11 @@ int list_iterate_reverse(struct list *list, list_op_t op, const void *arg);
 struct list *list_sort(struct list *list, int (*comparator) (const void *, const void *));
 
 /** Macro to iterate over a list in the most common case.
-Note that a statement or code block must follow the macro, like this:
+A statement or code block must follow the macro containing
+the code to be iterated over.  The macro internally makes
+use of a fresh cursor, allowing iterations to be nested,
+and for the containing code to invoke break, continue,
+or return as needed.
 
 <pre>
 char *s;
@@ -455,18 +452,23 @@ LIST_ITERATE( list, s ) {
 </pre>
 */
 
-#define LIST_ITERATE( list, item ) list_first_item(list); while((item=list_next_item(list)))
+#define LIST_ITERATE( list, item ) \
+  for( struct list_cursor *cursor  __attribute__((cleanup(list_cursor_destroy_vpp))) = list_cursor_create(list), *__keep_going=cursor; __keep_going; __keep_going=0) \
+    for( list_seek(cursor,0); list_get(cursor,(void**)&item); list_next(cursor) )
 
-/** Macro to iterate over a list in reverse order.
-Note that a statement or code block must follow the macro, like this:
-<pre>
-char *s;
-LIST_ITERATE_REVERSE( list, s ) {
-	printf("%s\n",s);
-}
-</pre>
+/*
+Notes about the details of LIST ITERATE:
+
+The outer for-loop exists to create a variable scope corresponding to the iteration.
+Within that scope, the cursor is created, and declared with a gcc cleanup extension,
+which will delete the cursor using list_cursor_destroy_vpp when it goes out of scope.
+The _keep_going variable is there to ensure the outer for-loop executes only once.
+The declaration clause in the for-loop can declare multiple variables, but they
+must be of the same type, and so __keep_going is incidentally a pointer to a cursor,
+getting set to null to halt the loop.
+
+The inner for-loop performs the actual iteration over the cursor values.
 */
 
-#define LIST_ITERATE_REVERSE( list, item ) list_last_item(list); while((item=list_prev_item(list)))
 
 #endif
