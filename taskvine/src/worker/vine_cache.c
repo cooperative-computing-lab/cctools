@@ -866,7 +866,10 @@ static void vine_cache_check_outputs(struct vine_cache *c, struct vine_cache_fil
 			size_t error_length;
 
 			if (copy_file_to_buffer(error_path, &error_message, &error_length) > 0 && error_message) {
-				/* got a message string */
+				/* Keep only the last 1024 bytes of a long error message. */
+				if (error_length > 1024) {
+					memmove(error_message, error_message + error_length - 1024, 1024 + 1);
+				}
 			} else {
 				error_message = string_format("Failed to copy error message to buffer: %s", strerror(errno));
 			}
