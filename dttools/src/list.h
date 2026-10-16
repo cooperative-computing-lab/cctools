@@ -52,8 +52,8 @@ transparently modify the linker namespace we are using.
 #define list_destroy			cctools_list_destroy
 #define list_length			cctools_list_length
 #define list_cursor_create		cctools_list_cursor_create
-#define list_cursor_destroy		cctools_list_cursor_destroy
-#define list_cursor_destroy_vpp		cctools_list_cursor_destroy_vpp
+#define list_cursor_delete		cctools_list_cursor_delete
+#define list_cursor_delete_vpp		cctools_list_cursor_delete_vpp
 #define list_cursor_clone		cctools_list_cursor_clone
 #define list_reset			cctools_list_reset
 #define list_seek			cctools_list_seek
@@ -111,7 +111,7 @@ unsigned list_length(struct list *list);
 
 /** Create a new cursor on a list.
  * The cursor's position is initially undefined.
- * The cursor must be deleted with @ref list_cursor_destroy.
+ * The cursor must be deleted with @ref list_cursor_delete.
  * @param list The list to use.
  * @returns A pointer to a new cursor.
  */
@@ -123,8 +123,8 @@ struct list_cursor *list_cursor_create(struct list *list);
  * This does not modify the underlying list.
  * @param cur The cursor to free.
  */
-void list_cursor_destroy(struct list_cursor *cur);
-void list_cursor_destroy_vpp( struct list_cursor **cursor_vpp );
+void list_cursor_delete(struct list_cursor *cur);
+void list_cursor_delete_vpp( struct list_cursor **cursor_vpp );
 
 /** Get a copy of an existing cursor.
  * The returned cursor is independent from the original, but initially
@@ -453,7 +453,7 @@ LIST_ITERATE( list, s ) {
 */
 
 #define LIST_ITERATE( list, item ) \
-  for( struct list_cursor *cursor  __attribute__((cleanup(list_cursor_destroy_vpp))) = list_cursor_create(list), *__keep_going=cursor; __keep_going; __keep_going=0) \
+  for( struct list_cursor *cursor  __attribute__((cleanup(list_cursor_delete_vpp))) = list_cursor_create(list), *__keep_going=cursor; __keep_going; __keep_going=0) \
     for( list_seek(cursor,0); list_get(cursor,(void**)&item); list_next(cursor) )
 
 /*
@@ -461,7 +461,7 @@ Notes about the details of LIST ITERATE:
 
 The outer for-loop exists to create a variable scope corresponding to the iteration.
 Within that scope, the cursor is created, and declared with a gcc cleanup extension,
-which will delete the cursor using list_cursor_destroy_vpp when it goes out of scope.
+which will delete the cursor using list_cursor_delete_vpp when it goes out of scope.
 The _keep_going variable is there to ensure the outer for-loop executes only once.
 The declaration clause in the for-loop can declare multiple variables, but they
 must be of the same type, and so __keep_going is incidentally a pointer to a cursor,

@@ -260,7 +260,7 @@ static int makeflow_archive_task_adheres_to_sandbox( struct batch_job *t ){
 		}
 	}
 	// Frees memory of list cursor
-	list_cursor_destroy(cur);
+	list_cursor_delete(cur);
 	
 
 	cur = list_cursor_create(t->output_files);
@@ -276,7 +276,7 @@ static int makeflow_archive_task_adheres_to_sandbox( struct batch_job *t ){
 		}
 	}
 	// Frees memory of list cursor
-	list_cursor_destroy(cur);
+	list_cursor_delete(cur);
 
 	return rc;
 }
@@ -322,7 +322,7 @@ static int makeflow_archive_write_task_info(struct archive_instance *a, struct d
 		jx_insert(input_files, jx_string(f->inner_name), jx_string(id));
 		free(id);
 	}
-	list_cursor_destroy(cur);
+	list_cursor_delete(cur);
 	jx_insert(task_jx, jx_string("INPUT_FILES"), input_files);
 
 	struct jx * output_files = jx_object(NULL);
@@ -340,7 +340,7 @@ static int makeflow_archive_write_task_info(struct archive_instance *a, struct d
 		jx_insert(output_files, jx_string(f->inner_name), jx_string(id));
 		free(id);
 	}
-	list_cursor_destroy(cur);
+	list_cursor_delete(cur);
 	jx_insert(task_jx, jx_string("OUTPUT_FILES"), output_files);
 
 	char *task_info = string_format("%s/task_info", archive_path);
@@ -582,11 +582,11 @@ static int makeflow_archive_write_input_files(struct archive_instance *a, struct
 		free(input_file_path);
 		// Check to see it was archived correctly
 		if(failed_checksum){
-			list_cursor_destroy(cur);
+			list_cursor_delete(cur);
 			return 0;
 		}
 	}
-	list_cursor_destroy(cur);
+	list_cursor_delete(cur);
 	return 1;
 }
 
@@ -602,11 +602,11 @@ static int makeflow_archive_write_output_files(struct archive_instance *a, struc
 		int failed_checksum = makeflow_archive_file(a, f, output_file_path);
 		free(output_file_path);
 		if(failed_checksum){
-			list_cursor_destroy(cur);
+			list_cursor_delete(cur);
 			return 0;
 		}
 	}
-	list_cursor_destroy(cur);
+	list_cursor_delete(cur);
 	return 1;
 }
 
@@ -744,14 +744,14 @@ int makeflow_archive_copy_preserved_files(struct archive_instance *a, struct bat
 			free(output_file_path);
 			free(file_name);
 			if (success < 0) {
-				list_cursor_destroy(cur);
+				list_cursor_delete(cur);
 				debug(D_ERROR|D_MAKEFLOW_HOOK,"Failed to copy output file %s to %s\n", output_file_path, file_name);
 				return 1;
 			}
 		}
 		else{
 			if(copy_dir(output_file_path, file_name) != 0){
-				list_cursor_destroy(cur);
+				list_cursor_delete(cur);
 								debug(D_ERROR|D_MAKEFLOW_HOOK,"Failed to copy output file %s to %s\n", output_file_path, file_name);
 				free(output_file_path);
 							free(file_name);
@@ -763,7 +763,7 @@ int makeflow_archive_copy_preserved_files(struct archive_instance *a, struct bat
 		}
 
 
-	list_cursor_destroy(cur);
+	list_cursor_delete(cur);
 
 	return 0;
 }
@@ -787,7 +787,7 @@ int makeflow_archive_is_preserved(struct archive_instance *a, struct batch_job *
 		int file_exists = stat(filename, &buf);
 		// If there is a failure with running stat delete the cursor and free memory
 		if (file_exists < 0) {
-			list_cursor_destroy(cur);
+			list_cursor_delete(cur);
 			// Print debug error
 			debug(D_MAKEFLOW_HOOK, "output file %s not found in archive at %s: %d %s", 
 				f->outer_name, filename, errno, strerror(errno));
@@ -797,7 +797,7 @@ int makeflow_archive_is_preserved(struct archive_instance *a, struct batch_job *
 		free(filename);
 	}
 	// Free list cursor memory
-	list_cursor_destroy(cur);
+	list_cursor_delete(cur);
 
 	return 1;
 }
