@@ -49,6 +49,16 @@ See the file COPYING for details.
  *
  * skip_list_cursor_delete(cur);
  * </pre>
+ *
+ * A macro is provided for the very common case of read-only iteration over the entire list:
+ *
+ * <pre>
+ * char *item;
+ * SKIP_LIST_ITERATE(sl,item) {
+ *     printf("%s\n",item);
+ * }
+ * </pre>
+ *
  */
 
 struct skip_list;
@@ -267,7 +277,6 @@ void skip_list_insert_arr(struct skip_list *lst, void *item, double *priority);
 #define skip_list_insert(lst, item, ...) \
 	skip_list_insert_arr(lst, item, (double[]){__VA_ARGS__})
 
-
 /** Macro to iterate over a list in the most common case.
 A statement or code block must follow the macro containing
 the code to be iterated over.  The macro internally makes
@@ -275,11 +284,14 @@ use of a fresh cursor, allowing iterations to be nested,
 and for the containing code to invoke break, continue,
 or return as needed.
 
-<pre>
-char *s;
+@param list The skip list to iterate over.
+@param item The name of an item pointer to receive each value.
 
-SKIP_LIST_ITERATE( sl, s ) {
-	printf("%s\n",s);
+<pre>
+char *item;
+
+SKIP_LIST_ITERATE( list, item ) {
+	printf("%s\n",item);
 }
 </pre>
 */
