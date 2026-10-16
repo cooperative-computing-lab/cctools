@@ -156,7 +156,7 @@ Helper function to simplify the use of __attribute__((cleanup))
 which passes around a void double-pointer to the object to be freed.
 */
 
-void list_cursor_destroy_vpp( struct list_cursor **cursor )
+void list_cursor_destroy_vpp(struct list_cursor **cursor)
 {
 	list_cursor_destroy(*cursor);
 }
