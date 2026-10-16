@@ -245,7 +245,7 @@ double measure_list_operations(struct item **items, int num_elements, int operat
 				}
 				list_next(cur);
 			}
-			list_cursor_destroy(cur);
+			list_cursor_delete(cur);
 		}
 
 		if (list_length(l) != 0) {

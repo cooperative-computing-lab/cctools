@@ -5311,7 +5311,7 @@ static void delete_feature(struct work_queue_task *t, const char *name)
 		}
 	}
 
-	list_cursor_destroy(c);
+	list_cursor_delete(c);
 }
 
 struct work_queue_file *work_queue_file_create(const char *payload, const char *remote_name, work_queue_file_t type, work_queue_file_flags_t flags)
