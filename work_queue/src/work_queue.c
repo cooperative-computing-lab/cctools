@@ -2409,13 +2409,10 @@ static struct rmsummary  *total_resources_needed(struct work_queue *q) {
 
 	/* for waiting tasks, we use what they would request if dispatched right now. */
 
-	struct skip_list_cursor *cursor = skip_list_cursor_create(q->ready_list);
-	skip_list_seek(cursor, 0);
-	SKIP_LIST_ITERATE(cursor, t) {
+	SKIP_LIST_ITERATE(q->ready_list, t) {
 		const struct rmsummary *s = task_min_resources(q, t);
 		rmsummary_add(total, s);
 	}
-	skip_list_cursor_delete(cursor);
 
 	/* for running tasks, we use what they have been allocated already. */
 	char *key;
@@ -4586,7 +4583,7 @@ static int send_one_task_with_cr( struct work_queue *q , struct skip_list_cursor
 
 	int iter_count = 0;
 
-	SKIP_LIST_ITERATE(cr, t) {
+	SKIP_LIST_ITERATE_CURSOR(cr,t) {
 		if(iter_count >= iter_depth) {
 			break;
 		}
@@ -4661,9 +4658,7 @@ static void print_large_tasks_warning(struct work_queue *q)
 
 	struct rmsummary *largest_unfit_task = rmsummary_create(-1);
 
-	struct skip_list_cursor *cur = skip_list_cursor_create(q->ready_list);
-	skip_list_seek(cur, 0);
-	SKIP_LIST_ITERATE(cur, t){
+	SKIP_LIST_ITERATE(q->ready_list, t) {
 		// check each task against the queue of connected workers
 		int bit_set = is_task_larger_than_connected_workers(q, t);
 		if(bit_set) {
@@ -4683,7 +4678,6 @@ static void print_large_tasks_warning(struct work_queue *q)
 			unfit_gpu++;
 		}
 	}
-	skip_list_cursor_delete(cur);
 
 	if(unfit_core || unfit_mem || unfit_disk || unfit_gpu){
 		notice(D_WQ,"There are tasks that cannot fit any currently connected worker:\n");
@@ -7186,15 +7180,12 @@ int work_queue_hungry(struct work_queue *q)
 	int64_t ready_task_gpus		= 0;
 
 	struct work_queue_task *t;
-	struct skip_list_cursor *cursor = skip_list_cursor_create(q->ready_list);
-	skip_list_seek(cursor, 0);
-	SKIP_LIST_ITERATE(cursor, t) {
+	SKIP_LIST_ITERATE(q->ready_list, t) {
 		ready_task_cores  += MAX(1,t->resources_requested->cores);
 		ready_task_memory += t->resources_requested->memory;
 		ready_task_disk   += t->resources_requested->disk;
 		ready_task_gpus   += t->resources_requested->gpus;
 	}
-	skip_list_cursor_delete(cursor);
 
 	//check possible limiting factors
 	//return false if required resources exceed available resources

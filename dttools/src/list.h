@@ -442,12 +442,13 @@ the code to be iterated over.  The macro internally makes
 use of a fresh cursor, allowing iterations to be nested,
 and for the containing code to invoke break, continue,
 or return as needed.
-
+@param list The list to iterate over.
+@param item The name of an item to receive each value.
 <pre>
-char *s;
+char *item;
 
-LIST_ITERATE( list, s ) {
-	printf("%s\n",s);
+LIST_ITERATE( list, item ) {
+	printf("%s\n",item);
 }
 </pre>
 */
