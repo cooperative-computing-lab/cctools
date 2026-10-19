@@ -3845,7 +3845,7 @@ static int send_one_task(struct vine_manager *q)
 {
 	double now_secs = ((double)timestamp_get()) / ONE_SECOND;
 	int iter_depth = MIN(skip_list_size(q->ready_tasks), q->attempt_schedule_depth);
-	
+
 	// if ready_tasks_cr is not pointing at a task
 	// (e.g it is at the end of the list, or first time through)
 	// set it to the beginning of the ready list.
@@ -3853,13 +3853,11 @@ static int send_one_task(struct vine_manager *q)
 		skip_list_seek(q->ready_tasks_cr, 0);
 	}
 
-
 	int sent = 0;
 	sent = send_one_task_with_cr(q, q->ready_tasks_cr, iter_depth, now_secs);
 
-
 	// find the magnitude of the highest-priority region. Adjust sched depth so we at least
-	// consider all of it plus a minimum factor of additional tasks. 	
+	// consider all of it plus a minimum factor of additional tasks.
 	if (q->hungry_internal) {
 		const struct vine_task *t;
 
@@ -3872,8 +3870,9 @@ static int send_one_task(struct vine_manager *q)
 
 		int depth = 1;
 		char *lead_region = t->semantic_category;
-		SKIP_LIST_ITERATE(q->ready_tasks_cr, t){
-			if (!strcmp(lead_region, t->semantic_category)){
+		SKIP_LIST_ITERATE(q->ready_tasks_cr, t)
+		{
+			if (!strcmp(lead_region, t->semantic_category)) {
 				depth++;
 			}
 		}
@@ -3882,7 +3881,7 @@ static int send_one_task(struct vine_manager *q)
 			int hungry_value = vine_hungry_computation(q);
 			q->attempt_schedule_depth = depth * MAX(q->hungry_minimum_factor, hungry_value);
 		}
-		
+
 		skip_list_seek(q->ready_tasks_cr, 0);
 	}
 
@@ -5817,7 +5816,6 @@ struct vine_task *vine_manager_no_wait(struct vine_manager *q, const char *tag, 
 
 	return t;
 }
-
 
 int vine_workers_shutdown(struct vine_manager *q, int n)
 {
