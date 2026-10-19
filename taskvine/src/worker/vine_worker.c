@@ -277,11 +277,18 @@ void send_async_message(struct link *l, const char *fmt, ...)
 	assert(l);
 
 	va_list va;
-	char *message = malloc(VINE_LINE_MAX);
 	va_start(va, fmt);
-	/* Use vsnprintf (not vsprintf) so an over-length message is truncated
-	 * rather than overflowing this fixed-size heap buffer. */
-	vsnprintf(message, VINE_LINE_MAX, fmt, va);
+	int length = vsnprintf(NULL, 0, fmt, va);
+	va_end(va);
+
+	/* Abort if the message is longer than VINE_LINE_MAX. */
+	if (length >= VINE_LINE_MAX) {
+		fatal("message to the manager is %d bytes, more than VINE_LINE_MAX", length);
+	}
+
+	char *message = xxmalloc(length + 1);
+	va_start(va, fmt);
+	vsnprintf(message, length + 1, fmt, va);
 	va_end(va);
 
 	list_push_tail(pending_async_messages, message);
@@ -468,20 +475,33 @@ static void send_features(struct link *manager)
 	}
 }
 
+static void vine_resources_send(struct link *manager, struct vine_resources *r)
+{
+	debug(D_VINE, "Sending resource description to manager:");
+	vine_resources_debug(r);
+
+	send_async_message(manager,
+			"resources\ncores %lf\nmemory %lf\ndisk %lf\ngpus %lf\nworkers %lf\ntag %" PRId64 "\nend\n",
+			r->cores.total,
+			r->memory.total,
+			r->disk.total,
+			r->gpus.total,
+			r->workers.total,
+			r->tag);
+}
+
 /*
 Send a message to the manager with my current resources.
 */
 
 static void send_resource_update(struct link *manager)
 {
-	time_t stoptime = time(0) + options->active_timeout;
-
 	// if workers are set to expire in some time, send the expiration time to manager
 	if (options->manual_wall_time_option > 0) {
 		options->end_time = worker_start_time + (options->manual_wall_time_option * 1e6);
 	}
 
-	vine_resources_send(manager, total_resources, stoptime);
+	vine_resources_send(manager, total_resources);
 }
 
 /*
@@ -490,7 +510,7 @@ Send a message to the manager with my current statistics information.
 
 static void send_stats_update(struct link *manager)
 {
-	send_message(manager, "info tasks_running %lld\n", (long long)itable_size(procs_running));
+	send_async_message(manager, "info tasks_running %lld\n", (long long)itable_size(procs_running));
 }
 
 /*
@@ -550,12 +570,11 @@ void vine_worker_send_cache_invalid(struct link *manager, const char *cachename,
 	char *transfer_id = hash_table_remove(current_transfers, cachename);
 	if (transfer_id) {
 		debug(D_VINE, "Sending Cache invalid transfer id: %s", transfer_id);
-		send_async_message(manager, "cache-invalid %s %d %s\n", cachename, length, transfer_id);
+		send_async_message(manager, "cache-invalid %s %d %s\n%s", cachename, length, transfer_id, message);
 		free(transfer_id);
 	} else {
-		send_async_message(manager, "cache-invalid %s %d\n", cachename, length);
+		send_async_message(manager, "cache-invalid %s %d\n%s", cachename, length, message);
 	}
-	link_write(manager, message, length, time(0) + options->active_timeout);
 }
 
 /*
@@ -664,7 +683,7 @@ static int start_process(struct vine_process *p, struct link *manager)
 		 * Also set the sigchld flag so the worker will immediately check for the library
 		 * startup instead of sleeping and waiting for the manager. */
 		if (p->task->provides_library) {
-			send_message(manager, "info library-update %d %d\n", p->task->task_id, VINE_LIBRARY_STARTED);
+			send_async_message(manager, "info library-update %d %d\n", p->task->task_id, VINE_LIBRARY_STARTED);
 			sigchld_received_flag = 1;
 		}
 
@@ -1744,7 +1763,7 @@ static void vine_worker_serve_manager(struct link *manager)
 					current_manager_address->addr,
 					current_manager_address->port,
 					options->idle_timeout);
-			send_message(manager, "info idle-disconnect-request %lld\n", (long long)options->idle_timeout);
+			send_async_message(manager, "info idle-disconnect-request %lld\n", (long long)options->idle_timeout);
 			reset_idle_timer();
 		}
 
