@@ -3554,6 +3554,140 @@ static void vine_manager_consider_recovery_task(struct vine_manager *q, struct v
 	}
 }
 
+// check if workers' resources are available to execute more tasks queue should
+// have at least MAX(hungry_minimum, hungry_minimum_factor * number of workers) ready tasks
+// Usually not called directly, but by vine_hungry.
+//@param: 	struct vine_manager* - pointer to manager
+//@return: 	approximate number of additional tasks if hungry, 0 otherwise
+static int vine_hungry_computation(struct vine_manager *q)
+{
+	struct vine_stats qstats;
+	vine_get_stats(q, &qstats);
+
+	// set min tasks running to 1. if it was 0, then committed resource would be 0 anyway so average works out to 0.
+	int64_t tasks_running = MAX(qstats.tasks_running, 1);
+	int64_t tasks_waiting = qstats.tasks_waiting;
+
+	/* queue is hungry according to the number of workers available (assume each worker can run at least one task) */
+	int hungry_minimum = MAX(q->hungry_minimum, qstats.workers_connected * q->hungry_minimum_factor);
+
+	if (tasks_running < 1 && tasks_waiting < 1) {
+		return hungry_minimum;
+	}
+
+	/* assume a task uses at least one core, otherwise if no resource is specified, the queue is infinitely hungry */
+	int64_t avg_commited_tasks_cores = MAX(1, DIV_INT_ROUND_UP(qstats.committed_cores, tasks_running));
+	int64_t avg_commited_tasks_memory = DIV_INT_ROUND_UP(qstats.committed_memory, tasks_running);
+	int64_t avg_commited_tasks_disk = DIV_INT_ROUND_UP(qstats.committed_disk, tasks_running);
+	int64_t avg_commited_tasks_gpus = DIV_INT_ROUND_UP(qstats.committed_gpus, tasks_running);
+
+	// get total available resources consumption (cores, memory, disk, gpus) of all workers of this manager
+	// available = factor*total (all) - committed (actual in use)
+	int64_t workers_total_avail_cores = q->hungry_minimum_factor * qstats.total_cores - qstats.committed_cores;
+	int64_t workers_total_avail_memory = q->hungry_minimum_factor * qstats.total_memory - qstats.committed_memory;
+	int64_t workers_total_avail_disk = q->hungry_minimum_factor * qstats.total_disk - qstats.committed_disk;
+	int64_t workers_total_avail_gpus = q->hungry_minimum_factor * qstats.total_gpus - qstats.committed_gpus;
+
+	int64_t tasks_needed = 0;
+	if (tasks_waiting < 1) {
+		tasks_needed = DIV_INT_ROUND_UP(workers_total_avail_cores, avg_commited_tasks_cores);
+		if (avg_commited_tasks_memory > 0) {
+			tasks_needed = MIN(tasks_needed, DIV_INT_ROUND_UP(workers_total_avail_memory, avg_commited_tasks_memory));
+		}
+
+		if (avg_commited_tasks_disk > 0) {
+			tasks_needed = MIN(tasks_needed, DIV_INT_ROUND_UP(workers_total_avail_disk, avg_commited_tasks_disk));
+		}
+
+		if (avg_commited_tasks_gpus > 0) {
+			tasks_needed = MIN(tasks_needed, DIV_INT_ROUND_UP(workers_total_avail_gpus, avg_commited_tasks_gpus));
+		}
+
+		return MAX(tasks_needed, hungry_minimum);
+	}
+
+	// from here on we can assume that tasks_waiting > 0.
+
+	// get required resources (cores, memory, disk, gpus) of one (all?) waiting tasks
+	// seems to iterate through all tasks counted in the queue.
+	int64_t ready_task_cores = 0;
+	int64_t ready_task_memory = 0;
+	int64_t ready_task_disk = 0;
+	int64_t ready_task_gpus = 0;
+
+	struct vine_task *t;
+	int iter_depth = MIN(q->attempt_schedule_depth, tasks_waiting);
+	int sampled_tasks_waiting = 0;
+
+	struct skip_list_cursor *cur = skip_list_cursor_create(q->ready_tasks);
+	skip_list_seek(cur, 0);
+	SKIP_LIST_ITERATE(cur, t)
+	{
+		if (sampled_tasks_waiting >= iter_depth) {
+			break;
+		}
+		/* unset resources are marked with -1, so we added what we know about currently running tasks */
+		ready_task_cores += t->resources_requested->cores > 0 ? t->resources_requested->cores : avg_commited_tasks_cores;
+		ready_task_memory += t->resources_requested->memory > 0 ? t->resources_requested->memory : avg_commited_tasks_memory;
+		ready_task_disk += t->resources_requested->disk > 0 ? t->resources_requested->disk : avg_commited_tasks_disk;
+		ready_task_gpus += t->resources_requested->gpus > 0 ? t->resources_requested->gpus : avg_commited_tasks_gpus;
+		sampled_tasks_waiting++;
+	}
+	skip_list_cursor_delete(cur);
+
+	int64_t avg_ready_tasks_cores = DIV_INT_ROUND_UP(ready_task_cores, sampled_tasks_waiting);
+	int64_t avg_ready_tasks_memory = DIV_INT_ROUND_UP(ready_task_memory, sampled_tasks_waiting);
+	int64_t avg_ready_tasks_disk = DIV_INT_ROUND_UP(ready_task_disk, sampled_tasks_waiting);
+	int64_t avg_ready_tasks_gpus = DIV_INT_ROUND_UP(ready_task_gpus, sampled_tasks_waiting);
+
+	// since sampled_tasks_waiting > 0 and avg_commited_tasks_cores > 0, then ready_task_cores > 0 and avg_ready_tasks_cores > 0
+	tasks_needed = DIV_INT_ROUND_UP(workers_total_avail_cores, avg_ready_tasks_cores);
+
+	if (avg_ready_tasks_memory > 0) {
+		tasks_needed = MIN(tasks_needed, DIV_INT_ROUND_UP(workers_total_avail_memory, avg_ready_tasks_memory));
+	}
+
+	if (avg_ready_tasks_disk > 0) {
+		tasks_needed = MIN(tasks_needed, DIV_INT_ROUND_UP(workers_total_avail_disk, avg_ready_tasks_disk));
+	}
+
+	if (avg_ready_tasks_gpus > 0) {
+		tasks_needed = MIN(tasks_needed, DIV_INT_ROUND_UP(workers_total_avail_gpus, avg_ready_tasks_gpus));
+	}
+
+	tasks_needed = MAX(0, MAX(tasks_needed, hungry_minimum) - tasks_waiting);
+
+	return tasks_needed;
+}
+
+/*
+ * Finding out the number of tasks needed when the manager is hungry is a potentially
+ * expensive operation if there are many workers connected or there already many waiting
+ * tasks. However, the number of tasks needed only changes significantly when the number
+ * of connected workers changes, and this does not happen very often. Thus we only call
+ * the expensive computation every few seconds, and in between these calls we just
+ * keep track how many tasks have been added/removed to the ready queue since last
+ * time we really checked.
+ * */
+int vine_hungry(struct vine_manager *q)
+{
+	if (!q) {
+		return 0;
+	}
+
+	timestamp_t current_time = timestamp_get();
+
+	if (current_time - q->time_last_hungry + q->hungry_check_interval > 0) {
+		q->time_last_hungry = current_time;
+		q->tasks_waiting_last_hungry = skip_list_size(q->ready_tasks);
+		q->tasks_to_sate_hungry = vine_hungry_computation(q);
+	}
+
+	int change = q->tasks_waiting_last_hungry - skip_list_size(q->ready_tasks);
+
+	return MAX(0, q->tasks_to_sate_hungry - change);
+}
+
 /*
 Determine whether the input files needed for this task are available in some form.
 Most file types (FILE, URL, BUFFER) we can materialize on demand.
@@ -3727,22 +3861,29 @@ static int send_one_task(struct vine_manager *q)
 	// find the magnitude of the highest-priority region. Adjust sched depth so we at least
 	// consider all of it plus a minimum factor of additional tasks. 	
 	if (q->hungry_internal) {
+		const struct vine_task *t;
+
+		t = skip_list_peek_head(q->ready_tasks);
+		if (!t) {
+			return sent;
+		}
+
 		skip_list_seek(q->ready_tasks_cr, 0);
 
-		int depth = 0;
-		const struct vine_task *t;
-		
-		t = skip_list_peek_head(q->ready_tasks);
-	       	char *lead_region = t->semantic_category; 	
+		int depth = 1;
+		char *lead_region = t->semantic_category;
 		SKIP_LIST_ITERATE(q->ready_tasks_cr, t){
 			if (!strcmp(lead_region, t->semantic_category)){
 				depth++;
-			}	
+			}
 		}
 
 		if (depth) {
-			q->attempt_schedule_depth = depth * q->hungry_minimum_factor;
+			int hungry_value = vine_hungry_computation(q);
+			q->attempt_schedule_depth = depth * MAX(q->hungry_minimum_factor, hungry_value);
 		}
+		
+		skip_list_seek(q->ready_tasks_cr, 0);
 	}
 
 	return sent;
@@ -5677,139 +5818,6 @@ struct vine_task *vine_manager_no_wait(struct vine_manager *q, const char *tag, 
 	return t;
 }
 
-// check if workers' resources are available to execute more tasks queue should
-// have at least MAX(hungry_minimum, hungry_minimum_factor * number of workers) ready tasks
-// Usually not called directly, but by vine_hungry.
-//@param: 	struct vine_manager* - pointer to manager
-//@return: 	approximate number of additional tasks if hungry, 0 otherwise
-int vine_hungry_computation(struct vine_manager *q)
-{
-	struct vine_stats qstats;
-	vine_get_stats(q, &qstats);
-
-	// set min tasks running to 1. if it was 0, then committed resource would be 0 anyway so average works out to 0.
-	int64_t tasks_running = MAX(qstats.tasks_running, 1);
-	int64_t tasks_waiting = qstats.tasks_waiting;
-
-	/* queue is hungry according to the number of workers available (assume each worker can run at least one task) */
-	int hungry_minimum = MAX(q->hungry_minimum, qstats.workers_connected * q->hungry_minimum_factor);
-
-	if (tasks_running < 1 && tasks_waiting < 1) {
-		return hungry_minimum;
-	}
-
-	/* assume a task uses at least one core, otherwise if no resource is specified, the queue is infinitely hungry */
-	int64_t avg_commited_tasks_cores = MAX(1, DIV_INT_ROUND_UP(qstats.committed_cores, tasks_running));
-	int64_t avg_commited_tasks_memory = DIV_INT_ROUND_UP(qstats.committed_memory, tasks_running);
-	int64_t avg_commited_tasks_disk = DIV_INT_ROUND_UP(qstats.committed_disk, tasks_running);
-	int64_t avg_commited_tasks_gpus = DIV_INT_ROUND_UP(qstats.committed_gpus, tasks_running);
-
-	// get total available resources consumption (cores, memory, disk, gpus) of all workers of this manager
-	// available = factor*total (all) - committed (actual in use)
-	int64_t workers_total_avail_cores = q->hungry_minimum_factor * qstats.total_cores - qstats.committed_cores;
-	int64_t workers_total_avail_memory = q->hungry_minimum_factor * qstats.total_memory - qstats.committed_memory;
-	int64_t workers_total_avail_disk = q->hungry_minimum_factor * qstats.total_disk - qstats.committed_disk;
-	int64_t workers_total_avail_gpus = q->hungry_minimum_factor * qstats.total_gpus - qstats.committed_gpus;
-
-	int64_t tasks_needed = 0;
-	if (tasks_waiting < 1) {
-		tasks_needed = DIV_INT_ROUND_UP(workers_total_avail_cores, avg_commited_tasks_cores);
-		if (avg_commited_tasks_memory > 0) {
-			tasks_needed = MIN(tasks_needed, DIV_INT_ROUND_UP(workers_total_avail_memory, avg_commited_tasks_memory));
-		}
-
-		if (avg_commited_tasks_disk > 0) {
-			tasks_needed = MIN(tasks_needed, DIV_INT_ROUND_UP(workers_total_avail_disk, avg_commited_tasks_disk));
-		}
-
-		if (avg_commited_tasks_gpus > 0) {
-			tasks_needed = MIN(tasks_needed, DIV_INT_ROUND_UP(workers_total_avail_gpus, avg_commited_tasks_gpus));
-		}
-
-		return MAX(tasks_needed, hungry_minimum);
-	}
-
-	// from here on we can assume that tasks_waiting > 0.
-
-	// get required resources (cores, memory, disk, gpus) of one (all?) waiting tasks
-	// seems to iterate through all tasks counted in the queue.
-	int64_t ready_task_cores = 0;
-	int64_t ready_task_memory = 0;
-	int64_t ready_task_disk = 0;
-	int64_t ready_task_gpus = 0;
-
-	struct vine_task *t;
-	int iter_depth = MIN(q->attempt_schedule_depth, tasks_waiting);
-	int sampled_tasks_waiting = 0;
-
-	struct skip_list_cursor *cur = skip_list_cursor_create(q->ready_tasks);
-	skip_list_seek(cur, 0);
-	SKIP_LIST_ITERATE(cur, t)
-	{
-		if (sampled_tasks_waiting >= iter_depth) {
-			break;
-		}
-		/* unset resources are marked with -1, so we added what we know about currently running tasks */
-		ready_task_cores += t->resources_requested->cores > 0 ? t->resources_requested->cores : avg_commited_tasks_cores;
-		ready_task_memory += t->resources_requested->memory > 0 ? t->resources_requested->memory : avg_commited_tasks_memory;
-		ready_task_disk += t->resources_requested->disk > 0 ? t->resources_requested->disk : avg_commited_tasks_disk;
-		ready_task_gpus += t->resources_requested->gpus > 0 ? t->resources_requested->gpus : avg_commited_tasks_gpus;
-		sampled_tasks_waiting++;
-	}
-	skip_list_cursor_delete(cur);
-
-	int64_t avg_ready_tasks_cores = DIV_INT_ROUND_UP(ready_task_cores, sampled_tasks_waiting);
-	int64_t avg_ready_tasks_memory = DIV_INT_ROUND_UP(ready_task_memory, sampled_tasks_waiting);
-	int64_t avg_ready_tasks_disk = DIV_INT_ROUND_UP(ready_task_disk, sampled_tasks_waiting);
-	int64_t avg_ready_tasks_gpus = DIV_INT_ROUND_UP(ready_task_gpus, sampled_tasks_waiting);
-
-	// since sampled_tasks_waiting > 0 and avg_commited_tasks_cores > 0, then ready_task_cores > 0 and avg_ready_tasks_cores > 0
-	tasks_needed = DIV_INT_ROUND_UP(workers_total_avail_cores, avg_ready_tasks_cores);
-
-	if (avg_ready_tasks_memory > 0) {
-		tasks_needed = MIN(tasks_needed, DIV_INT_ROUND_UP(workers_total_avail_memory, avg_ready_tasks_memory));
-	}
-
-	if (avg_ready_tasks_disk > 0) {
-		tasks_needed = MIN(tasks_needed, DIV_INT_ROUND_UP(workers_total_avail_disk, avg_ready_tasks_disk));
-	}
-
-	if (avg_ready_tasks_gpus > 0) {
-		tasks_needed = MIN(tasks_needed, DIV_INT_ROUND_UP(workers_total_avail_gpus, avg_ready_tasks_gpus));
-	}
-
-	tasks_needed = MAX(0, MAX(tasks_needed, hungry_minimum) - tasks_waiting);
-
-	return tasks_needed;
-}
-
-/*
- * Finding out the number of tasks needed when the manager is hungry is a potentially
- * expensive operation if there are many workers connected or there already many waiting
- * tasks. However, the number of tasks needed only changes significantly when the number
- * of connected workers changes, and this does not happen very often. Thus we only call
- * the expensive computation every few seconds, and in between these calls we just
- * keep track how many tasks have been added/removed to the ready queue since last
- * time we really checked.
- * */
-int vine_hungry(struct vine_manager *q)
-{
-	if (!q) {
-		return 0;
-	}
-
-	timestamp_t current_time = timestamp_get();
-
-	if (current_time - q->time_last_hungry + q->hungry_check_interval > 0) {
-		q->time_last_hungry = current_time;
-		q->tasks_waiting_last_hungry = skip_list_size(q->ready_tasks);
-		q->tasks_to_sate_hungry = vine_hungry_computation(q);
-	}
-
-	int change = q->tasks_waiting_last_hungry - skip_list_size(q->ready_tasks);
-
-	return MAX(0, q->tasks_to_sate_hungry - change);
-}
 
 int vine_workers_shutdown(struct vine_manager *q, int n)
 {

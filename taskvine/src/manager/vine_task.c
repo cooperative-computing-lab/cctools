@@ -479,12 +479,9 @@ void vine_task_set_semantic_category(struct vine_task *t, const char *semantic_c
 	t->semantic_category = xxstrdup(semantic_category ? semantic_category : "default");
 
 	unsigned int hash_prio = 12345U;
-	char *category_string = xxstrdup(t->semantic_category);
-	while(*category_string)
-	{
-		hash_prio ^= (unsigned char)*category_string;
+	for (const char *c = t->semantic_category; *c; c++) {
+		hash_prio ^= (unsigned char)*c;
 		hash_prio *= 16777619U;
-		category_string++;
 	}
 
 	t->user_priority = hash_prio;
