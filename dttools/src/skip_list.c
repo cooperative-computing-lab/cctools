@@ -273,6 +273,11 @@ void skip_list_cursor_delete(struct skip_list_cursor *cur)
 	free(cur);
 }
 
+void skip_list_cursor_delete_vpp(struct skip_list_cursor **cur)
+{
+	skip_list_cursor_delete(*cur);
+}
+
 struct skip_list_cursor *skip_list_cursor_clone(struct skip_list_cursor *cur)
 {
 	debug_assert(cur);
