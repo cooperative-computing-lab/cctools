@@ -10,7 +10,6 @@ See the file COPYING for details.
 #include "gpu_info.h"
 #include "host_disk_info.h"
 #include "host_memory_info.h"
-#include "link.h"
 #include "load_average.h"
 #include "macros.h"
 #include "nvpair.h"
@@ -73,29 +72,6 @@ void vine_resources_measure_locally(struct vine_resources *r, const char *disk_p
 static void vine_resource_debug(struct vine_resource *r, const char *name)
 {
 	debug(D_VINE, "%8s %lf inuse %lf total", name, r->inuse, r->total);
-}
-
-static void vine_resource_send(struct link *manager, struct vine_resource *r, const char *name, time_t stoptime)
-{
-	vine_resource_debug(r, name);
-	link_printf(manager, stoptime, "%s %lf\n", name, r->total);
-}
-
-void vine_resources_send(struct link *manager, struct vine_resources *r, time_t stoptime)
-{
-	debug(D_VINE, "Sending resource description to manager:");
-
-	link_printf(manager, stoptime, "resources\n");
-
-	vine_resource_send(manager, &r->cores, "cores", stoptime);
-	vine_resource_send(manager, &r->memory, "memory", stoptime);
-	vine_resource_send(manager, &r->disk, "disk", stoptime);
-	vine_resource_send(manager, &r->gpus, "gpus", stoptime);
-	vine_resource_send(manager, &r->workers, "workers", stoptime);
-
-	link_printf(manager, stoptime, "tag %" PRId64 "\n", r->tag);
-
-	link_printf(manager, stoptime, "end\n");
 }
 
 void vine_resources_debug(struct vine_resources *r)
