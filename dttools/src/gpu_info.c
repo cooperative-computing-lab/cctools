@@ -82,6 +82,7 @@ char *gpu_name_get()
 		return gpu_name;
 	} else {
 		debug(D_DEBUG, "gpu_name_get: failed with status %d", WEXITSTATUS(status));
+		free(gpu_name);
 		return 0;
 	}
 }
