@@ -67,9 +67,6 @@ char *gpu_name_get()
 		return 0;
 
 	char *gpu_name = get_line(pipe);
-
-	string_chomp(gpu_name);
-
 	int status = pclose(pipe);
 
 	/*
@@ -79,6 +76,7 @@ char *gpu_name_get()
 	*/
 
 	if (WIFEXITED(status) && WEXITSTATUS(status) == 0) {
+		string_chomp(gpu_name);
 		return gpu_name;
 	} else {
 		debug(D_DEBUG, "gpu_name_get: failed with status %d", WEXITSTATUS(status));
