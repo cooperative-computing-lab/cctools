@@ -2693,6 +2693,10 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 	jx_insert_integer(j,"tasks_with_results",info.tasks_with_results);
 	jx_insert_integer(j,"tasks_left",q->num_tasks_left);
 
+	// workers the manager is waiting for before dispatching the first task.
+	// Drops to 0 once reached. Used by work_queue_factory.
+	jx_insert_integer(j,"wait_for_workers",q->wait_for_workers);
+
 	jx_insert_integer(j,"tasks_submitted",info.tasks_submitted);
 	jx_insert_integer(j,"tasks_dispatched",info.tasks_dispatched);
 	jx_insert_integer(j,"tasks_done",info.tasks_done);
@@ -2823,6 +2827,10 @@ static struct jx * queue_lean_to_jx( struct work_queue *q, struct link *foreman_
 	//additional task information for work_queue_factory
 	jx_insert_integer(j,"tasks_on_workers",info.tasks_on_workers);
 	jx_insert_integer(j,"tasks_left",q->num_tasks_left);
+
+	// workers the manager is waiting for before dispatching the first task.
+	// Drops to 0 once reached. Used by work_queue_factory.
+	jx_insert_integer(j,"wait_for_workers",q->wait_for_workers);
 
 	//capacity information the factory needs
 	jx_insert_integer(j,"capacity_tasks",info.capacity_tasks);

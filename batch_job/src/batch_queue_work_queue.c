@@ -216,6 +216,9 @@ static void batch_queue_wq_option_update(struct batch_queue *q, const char *what
 	} else if (strcmp(what, "fast-abort") == 0) {
 		if (value)
 			work_queue_activate_fast_abort(q->wq_manager, atof(value));
+	} else if (strcmp(what, "wait-for-workers") == 0) {
+		if (value)
+			work_queue_tune(q->wq_manager, "wait-for-workers", atoi(value));
 	} else if (strcmp(what, "estimate-capacity") == 0) {
 		work_queue_specify_estimate_capacity_on(q->wq_manager, string_istrue(value));
 	} else if (strcmp(what, "keepalive-interval") == 0) {
