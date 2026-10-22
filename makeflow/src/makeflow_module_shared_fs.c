@@ -1,5 +1,6 @@
 
 #include <assert.h>
+#include <string.h>
 
 #include "debug.h"
 #include "itable.h"
@@ -151,9 +152,11 @@ static int batch_submit( void * instance_struct, struct batch_job *t){
 	struct list *saved_inputs = list_create();
 	struct list *saved_outputs = list_create();
 
+	/* A file renamed for the task is not visible under its task name on the shared fs,
+	   so it is still transferred. */
 	list_first_item(t->input_files);
 	while((f = list_next_item(t->input_files))){
-		if(batch_file_on_sharedfs(sf->shared_fs_list, f->outer_name)) {
+		if (!strcmp(f->outer_name, f->inner_name) && batch_file_on_sharedfs(sf->shared_fs_list, f->outer_name)) {
 			list_remove(t->input_files, f);
 			list_push_tail(saved_inputs, f);
 			debug(D_MAKEFLOW_HOOK, "skipping file %s on shared fs\n", f->outer_name);
@@ -164,7 +167,7 @@ static int batch_submit( void * instance_struct, struct batch_job *t){
 
 	list_first_item(t->output_files);
 	while((f = list_next_item(t->output_files))){
-		if(batch_file_on_sharedfs(sf->shared_fs_list, f->outer_name)) {
+		if (!strcmp(f->outer_name, f->inner_name) && batch_file_on_sharedfs(sf->shared_fs_list, f->outer_name)) {
 			list_remove(t->output_files, f);
 			list_push_tail(saved_outputs, f);
 			debug(D_MAKEFLOW_HOOK, "skipping file %s on shared fs\n", f->outer_name);
