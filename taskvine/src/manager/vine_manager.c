@@ -3538,7 +3538,10 @@ static void vine_manager_create_recovery_tasks(struct vine_manager *q, struct vi
 				recovery_task->type = VINE_TASK_TYPE_RECOVERY;
 			}
 
+			/* A new task that writes the same file (such as a rerun) replaces the earlier recovery task. */
+			struct vine_task *previous = m->file->recovery_task;
 			m->file->recovery_task = vine_task_addref(recovery_task);
+			vine_task_delete(previous);
 			m->file->original_producer_task_id = t->task_id;
 		}
 	}
