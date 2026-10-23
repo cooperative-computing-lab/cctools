@@ -4407,6 +4407,20 @@ int vine_disable_peer_transfers(struct vine_manager *q)
 	return 1;
 }
 
+int vine_enable_external_recovery_handling(struct vine_manager *q)
+{
+	debug(D_VINE, "External recovery handling enabled");
+	q->external_recovery_handling = 1;
+	return 1;
+}
+
+int vine_disable_external_recovery_handling(struct vine_manager *q)
+{
+	debug(D_VINE, "External recovery handling disabled");
+	q->external_recovery_handling = 0;
+	return 1;
+}
+
 int vine_enable_proportional_resources(struct vine_manager *q)
 {
 	debug(D_VINE, "Proportional resources enabled");
@@ -5382,6 +5396,10 @@ struct vine_task *find_task_to_return(struct vine_manager *q, const char *tag, i
 
 		/* The task was given a reference when added to the table, so delete a reference on removal. */
 		itable_remove(q->tasks, t->task_id);
+		if (type == VINE_TASK_TYPE_RECOVERY && q->external_recovery_handling) {
+			/* The application receives the table's reference and deletes the task when it is done. */
+			return t;
+		}
 		vine_task_delete(t);
 
 		/* CAREFUL: a non-standard task *may* no longer exist following vine_delete! */
