@@ -693,6 +693,21 @@ Server address are taken from the environment variables **CATALOG_HOST** and
 It is also easy to run your own catalog server, if you prefer. For more
 details, see the [Catalog Server Manual](../catalog/index.md).
 
+### Waiting for Workers
+
+By default, Makeflow dispatches the first ready task as soon as any worker
+connects. To hold all tasks until a given number of workers have connected,
+use `--wait-for-workers`:
+
+```sh
+$ makeflow -T condor -N myproject --wait-for-workers 50 example.makeflow
+```
+
+A `work_queue_factory` serving this project will submit at least that
+many workers until the target is reached (subject to its `--max-workers`).
+Once the target is reached, the factory returns to sizing the pool by
+the number of tasks.
+
 ### Setting a Password
 
 We recommend that anyone using the catalog server also set a password. To do
