@@ -426,6 +426,7 @@ static int count_workers_needed( struct list *managers_list, int only_not_runnin
 		const int tw =       jx_lookup_integer(j,"tasks_waiting");
 		const int tl =       jx_lookup_integer(j,"tasks_left");
 		const int protocol = jx_lookup_integer(j,"protocol");
+		const int able =     jx_lookup_integer(j,"workers_able");
 
 		if(protocol!=VINE_PROTOCOL_VERSION) {
 			printf("WARNING: skipping manager %s (%s:%d) with protocol version %d\n",project, host, port, protocol);
@@ -454,6 +455,18 @@ static int count_workers_needed( struct list *managers_list, int only_not_runnin
 
 		if(consider_capacity && capacity > 0) {
 			need = MIN(need, capacity);
+		}
+
+		// If the manager is holding dispatch until a number of workers connect
+		// (tune "wait-for-workers"), ask for at least that many. Not capped by
+		// capacity, since capacity is meaningless before workers connect.
+		// Older managers do not send this field and look up as 0.
+		const int wfw = jx_lookup_integer(j,"wait_for_workers");
+		if(wfw > need) {
+			if (wfw > able) {
+				debug(D_VINE,"%s %s:%d is waiting for %d more worker(s) before dispatching tasks",project,host,port,wfw-able);
+			}
+			need = wfw;
 		}
 
 		debug(D_VINE,"%s %s:%d %s tasks: %d capacity: %d workers needed: %d tasks running: %d",project,host,port,owner,tw+tl+tr,capacity,need,tr);
