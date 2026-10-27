@@ -58,6 +58,7 @@ SOURCES = \
 	gpu_info.c \
 	hash_cache.c \
 	hash_table.c \
+	hash_map.c \
 	hdfs_library.c \
 	histogram.c \
 	hmac.c \
