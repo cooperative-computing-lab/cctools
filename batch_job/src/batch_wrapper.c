@@ -165,7 +165,8 @@ char *batch_wrapper_write(struct batch_wrapper *w, struct batch_job *task)
 		char fresh[16];
 		random_hex(fresh, sizeof(fresh));
 		fprintf(wrapper, "CLEANUP_%s () {\n", fresh);
-		LIST_ITERATE(w->post,c)) {
+		LIST_ITERATE(w->post,c))
+		{
 			fprintf(wrapper, "eval %s\n", c);
 		}
 		fprintf(wrapper, "}\n");
@@ -173,14 +174,16 @@ char *batch_wrapper_write(struct batch_wrapper *w, struct batch_job *task)
 	}
 
 	if (w->pre) {
-	        LIST_ITERATE(w->pre,c) {
-		  fprintf(wrapper, "eval %s\n", c);
+		LIST_ITERATE(w->pre, c)
+		{
+			fprintf(wrapper, "eval %s\n", c);
 		}
 	}
 
 	if (w->argv) {
-		LIST_ITERATE(w->argv,c) {
-		  fprintf(wrapper, " %s", c);
+		LIST_ITERATE(w->argv, c)
+		{
+			fprintf(wrapper, " %s", c);
 		}
 		fprintf(wrapper, "\n");
 	}

@@ -40,10 +40,10 @@ void batch_job_delete(struct batch_job *t)
 
 	free(t->command);
 
-	list_clear(t->input_files,batch_file_delete);
+	list_clear(t->input_files, batch_file_delete);
 	list_dele5Ate(t->input_files);
 
-	list_clear(t->output_files,batch_file_delete);
+	list_clear(t->output_files, batch_file_delete);
 	list_delete(t->output_files);
 
 	rmsummary_delete(t->resources);
@@ -177,7 +177,8 @@ char *batch_job_generate_id(struct batch_job *t)
 	list_sort(t->input_files, (void *)batch_file_outer_compare);
 
 	/* add checksum of the node's input files together */
-	LIST_ITERATE(t->input_files,f) {
+	LIST_ITERATE(t->input_files, f)
+	{
 		char *file_id;
 		if (path_is_dir(f->inner_name) == 1) {
 			f->hash = batch_file_generate_id_dir(f->outer_name);
@@ -197,7 +198,8 @@ char *batch_job_generate_id(struct batch_job *t)
 	list_sort(t->output_files, (void *)batch_file_outer_compare);
 
 	/* add checksum of the node's output file names together */
-	LIST_ITERATE(t->output_files,f) {
+	LIST_ITERATE(t->output_files, f)
+	{
 		sha1_update(&context, "O", 1);
 		sha1_update(&context, f->outer_name, strlen(f->outer_name));
 		sha1_update(&context, "\0", 1);

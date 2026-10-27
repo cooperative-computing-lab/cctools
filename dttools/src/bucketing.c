@@ -415,7 +415,8 @@ void bucketing_sorted_buckets_print(struct list *l)
 	printf("Printing sorted buckets\n");
 	int i = 0;
 	bucketing_bucket_t *tmp;
-	LIST_ITERATE(l,tmp) {
+	LIST_ITERATE(l, tmp)
+	{
 		printf("bucket pos: %d, value: %lf, prob: %lf\n", i, tmp->val, tmp->prob);
 		++i;
 	}
@@ -428,7 +429,8 @@ void bucketing_sorted_points_print(struct list *l)
 	printf("Printing sorted points\n");
 	int i = 0;
 	bucketing_point_t *tmp;
-	LIST_ITERATE(l,tmp) {
+	LIST_ITERATE(l, tmp)
+	{
 		printf("pos: %d, value: %lf, sig: %lf\n", i, tmp->val, tmp->sig);
 		++i;
 	}
@@ -443,7 +445,8 @@ void get_bucketing_sorted_buckets_values(struct list *l, double *vals, int limit
 		return;
 	int i = 0;
 	bucketing_bucket_t *tmp;
-	LIST_ITERATE(l,tmp) {
+	LIST_ITERATE(l, tmp)
+	{
 		*(vals + i) = tmp->val;
 		++i;
 		if (i == limit) {

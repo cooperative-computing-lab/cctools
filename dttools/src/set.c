@@ -337,7 +337,8 @@ int set_insert_list(struct set *s, struct list *l)
 {
 	int additions = 0;
 	const void *element;
-	LIST_ITERATE(l,element) {
+	LIST_ITERATE(l, element)
+	{
 		additions += set_insert(s, element);
 	}
 

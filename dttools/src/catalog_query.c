@@ -141,7 +141,7 @@ struct list *catalog_query_sort_hostlist(const char *hosts)
 	}
 
 	if (!down_hosts) {
-		down_hosts = hash_table_create(0,0);
+		down_hosts = hash_table_create(0, 0);
 	}
 
 	do {
@@ -155,7 +155,7 @@ struct list *catalog_query_sort_hostlist(const char *hosts)
 		h->port = port;
 		h->down = 0;
 
-		if(hash_table_lookup(down_hosts,host)) {
+		if (hash_table_lookup(down_hosts, host)) {
 			h->down = 1;
 		}
 
@@ -178,8 +178,9 @@ struct catalog_query *catalog_query_create(const char *hosts, struct jx *filter_
 	int backoff_interval = 1;
 
 	while (time(NULL) < stoptime) {
-		LIST_ITERATE(sorted_hosts,h) {
-		
+		LIST_ITERATE(sorted_hosts, h)
+		{
+
 			struct jx *j = catalog_query_send_query(h, filter_expr, time(NULL) + 5);
 
 			if (j) {
@@ -190,17 +191,17 @@ struct catalog_query *catalog_query_create(const char *hosts, struct jx *filter_
 
 				if (h->down) {
 					debug(D_DEBUG, "catalog server at %s is back up", h->host);
-					hash_table_remove(down_hosts,h->host);
+					hash_table_remove(down_hosts, h->host);
 				}
 				break;
 			} else {
 				if (!h->down) {
 					debug(D_DEBUG, "catalog server at %s seems to be down", h->host);
-					hash_table_insert(down_hosts,h->host,h->host);
+					hash_table_insert(down_hosts, h->host, h->host);
 				}
 			}
 		}
-		
+
 		/* If we tried all the hosts without success, wait a bit and try again. */
 		sleep(backoff_interval);
 
@@ -208,7 +209,8 @@ struct catalog_query *catalog_query_create(const char *hosts, struct jx *filter_
 		backoff_interval = MIN(backoff_interval * 2, max_backoff_interval);
 	}
 
-	LIST_ITERATE(sorted_hosts,h) {
+	LIST_ITERATE(sorted_hosts, h)
+	{
 		free(h->host);
 		free(h);
 	}

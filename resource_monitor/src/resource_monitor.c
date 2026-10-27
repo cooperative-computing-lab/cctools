@@ -834,7 +834,8 @@ int64_t average_bandwidth(int use_min_len)
 	if (tail->end + 60 * ONE_SECOND < timestamp_get())
 		return 0;
 
-	LIST_ITERATE(tx_rx_sizes,head) {
+	LIST_ITERATE(tx_rx_sizes, head)
+	{
 		sum += head->bit_count;
 	}
 
