@@ -600,12 +600,11 @@ static batch_queue_id_t batch_queue_k8s_wait(struct batch_queue *q,
 		// 3. Iterate the running pods, execute tasks that have container ready
 		char *curr_pod_id;
 		int retry_get_pod_status = 0;
-		list_first_item(running_pod_lst);
 		debug(D_BATCH, "there are %d of running pods", list_size(running_pod_lst));
 		debug(D_BATCH, "there are %d of terminating pods", list_size(terminating_pod_lst));
 		debug(D_BATCH, "there are %d of creating pods", list_size(creating_pod_lst));
-		while ((curr_pod_id = (char *)list_next_item(running_pod_lst))) {
 
+		LIST_ITERATE(running_pod_lst,curr_pod_id) {
 			char *get_log_cmd = string_format("kubectl exec %s -- tail -1 %s.log",
 					curr_pod_id,
 					curr_pod_id);

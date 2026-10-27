@@ -392,8 +392,7 @@ static int count_workers_connected( struct list *managers_list )
 		return connected_workers;
 	}
 
-	list_first_item(managers_list);
-	while((j=list_next_item(managers_list))) {
+	LIST_ITERATE(managers_list,j) {
 		const int workers = jx_lookup_integer(j,"workers");
 		connected_workers += workers;
 	}
@@ -415,9 +414,7 @@ static int count_workers_needed( struct list *managers_list, int only_not_runnin
 		return needed_workers;
 	}
 
-	list_first_item(managers_list);
-	while((j=list_next_item(managers_list))) {
-
+	LIST_ITERATE(managers_list,j) {
 		const char *project =jx_lookup_string(j,"project");
 		const char *host =   jx_lookup_string(j,"name");
 		const int  port =    jx_lookup_integer(j,"port");
@@ -629,8 +626,7 @@ static void update_blocked_hosts( struct batch_queue *queue, struct list *manage
 
 	if(managers_list) {
 		struct jx *j;
-		list_first_item(managers_list);
-		while((j=list_next_item(managers_list))) {
+		LIST_ITERATE(managers_list,j) {
 
 			/* Skip if no workers_blocked property */
 			struct jx *blocked = jx_lookup(j,"workers_blocked");
@@ -837,9 +833,7 @@ struct jx *factory_to_jx(struct list *managers, struct list *foremen, int submit
 	if(managers && list_size(managers) > 0)
 	{
 		struct jx *m;
-		list_first_item(managers);
-		while((m = list_next_item(managers)))
-		{
+		LIST_ITERATE(managers,m) {
 			jx_array_append(ms, manager_to_jx(m));
 		}
 	}
@@ -850,11 +844,8 @@ struct jx *factory_to_jx(struct list *managers, struct list *foremen, int submit
 	if(foremen && list_size(foremen) > 0)
 	{
 		struct jx *f;
-		list_first_item(foremen);
-		while((f = list_next_item(foremen)))
-		{
+		LIST_ITERATE(foremen,f) {
 			jx_array_append(fs, manager_to_jx(f));
-
 		}
 	}
 	jx_insert(j, jx_string("foremen"), fs);
@@ -1814,8 +1805,7 @@ int main(int argc, char *argv[])
 	}
 		
 	const char *item = NULL;
-	list_first_item(wrapper_inputs);
-	while((item = list_next_item(wrapper_inputs))) {
+	LIST_ITERATE(wrapper_inputs,item) {
 		char *file_at_scratch_dir = string_format("%s/%s", scratch_dir, path_basename(item));
 		int64_t result = copy_file_to_file(item, file_at_scratch_dir);
 		if(result < 0) {
