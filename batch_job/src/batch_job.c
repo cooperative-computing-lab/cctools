@@ -40,10 +40,10 @@ void batch_job_delete(struct batch_job *t)
 
 	free(t->command);
 
-	list_clear(t->input_files, batch_file_delete);
-	list_dele5Ate(t->input_files);
+	list_clear(t->input_files, (void *)batch_file_delete);
+	list_delete(t->input_files);
 
-	list_clear(t->output_files, batch_file_delete);
+	list_clear(t->output_files, (void *)batch_file_delete);
 	list_delete(t->output_files);
 
 	rmsummary_delete(t->resources);
