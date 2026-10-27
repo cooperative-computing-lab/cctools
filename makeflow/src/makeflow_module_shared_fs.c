@@ -46,11 +46,17 @@ static int prefix_match(void *stem, const void *filename) {
 /*
  * Returns true if the given filename is located in
  * a shared filesystem, as given by the shared_fs_list.
+ * If inner_name is not NULL, the file must also keep its name
+ * in the task: a renamed file is not visible under its task name
+ * on the shared fs, so it still needs to be transferred.
  * */
 
-static int batch_file_on_sharedfs( struct list *shared_fs_list, const char *filename )
+static int batch_file_from_sharedfs( struct list *shared_fs_list, const char *filename, const char *inner_name )
 {
 	assert(shared_fs_list);
+	if(inner_name && strcmp(filename, inner_name)){
+		return 0;
+	}
 	if(list_size(shared_fs_list) > 0){
 		return !list_iterate(shared_fs_list,prefix_match,filename);
 	}
@@ -96,7 +102,7 @@ static int destroy( void * instance_struct, struct dag *d ){
 static int node_file_uses_unsupported_shared_fs( struct shared_fs_instance *sf, struct dag_node *n, struct dag_file *f)
 {
 	const char *remotename = dag_node_get_remote_name(n, f->filename);
-	if (batch_file_on_sharedfs(sf->shared_fs_list, f->filename)) {
+	if (batch_file_from_sharedfs(sf->shared_fs_list, f->filename, NULL)) {
 		if (remotename){
 			debug(D_ERROR|D_MAKEFLOW_HOOK, "Remote renaming for %s is not supported on a shared filesystem",
 					f->filename);
@@ -152,11 +158,9 @@ static int batch_submit( void * instance_struct, struct batch_job *t){
 	struct list *saved_inputs = list_create();
 	struct list *saved_outputs = list_create();
 
-	/* A file renamed for the task is not visible under its task name on the shared fs,
-	   so it is still transferred. */
 	list_first_item(t->input_files);
 	while((f = list_next_item(t->input_files))){
-		if (!strcmp(f->outer_name, f->inner_name) && batch_file_on_sharedfs(sf->shared_fs_list, f->outer_name)) {
+		if (batch_file_from_sharedfs(sf->shared_fs_list, f->outer_name, f->inner_name)) {
 			list_remove(t->input_files, f);
 			list_push_tail(saved_inputs, f);
 			debug(D_MAKEFLOW_HOOK, "skipping file %s on shared fs\n", f->outer_name);
@@ -167,7 +171,7 @@ static int batch_submit( void * instance_struct, struct batch_job *t){
 
 	list_first_item(t->output_files);
 	while((f = list_next_item(t->output_files))){
-		if (!strcmp(f->outer_name, f->inner_name) && batch_file_on_sharedfs(sf->shared_fs_list, f->outer_name)) {
+		if (batch_file_from_sharedfs(sf->shared_fs_list, f->outer_name, f->inner_name)) {
 			list_remove(t->output_files, f);
 			list_push_tail(saved_outputs, f);
 			debug(D_MAKEFLOW_HOOK, "skipping file %s on shared fs\n", f->outer_name);
