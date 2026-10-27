@@ -144,8 +144,7 @@ void reset_events_counts(struct rmonitor_file_watch_info *f)
 	struct rmonitor_file_watch_event *e;
 
 	// reset counts for cycle
-	list_first_item(f->events);
-	while ((e = list_next_item(f->events))) {
+	LIST_ITERATE(f->events,e) {
 		e->cycle_count = 0;
 	}
 }
@@ -155,8 +154,7 @@ int at_least_one_event_still_active(struct rmonitor_file_watch_info *f)
 	struct rmonitor_file_watch_event *e;
 	int at_least_one_active = 0;
 
-	list_first_item(f->events);
-	while ((e = list_next_item(f->events))) {
+	LIST_ITERATE(f->events,e) {
 		if (e->max_count < 0 || e->total_count < e->max_count) {
 			at_least_one_active = 1;
 			break;
@@ -181,8 +179,7 @@ const char *construct_label(struct rmonitor_file_watch_info *f)
 	int event_count = 0;
 	char *sep = "";
 
-	list_first_item(f->events);
-	while ((e = list_next_item(f->events))) {
+	LIST_ITERATE(f->events,e) {
 		if (e->cycle_count > 0) {
 			e->total_count += e->cycle_count;
 			event_count += e->cycle_count;
@@ -271,8 +268,7 @@ void rmonitor_watch_file_aux(struct rmonitor_file_watch_info *f)
 
 		// count created, deleted and shrank events
 		if (created || deleted || shrank) {
-			list_first_item(f->events);
-			while ((e = list_next_item(f->events))) {
+			LIST_ITERATE(f->events,e) {
 				if (e->on_creation && created) {
 					e->cycle_count++;
 					e->total_count++;
@@ -303,8 +299,7 @@ void rmonitor_watch_file_aux(struct rmonitor_file_watch_info *f)
 
 			char *line;
 			while ((line = get_line(fp))) {
-				list_first_item(f->events);
-				while ((e = list_next_item(f->events))) {
+				LIST_ITERATE(f->events,e) {
 					if (e->max_count < 0 || e->max_count < e->total_count) {
 						if (string_match_regex(line, e->on_pattern)) {
 							e->cycle_count++;
