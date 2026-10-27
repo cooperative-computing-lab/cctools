@@ -40,17 +40,10 @@ void batch_job_delete(struct batch_job *t)
 
 	free(t->command);
 
-	struct batch_file *f;
-	list_first_item(t->input_files);
-	while ((f = list_next_item(t->input_files))) {
-		batch_file_delete(f);
-	}
+	list_clear(t->input_files, (void *)batch_file_delete);
 	list_delete(t->input_files);
 
-	list_first_item(t->output_files);
-	while ((f = list_next_item(t->output_files))) {
-		batch_file_delete(f);
-	}
+	list_clear(t->output_files, (void *)batch_file_delete);
 	list_delete(t->output_files);
 
 	rmsummary_delete(t->resources);
@@ -184,8 +177,8 @@ char *batch_job_generate_id(struct batch_job *t)
 	list_sort(t->input_files, (void *)batch_file_outer_compare);
 
 	/* add checksum of the node's input files together */
-	struct list_cursor *cur = list_cursor_create(t->input_files);
-	for (list_seek(cur, 0); list_get(cur, (void **)&f); list_next(cur)) {
+	LIST_ITERATE(t->input_files, f)
+	{
 		char *file_id;
 		if (path_is_dir(f->inner_name) == 1) {
 			f->hash = batch_file_generate_id_dir(f->outer_name);
@@ -200,19 +193,17 @@ char *batch_job_generate_id(struct batch_job *t)
 		sha1_update(&context, "\0", 1);
 		free(file_id);
 	}
-	list_cursor_delete(cur);
 
 	/* Sort outputs for consistent hashing */
 	list_sort(t->output_files, (void *)batch_file_outer_compare);
 
 	/* add checksum of the node's output file names together */
-	cur = list_cursor_create(t->output_files);
-	for (list_seek(cur, 0); list_get(cur, (void **)&f); list_next(cur)) {
+	LIST_ITERATE(t->output_files, f)
+	{
 		sha1_update(&context, "O", 1);
 		sha1_update(&context, f->outer_name, strlen(f->outer_name));
 		sha1_update(&context, "\0", 1);
 	}
-	list_cursor_delete(cur);
 
 	sha1_final(hash, &context);
 	t->hash = xxstrdup(sha1_string(hash));

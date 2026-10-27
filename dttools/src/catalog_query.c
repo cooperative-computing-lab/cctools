@@ -16,6 +16,7 @@ See the file COPYING for details.
 #include "debug.h"
 #include "domain_name.h"
 #include "domain_name_cache.h"
+#include "hash_table.h"
 #include "http_query.h"
 #include "jx.h"
 #include "jx_eval.h"
@@ -23,7 +24,6 @@ See the file COPYING for details.
 #include "jx_print.h"
 #include "list.h"
 #include "macros.h"
-#include "set.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
 #include "zlib.h"
@@ -40,7 +40,7 @@ struct catalog_host {
 	int down;
 };
 
-static struct set *down_hosts = NULL;
+static struct hash_table *down_hosts = NULL;
 
 /* Given a comma delimited list of host:port or host, set the values pointed
    to by host and port, using the default port if not provided. Return the address
@@ -130,7 +130,6 @@ struct jx *catalog_query_send_query(struct catalog_host *h, struct jx *expr, tim
 struct list *catalog_query_sort_hostlist(const char *hosts)
 {
 	const char *next_host;
-	char *n;
 	struct catalog_host *h;
 	struct list *previously_up = list_create();
 	struct list *previously_down = list_create();
@@ -142,7 +141,7 @@ struct list *catalog_query_sort_hostlist(const char *hosts)
 	}
 
 	if (!down_hosts) {
-		down_hosts = set_create(0);
+		down_hosts = hash_table_create(0, 0);
 	}
 
 	do {
@@ -156,13 +155,10 @@ struct list *catalog_query_sort_hostlist(const char *hosts)
 		h->port = port;
 		h->down = 0;
 
-		int iteration;
-		SET_ITERATE(down_hosts, iteration, n)
-		{
-			if (!strcmp(n, host)) {
-				h->down = 1;
-			}
+		if (hash_table_lookup(down_hosts, host)) {
+			h->down = 1;
 		}
+
 		if (h->down) {
 			list_push_tail(previously_down, h);
 		} else {
@@ -176,54 +172,45 @@ struct list *catalog_query_sort_hostlist(const char *hosts)
 struct catalog_query *catalog_query_create(const char *hosts, struct jx *filter_expr, time_t stoptime)
 {
 	struct catalog_query *q = NULL;
-	char *n;
 	struct catalog_host *h;
 	struct list *sorted_hosts = catalog_query_sort_hostlist(hosts);
 
 	int backoff_interval = 1;
 
-	list_first_item(sorted_hosts);
 	while (time(NULL) < stoptime) {
-		if (!(h = list_next_item(sorted_hosts))) {
-			list_first_item(sorted_hosts);
-			sleep(backoff_interval);
+		LIST_ITERATE(sorted_hosts, h)
+		{
 
-			int max_backoff_interval = MAX(0, stoptime - time(NULL));
-			backoff_interval = MIN(backoff_interval * 2, max_backoff_interval);
+			struct jx *j = catalog_query_send_query(h, filter_expr, time(NULL) + 5);
 
-			continue;
-		}
-		struct jx *j = catalog_query_send_query(h, filter_expr, time(NULL) + 5);
+			if (j) {
+				q = xxmalloc(sizeof(*q));
+				q->data = j;
+				q->current = j->u.items;
+				q->filter_expr = filter_expr;
 
-		if (j) {
-			q = xxmalloc(sizeof(*q));
-			q->data = j;
-			q->current = j->u.items;
-			q->filter_expr = filter_expr;
-
-			if (h->down) {
-				debug(D_DEBUG, "catalog server at %s is back up", h->host);
-				int iteration;
-				SET_ITERATE(down_hosts, iteration, n)
-				{
-					if (!strcmp(n, h->host)) {
-						set_remove(down_hosts, n);
-						free(n);
-						break;
-					}
+				if (h->down) {
+					debug(D_DEBUG, "catalog server at %s is back up", h->host);
+					hash_table_remove(down_hosts, h->host);
+				}
+				break;
+			} else {
+				if (!h->down) {
+					debug(D_DEBUG, "catalog server at %s seems to be down", h->host);
+					hash_table_insert(down_hosts, h->host, h->host);
 				}
 			}
-			break;
-		} else {
-			if (!h->down) {
-				debug(D_DEBUG, "catalog server at %s seems to be down", h->host);
-				set_insert(down_hosts, xxstrdup(h->host));
-			}
 		}
+
+		/* If we tried all the hosts without success, wait a bit and try again. */
+		sleep(backoff_interval);
+
+		int max_backoff_interval = MAX(0, stoptime - time(NULL));
+		backoff_interval = MIN(backoff_interval * 2, max_backoff_interval);
 	}
 
-	list_first_item(sorted_hosts);
-	while ((h = list_next_item(sorted_hosts))) {
+	LIST_ITERATE(sorted_hosts, h)
+	{
 		free(h->host);
 		free(h);
 	}

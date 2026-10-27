@@ -335,10 +335,10 @@ int set_insert_set(struct set *s, struct set *s2)
 
 int set_insert_list(struct set *s, struct list *l)
 {
-	list_first_item(l);
 	int additions = 0;
 	const void *element;
-	while ((element = list_next_item(l))) {
+	LIST_ITERATE(l, element)
+	{
 		additions += set_insert(s, element);
 	}
 
