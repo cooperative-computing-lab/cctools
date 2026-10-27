@@ -2297,6 +2297,8 @@ static struct jx *manager_to_jx(struct vine_manager *q)
 	jx_insert_integer(j, "tasks_recovery", info.tasks_recovery);
 	jx_insert_integer(j, "tasks_left", q->num_tasks_left);
 
+	jx_insert_integer(j, "wait_for_workers", q->wait_for_workers);
+
 	jx_insert_integer(j, "tasks_submitted", info.tasks_submitted);
 	jx_insert_integer(j, "tasks_dispatched", info.tasks_dispatched);
 	jx_insert_integer(j, "tasks_done", info.tasks_done);
@@ -2422,6 +2424,8 @@ static struct jx *manager_lean_to_jx(struct vine_manager *q)
 	// additional task information for vine_factory
 	jx_insert_integer(j, "tasks_on_workers", info.tasks_on_workers);
 	jx_insert_integer(j, "tasks_left", q->num_tasks_left);
+
+	jx_insert_integer(j, "wait_for_workers", q->wait_for_workers);
 
 	// capacity information the factory needs
 	jx_insert_integer(j, "capacity_tasks", info.capacity_tasks);
