@@ -1367,7 +1367,11 @@ void rmonitor_add_children_by_polling()
 
 	uint64_t pid;
 	struct rmonitor_process_info *p;
-	uint64_t *children = NULL;
+
+	/* rmonitor_track_process inserts into processes, which cannot be done
+	 * while iterating over processes. Collect the children first. */
+	uint64_t *found = NULL;
+	int found_count = 0;
 
 	ITABLE_ITERATE(processes, iteration, pid, p)
 	{
@@ -1375,21 +1379,26 @@ void rmonitor_add_children_by_polling()
 			continue;
 		}
 
+		uint64_t *children = NULL;
 		int n = rmonitor_get_children(pid, &children);
 
-		if (n < 1) {
-			continue;
-		}
-
-		int i;
-		for (i = 0; i < n; i++) {
-			if (rmonitor_track_process(children[i])) {
-				debug(D_RMON, "added by polling pid %" PRIu64, children[i]);
-			}
+		if (n > 0) {
+			found = xxrealloc(found, (found_count + n) * sizeof(*found));
+			memcpy(found + found_count, children, n * sizeof(*found));
+			found_count += n;
 		}
 
 		free(children);
 	}
+
+	int i;
+	for (i = 0; i < found_count; i++) {
+		if (rmonitor_track_process(found[i])) {
+			debug(D_RMON, "added by polling pid %" PRIu64, found[i]);
+		}
+	}
+
+	free(found);
 }
 
 void cleanup_zombie(struct rmonitor_process_info *p)
