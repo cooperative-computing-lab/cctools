@@ -1,5 +1,4 @@
 #include <assert.h>
-#include <string.h>
 
 #include "debug.h"
 #include "list.h"
@@ -55,16 +54,6 @@ struct dag_file *makeflow_hook_add_input_file(struct dag *d, struct batch_job *t
 	struct dag_file *f = dag_file_lookup_or_create(d, name_on_submission);
 	/* Indicate this is an temporary file that should be cleaned up. */
 	f->type = file_type;
-
-	/* batch_wrapper_write already lists the wrapper it creates, so an identical
-	   entry is not added twice. A duplicate input makes a TaskVine worker forsake the task. */
-	const char *inner = name_on_execution ? name_on_execution : name_on_submission;
-	struct batch_file *bf;
-	LIST_ITERATE(task->input_files, bf)
-	{
-		if (!strcmp(bf->outer_name, name_on_submission) && !strcmp(bf->inner_name, inner))
-			return f;
-	}
 
 	batch_job_add_input_file(task, name_on_submission, name_on_execution);
 
