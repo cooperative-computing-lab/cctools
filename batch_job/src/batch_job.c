@@ -12,6 +12,7 @@ See the file COPYING for details.
 #include "batch_wrapper.h"
 #include "batch_queue.h"
 
+#include "hash_table.h"
 #include "sha1.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
@@ -26,6 +27,8 @@ struct batch_job *batch_job_create(struct batch_queue *queue)
 
 	t->input_files = list_create();
 	t->output_files = list_create();
+	t->input_names = hash_table_create(0, 0);
+	t->output_names = hash_table_create(0, 0);
 
 	t->info = batch_job_info_create();
 
@@ -53,6 +56,9 @@ void batch_job_delete(struct batch_job *t)
 	}
 	list_delete(t->output_files);
 
+	hash_table_delete(t->input_names);
+	hash_table_delete(t->output_names);
+
 	rmsummary_delete(t->resources);
 
 	jx_delete(t->envlist);
@@ -62,22 +68,38 @@ void batch_job_delete(struct batch_job *t)
 	free(t);
 }
 
+/* Adds a file to a task's file list, unless the list already has that file.
+ Two different outer names for the same inner name is a fatal error. */
+static struct batch_file *add_file(struct list *files, struct hash_table *names, const char *kind, const char *outer_name, const char *inner_name)
+{
+	const char *inner = inner_name ? inner_name : outer_name;
+
+	struct batch_file *f = hash_table_lookup(names, inner);
+	if (f) {
+		if (strcmp(f->outer_name, outer_name)) {
+			fatal("%s file %s is given twice, from %s and from %s", kind, inner, f->outer_name, outer_name);
+		}
+
+		return f;
+	}
+
+	f = batch_file_create(outer_name, inner_name);
+	list_push_tail(files, f);
+	hash_table_insert(names, f->inner_name, f);
+
+	return f;
+}
+
 /** Creates new batch_file and adds to inputs. */
 struct batch_file *batch_job_add_input_file(struct batch_job *task, const char *outer_name, const char *inner_name)
 {
-	struct batch_file *f = batch_file_create(outer_name, inner_name);
-	list_push_tail(task->input_files, f);
-
-	return f;
+	return add_file(task->input_files, task->input_names, "input", outer_name, inner_name);
 }
 
 /** Creates new batch_file and adds to outputs. */
 struct batch_file *batch_job_add_output_file(struct batch_job *task, const char *outer_name, const char *inner_name)
 {
-	struct batch_file *f = batch_file_create(outer_name, inner_name);
-	list_push_tail(task->output_files, f);
-
-	return f;
+	return add_file(task->output_files, task->output_names, "output", outer_name, inner_name);
 }
 
 /** Free previous command and strdup passed command. */
