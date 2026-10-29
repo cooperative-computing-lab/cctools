@@ -252,6 +252,9 @@ static void batch_queue_vine_option_update(struct batch_queue *q, const char *wh
 	} else if (strcmp(what, "fast-abort") == 0 || strcmp(what, "disconnect-slow-workers") == 0) {
 		if (value)
 			vine_enable_disconnect_slow_workers(q->tv_manager, atof(value));
+	} else if (strcmp(what, "wait-for-workers") == 0) {
+		if (value)
+			vine_tune(q->tv_manager, "wait-for-workers", atoi(value));
 	} else if (strcmp(what, "keepalive-interval") == 0) {
 		if (value)
 			vine_tune(q->tv_manager, "keepalive-interval", atoi(value));
