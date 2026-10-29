@@ -19,7 +19,7 @@ double measure_iteration_time(struct hash_map *h)
 	struct timespec start, end;
 	clock_gettime(CLOCK_MONOTONIC, &start);
 
-	char *key;
+	__attribute__((unused)) char *key;
 	void *value;
 	HASH_MAP_ITERATE(h, key, value);
 
