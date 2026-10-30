@@ -306,6 +306,29 @@ void *hash_map_remove(struct hash_map *map, const char *key)
 	return value;
 }
 
+char ** hash_map_keys( struct hash_map *map )
+{
+	char **keys = malloc(sizeof(char*)*(map->live_count+1));
+	char *key=0;
+	void *value=0;
+	int i=0;
+	HASH_MAP_ITERATE_READONLY(map,key,value) {
+		keys[i++] = strdup(key);
+	}
+	keys[i] = 0;
+	return keys;
+}
+
+void hash_map_keys_delete( char **keys )
+{
+	free(keys);
+}
+
+void hash_map_keys_delete_vppp( char ***keys )
+{
+	hash_map_keys_delete(*keys);
+}
+
 /*
 Create a new cursor object, which will be initially positioned
 at the first valid entry in the hash_map, or at the INVALID position,
@@ -347,11 +370,12 @@ void hash_map_cursor_seek(struct hash_map_cursor *cursor, unsigned position)
 }
 
 /*
-If the cursor points to a valid position, give back that value and return true.
+If the cursor points to a valid position,
+give back that key:value and return true.
 Otherwise return false.
 */
 
-int hash_map_cursor_get(struct hash_map_cursor *cursor, void **value)
+int hash_map_cursor_get(struct hash_map_cursor *cursor, char **key, void **value)
 {
 	/* If the cursor is already invalid, return false. */
 	if (cursor->position == HASH_MAP_CURSOR_INVALID) {
@@ -379,6 +403,7 @@ int hash_map_cursor_get(struct hash_map_cursor *cursor, void **value)
 	}
 
 	/* Otherwise, we have a good value and return true. */
+	*key = e->key;
 	*value = e->value;
 	return 1;
 }
