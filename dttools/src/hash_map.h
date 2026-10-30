@@ -15,7 +15,6 @@ int    hash_map_size( struct hash_map *map );
 double hash_map_load( struct hash_map *map );
 void   hash_map_clear(struct hash_map *map, void (*delete_func)( void *) );
 void   hash_map_delete( struct hash_map *map );
-void   hash_map_delete( struct hash_map *map );
 
 struct hash_map_cursor * hash_map_cursor_create( struct hash_map *map );
 

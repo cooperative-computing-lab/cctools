@@ -197,18 +197,17 @@ int hash_map_insert(struct hash_map *map, const char *key, void *value)
 	unsigned hashkey = map->hashfunc(key);
 	unsigned pos = hashkey % map->bucket_count;
 
-	while (1) {
+	for (;; pos = (pos + 1) % map->bucket_count) {
 		struct hash_map_entry *e = map->buckets[pos];
-		if (!e) {
-			break;
-		} else if (e == HASH_MAP_TOMBSTONE) {
-			map->dead_count--;
-			break;
-		} else {
-			pos++;
-			if (pos >= map->bucket_count) {
-				pos = 0;
+		if(e) {
+			if (e == HASH_MAP_TOMBSTONE) {
+				map->dead_count--;
+				break;
+			} else {
+				/* fall through */
 			}
+		} else {
+			break;
 		}
 	}
 
@@ -223,26 +222,27 @@ void *hash_map_lookup(struct hash_map *map, const char *key)
 	if (!map || !key)
 		return 0;
 
+	struct hash_map_entry *e=0;
+	
 	unsigned hashkey = map->hashfunc(key);
 	unsigned pos = hashkey % map->bucket_count;
 
 	for (;; pos = (pos + 1) % map->bucket_count) {
-		struct hash_map_entry *e = map->buckets[pos];
-		if (!e) {
-			return 0;
-		} else {
+		e = map->buckets[pos];
+		if(e) {
 			if (e == HASH_MAP_TOMBSTONE) {
 				continue;
-			} else if (!strcmp(key, e->key)) {
-				return e->value;
+			} else if (hashkey==e->hashkey && !strcmp(key, e->key)) {
+				break;
 			} else {
 				continue;
 			}
+		} else {
+			return 0;
 		}
 	}
 
-	/* NOTREACHED */
-	return 0;
+	return e->value;
 }
 
 /*
@@ -255,21 +255,18 @@ void *hash_map_remove_stable(struct hash_map *map, const char *key)
 	if (!map || !key)
 		return 0;
 
+	struct hash_map_entry *e = 0;
+	
 	unsigned hashkey = map->hashfunc(key);
 	unsigned pos = hashkey % map->bucket_count;
 
 	for (;; pos = (pos + 1) % map->bucket_count) {
-		struct hash_map_entry *e = map->buckets[pos];
-		if (e == HASH_MAP_TOMBSTONE) {
-			continue;
-		} else if (e) {
-			if (!strcmp(key, e->key)) {
-				void *value = e->value;
-				hash_map_entry_delete(e);
-				map->buckets[pos] = HASH_MAP_TOMBSTONE;
-				map->live_count--;
-				map->dead_count++;
-				return value;
+		e = map->buckets[pos];
+		if(e) {
+  			if(e == HASH_MAP_TOMBSTONE) {
+				continue;
+			} else if (hashkey==e->hashkey && !strcmp(key, e->key)) {
+				break;
 			} else {
 				continue;
 			}
@@ -278,8 +275,14 @@ void *hash_map_remove_stable(struct hash_map *map, const char *key)
 		}
 	}
 
-	/* NOTREACHED */
-	return 0;
+	/* e now points to the entry to remove */
+	void *value = e->value;
+	hash_map_entry_delete(e);
+	map->buckets[pos] = HASH_MAP_TOMBSTONE;
+	map->live_count--;
+	map->dead_count++;
+
+	return value;
 }
 
 /*
