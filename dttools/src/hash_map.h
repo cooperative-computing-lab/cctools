@@ -11,6 +11,7 @@ int    hash_map_insert( struct hash_map *map, const char *key, void *value );
 void * hash_map_lookup( struct hash_map *map, const char *key );
 void * hash_map_remove( struct hash_map *map, const char *key );
 void * hash_map_remove_stable( struct hash_map *map, const char *key );
+
 int    hash_map_size( struct hash_map *map );
 double hash_map_load( struct hash_map *map );
 void   hash_map_clear(struct hash_map *map, void (*delete_func)( void *) );
@@ -24,8 +25,8 @@ int  hash_map_cursor_next( struct hash_map_cursor *cursor );
 void hash_map_cursor_delete( struct hash_map_cursor *cursor );
 void hash_map_cursor_delete_vpp( struct hash_map_cursor **cursor );
 
-#define HASH_MAP_ITERATE( map, key, item )					\
-  for( struct hash_map_cursor *cursor  __attribute__((cleanup(hash_map_cursor_delete_vpp))) = hash_map_cursor_create(map), *__keep_going=cursor; __keep_going; __keep_going=0) \
-    for( hash_map_cursor_seek(cursor,0); hash_map_cursor_get(cursor,(void**)&item); hash_map_cursor_next(cursor) )
+#define HASH_MAP_ITERATE( map, key, value ) \
+  for( struct hash_map_cursor *__cursor  __attribute__((cleanup(hash_map_cursor_delete_vpp))) = hash_map_cursor_create(map), *__keep_going=__cursor; __keep_going; __keep_going=0) \
+    for( hash_map_cursor_seek(__cursor,0); hash_map_cursor_get(__cursor,(void**)&value); hash_map_cursor_next(__cursor) )
 
 #endif

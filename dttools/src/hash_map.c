@@ -16,15 +16,14 @@ struct hash_map_entry {
 struct hash_map {
 	struct hash_map_entry **buckets;
 	hash_func_t hashfunc;
-	unsigned bucket_count; /* Length of the buckets array. */
-	unsigned live_count;   /* Number of valid entries in array. */
-	unsigned dead_count;   /* Number of tombstone entries in array. */
-	unsigned version;      /* Version incremented on every resize to invalidate iterators. */
+	unsigned bucket_count;   /* Length of the buckets array. */
+	unsigned live_count;     /* Number of valid entries in array. */
+	unsigned dead_count;     /* Number of tombstone entries in array. */
+	unsigned active_cursors; /* Number of cursors created on this map. */
 };
 
 struct hash_map_cursor {
 	unsigned position;
-	unsigned version;
 	struct hash_map *map;
 };
 
@@ -69,7 +68,7 @@ struct hash_map *hash_map_create(unsigned bucket_count, hash_func_t hashfunc)
 	map->bucket_count = bucket_count;
 	map->live_count = 0;
 	map->dead_count = 0;
-	map->version = 0;
+	map->active_cursors = 0;
 
 	return map;
 }
@@ -144,9 +143,6 @@ static void hash_map_rehash(struct hash_map *map, unsigned new_bucket_count)
 	map->buckets = new_buckets;
 	map->bucket_count = new_bucket_count;
 	map->dead_count = 0;
-
-	/* Bump the version number to invalidate current iterators. */
-	map->version++;
 }
 
 static void hash_map_shrink(struct hash_map *map)
@@ -165,6 +161,9 @@ static void hash_map_grow(struct hash_map *map)
 
 int hash_map_consider_rehash(struct hash_map *map)
 {
+	/* Never rehash the table while cursors are actively iterating. */
+	if(map->active_cursors>0) return 0;
+
 	unsigned live_load = map->live_count * 100 / map->bucket_count;
 	unsigned total_load = (map->live_count + map->dead_count) * 100 / map->bucket_count;
 
@@ -180,10 +179,16 @@ int hash_map_consider_rehash(struct hash_map *map)
 }
 
 /*
-Insert an item into the hash_map.  Under most conditions,
-the addition of an item to the table will not affect active
-cursor.  But if the insertion results in a rehash of the table,
-the version number will be bumped and cursors will be invalidated.
+Insert an item into the hash_map and then rehash if necessary.
+Note that *any* insertion is disallowed while a cursor is active,
+because insertion might require a rehash which would confuse cursors.
+
+Why not just optimistically permit insertions as long as there is room?
+Because this would result in a *rare* failure when repeated inserts
+left no room in the table, requiring a (prohibited) rehash.
+
+We prefer to establish a strict, easily testable rule rather than
+leave a rare, difficult to test bug.
 */
 
 int hash_map_insert(struct hash_map *map, const char *key, void *value)
@@ -191,8 +196,11 @@ int hash_map_insert(struct hash_map *map, const char *key, void *value)
 	if (!map || !key)
 		return 0;
 
-	/* Consider whether to rehash before the insert, to ensure available space. */
-	hash_map_consider_rehash(map);
+	if(map->active_cursors) {
+		fatal("hash_map_insert attempted on a table with active cursors!");
+		/* NOTREACHED */
+		return 0;
+	}
 
 	unsigned hashkey = map->hashfunc(key);
 	unsigned pos = hashkey % map->bucket_count;
@@ -221,6 +229,8 @@ int hash_map_insert(struct hash_map *map, const char *key, void *value)
 
 	map->live_count++;
 	map->buckets[pos] = hash_map_entry_create(key, value, hashkey);
+
+	hash_map_consider_rehash(map);
 
 	return 1;
 }
@@ -254,11 +264,12 @@ void *hash_map_lookup(struct hash_map *map, const char *key)
 }
 
 /*
-Remove an item from the hash_map, keeping the size stable
-so that all current iterators remain valid.
+Remove an item from the hash_map.
+This operation is safe because removals happen in place,
+and rehashes are suppressed while cursors are active.
 */
 
-void *hash_map_remove_stable(struct hash_map *map, const char *key)
+void *hash_map_remove(struct hash_map *map, const char *key)
 {
 	if (!map || !key)
 		return 0;
@@ -290,19 +301,8 @@ void *hash_map_remove_stable(struct hash_map *map, const char *key)
 	map->live_count--;
 	map->dead_count++;
 
-	return value;
-}
+	hash_map_consider_rehash(map);
 
-/*
-Remove an item from the hash_map, but permit the table
-to resize, which would result in invalidated iterators.
-*/
-
-void *hash_map_remove(struct hash_map *map, const char *key)
-{
-	void *value = hash_map_remove_stable(map, key);
-	if (value)
-		hash_map_consider_rehash(map);
 	return value;
 }
 
@@ -312,13 +312,16 @@ at the first valid entry in the hash_map, or at the INVALID position,
 if the hash_map is empty.
 */
 
-struct hash_map_cursor *hash_map_cursor_create(struct hash_map *map)
+struct hash_map_cursor *hash_map_cursor_create(struct hash_map *map )
 {
 	struct hash_map_cursor *cursor = malloc(sizeof(*cursor));
+
 	cursor->position = 0;
 	cursor->map = map;
-	cursor->version = map->version;
+	cursor->map->active_cursors++;
+
 	hash_map_cursor_seek(cursor, 0);
+
 	return cursor;
 }
 
@@ -332,15 +335,14 @@ A position of zero indicates the first valid entry.
 
 void hash_map_cursor_seek(struct hash_map_cursor *cursor, unsigned position)
 {
-	if (cursor->version != cursor->map->version) {
-		cursor->position = HASH_MAP_CURSOR_INVALID;
-	} else if (position >= cursor->map->bucket_count) {
+	if (position >= cursor->map->bucket_count) {
 		cursor->position = HASH_MAP_CURSOR_INVALID;
 	} else {
 		cursor->position = position;
 		struct hash_map_entry *e = cursor->map->buckets[cursor->position];
-		if (!e || e == HASH_MAP_TOMBSTONE)
+		if (!e || e == HASH_MAP_TOMBSTONE) {
 			hash_map_cursor_next(cursor);
+		}
 	}
 }
 
@@ -351,10 +353,6 @@ Otherwise return false.
 
 int hash_map_cursor_get(struct hash_map_cursor *cursor, void **value)
 {
-	if (cursor->version != cursor->map->version) {
-		cursor->position = HASH_MAP_CURSOR_INVALID;
-	}
-
 	/* If the cursor is already invalid, return false. */
 	if (cursor->position == HASH_MAP_CURSOR_INVALID) {
 		return 0;
@@ -370,11 +368,14 @@ int hash_map_cursor_get(struct hash_map_cursor *cursor, void **value)
 	/* Grab the bucket at that position, which may be null. */
 	struct hash_map_entry *e = cursor->map->buckets[cursor->position];
 
-	/* If there is no object at this position, return null. */
-	/* This could happen if the item was removed before calling get. */
+	/* If there is no object at this position, advance the cursor. */
+	/* This could happen if the item was removed during iteration. */
 	/* Should we advance the cursor instead? */
 	if (!e || e == HASH_MAP_TOMBSTONE) {
-		return 0;
+		hash_map_cursor_next(cursor);
+		if(cursor->position==HASH_MAP_CURSOR_INVALID) {
+			return 0;
+		}
 	}
 
 	/* Otherwise, we have a good value and return true. */
@@ -390,10 +391,6 @@ return false.
 
 int hash_map_cursor_next(struct hash_map_cursor *cursor)
 {
-	if (cursor->version != cursor->map->version) {
-		cursor->position = HASH_MAP_CURSOR_INVALID;
-	}
-
 	if (cursor->position == HASH_MAP_CURSOR_INVALID) {
 		return 0;
 	}
@@ -420,6 +417,7 @@ int hash_map_cursor_next(struct hash_map_cursor *cursor)
 
 void hash_map_cursor_delete(struct hash_map_cursor *cursor)
 {
+	cursor->map->active_cursors--;
 	free(cursor);
 }
 
