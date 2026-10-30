@@ -1799,7 +1799,7 @@ can be tailored as any other task:
     print(f.result())
     ```
 
-Additionally, the executor the Vine Factory to submit TaskVine workers.
+Additionally, the executor can use the VineFactory to submit TaskVine workers.
 Specifications for the workers can be provided via the `opts` keyword argument when creating to executor.
 
 === "Python"
@@ -1818,6 +1818,7 @@ Specifications for the workers can be provided via the `opts` keyword argument w
     f = m.submit(t)
 
     print(f.result())
+    ```
 
 Instead of tasks, the futures may also executed using [function calls](#serverless-computing) with the `future_funcall` method:
 
