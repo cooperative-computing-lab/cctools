@@ -203,8 +203,16 @@ int hash_map_insert(struct hash_map *map, const char *key, void *value)
 			if (e == HASH_MAP_TOMBSTONE) {
 				map->dead_count--;
 				break;
+			} if(hashkey==e->hashkey && !strcmp(key,e->key)) {
+				if(value==e->value) {
+					/* identical key:value exists */
+					return 1;
+				} else {
+					notice(D_DEBUG, "key %s already exists in hash table with different value, ignoring new value.", key);
+					return 0;
+				}
 			} else {
-				/* fall through */
+				continue;
 			}
 		} else {
 			break;
