@@ -19,9 +19,9 @@ double measure_iteration_time(struct hash_map *h)
 	struct timespec start, end;
 	clock_gettime(CLOCK_MONOTONIC, &start);
 
-	__attribute__((unused)) char *key;
+	char *key;
 	void *value;
-	HASH_MAP_ITERATE(h, key, value);
+	HASH_MAP_ITERATE_SNAPSHOT(h, key, value);
 
 	clock_gettime(CLOCK_MONOTONIC, &end);
 
@@ -34,7 +34,7 @@ double measure_iteration_time(struct hash_map *h)
 int main()
 {
 	int power_step = 0;
-	int power_max_step = 15; // ~64k max entries
+	int power_max_step = 13; // ~64k max entries
 
 	struct hash_map *h = hash_map_create(0, 0);
 
