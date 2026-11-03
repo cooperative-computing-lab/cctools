@@ -2138,8 +2138,7 @@ int serve_manager_by_hostport_list(struct list *manager_addresses, int use_ssl)
 
 	/* keep trying managers in the list, until all manager addresses
 	 * are tried, or a succesful connection was done */
-	list_first_item(manager_addresses);
-	while((current_manager_address = list_next_item(manager_addresses))) {
+	LIST_ITERATE(manager_addresses,current_manager_address) {
 		result = serve_manager_by_hostport(current_manager_address->host,current_manager_address->port,/*verify name*/ 0, use_ssl);
 
 		if(result) {

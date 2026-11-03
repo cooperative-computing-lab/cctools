@@ -235,7 +235,6 @@ int vine_current_transfers_wipe_worker(struct vine_manager *q, struct vine_worke
 	}
 
 	// BUG: Inefficient, implement safe remove in hash table
-	list_first_item(ids_to_remove);
 	char *transfer_id;
 	while ((transfer_id = list_pop_head(ids_to_remove))) {
 		vine_current_transfers_remove(q, transfer_id);
