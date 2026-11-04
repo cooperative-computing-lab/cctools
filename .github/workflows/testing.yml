@@ -103,6 +103,12 @@ jobs:
         uses: actions/checkout@v5
         with:
           ref: ${{ github.event.inputs.tag }}
+      - name: Install conda
+        # ubuntu-latest images from 26.04 on no longer ship conda.
+        uses: conda-incubator/setup-miniconda@v4
+        with:
+          miniforge-version: latest
+          activate-environment: ""
       - name: Conda-Setup
         run: ${GITHUB_WORKSPACE}/packaging/build-conda/setup.sh
       - name: Configure
@@ -201,6 +207,12 @@ jobs:
         uses: actions/checkout@v5
         with:
           ref: ${{ github.event.inputs.tag }}
+      - name: Install conda
+        # ubuntu-latest images from 26.04 on no longer ship conda.
+        uses: conda-incubator/setup-miniconda@v4
+        with:
+          miniforge-version: latest
+          activate-environment: ""
       - name: lint code
         run: ${GITHUB_WORKSPACE}/packaging/lint/lint.sh
 
