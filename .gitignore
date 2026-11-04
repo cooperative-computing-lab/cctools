@@ -3,6 +3,7 @@
 *.dSYM
 *.gz
 *.o
+*.d
 *.swp
 cctools.test.log
 cctools.test.tmp
