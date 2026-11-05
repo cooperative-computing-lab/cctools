@@ -209,6 +209,7 @@ int hash_map_insert(struct hash_map *map, const char *key, void *value)
 		struct hash_map_entry *e = map->buckets[pos];
 		if(e) {
 			if (e == HASH_MAP_TOMBSTONE) {
+				/* tombstone: insert here */
 				map->dead_count--;
 				break;
 			} if(hashkey==e->hashkey && !strcmp(key,e->key)) {
@@ -220,9 +221,11 @@ int hash_map_insert(struct hash_map *map, const char *key, void *value)
 					return 0;
 				}
 			} else {
+				/* different key: keep looking */
 				continue;
 			}
 		} else {
+			/* empty bucket: insert here */
 			break;
 		}
 	}
@@ -321,10 +324,13 @@ char ** hash_map_keys( struct hash_map *map )
 
 void hash_map_keys_delete( char **keys )
 {
+	for(int i=0;keys[i];i++) {
+		free(keys[i]);
+	}
 	free(keys);
 }
 
-void hash_map_keys_delete_vppp( char ***keys )
+void hash_map_keys_delete_ppp( char ***keys )
 {
 	hash_map_keys_delete(*keys);
 }
@@ -446,7 +452,7 @@ void hash_map_cursor_delete(struct hash_map_cursor *cursor)
 	free(cursor);
 }
 
-void hash_map_cursor_delete_vpp(struct hash_map_cursor **cursor)
+void hash_map_cursor_delete_pp(struct hash_map_cursor **cursor)
 {
 	hash_map_cursor_delete(*cursor);
 }
