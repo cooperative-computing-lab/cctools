@@ -16,9 +16,9 @@ struct hash_map_entry {
 struct hash_map {
 	struct hash_map_entry **buckets;
 	hash_func_t hashfunc;
-	unsigned bucket_count;   /* Length of the buckets array. */
-	unsigned live_count;     /* Number of valid entries in array. */
-	unsigned dead_count;     /* Number of tombstone entries in array. */
+	unsigned bucket_count;	 /* Length of the buckets array. */
+	unsigned live_count;	 /* Number of valid entries in array. */
+	unsigned dead_count;	 /* Number of tombstone entries in array. */
 	unsigned active_cursors; /* Number of cursors created on this map. */
 };
 
@@ -162,7 +162,8 @@ static void hash_map_grow(struct hash_map *map)
 int hash_map_consider_rehash(struct hash_map *map)
 {
 	/* Never rehash the table while cursors are actively iterating. */
-	if(map->active_cursors>0) return 0;
+	if (map->active_cursors > 0)
+		return 0;
 
 	unsigned live_load = map->live_count * 100 / map->bucket_count;
 	unsigned total_load = (map->live_count + map->dead_count) * 100 / map->bucket_count;
@@ -196,7 +197,7 @@ int hash_map_insert(struct hash_map *map, const char *key, void *value)
 	if (!map || !key)
 		return 0;
 
-	if(map->active_cursors) {
+	if (map->active_cursors) {
 		fatal("hash_map_insert attempted on a table with active cursors!");
 		/* NOTREACHED */
 		return 0;
@@ -207,13 +208,14 @@ int hash_map_insert(struct hash_map *map, const char *key, void *value)
 
 	for (;; pos = (pos + 1) % map->bucket_count) {
 		struct hash_map_entry *e = map->buckets[pos];
-		if(e) {
+		if (e) {
 			if (e == HASH_MAP_TOMBSTONE) {
 				/* tombstone: insert here */
 				map->dead_count--;
 				break;
-			} if(hashkey==e->hashkey && !strcmp(key,e->key)) {
-				if(value==e->value) {
+			}
+			if (hashkey == e->hashkey && !strcmp(key, e->key)) {
+				if (value == e->value) {
 					/* identical key:value exists */
 					return 1;
 				} else {
@@ -243,17 +245,17 @@ void *hash_map_lookup(struct hash_map *map, const char *key)
 	if (!map || !key)
 		return 0;
 
-	struct hash_map_entry *e=0;
-	
+	struct hash_map_entry *e = 0;
+
 	unsigned hashkey = map->hashfunc(key);
 	unsigned pos = hashkey % map->bucket_count;
 
 	for (;; pos = (pos + 1) % map->bucket_count) {
 		e = map->buckets[pos];
-		if(e) {
+		if (e) {
 			if (e == HASH_MAP_TOMBSTONE) {
 				continue;
-			} else if (hashkey==e->hashkey && !strcmp(key, e->key)) {
+			} else if (hashkey == e->hashkey && !strcmp(key, e->key)) {
 				break;
 			} else {
 				continue;
@@ -278,16 +280,16 @@ void *hash_map_remove(struct hash_map *map, const char *key)
 		return 0;
 
 	struct hash_map_entry *e = 0;
-	
+
 	unsigned hashkey = map->hashfunc(key);
 	unsigned pos = hashkey % map->bucket_count;
 
 	for (;; pos = (pos + 1) % map->bucket_count) {
 		e = map->buckets[pos];
-		if(e) {
-  			if(e == HASH_MAP_TOMBSTONE) {
+		if (e) {
+			if (e == HASH_MAP_TOMBSTONE) {
 				continue;
-			} else if (hashkey==e->hashkey && !strcmp(key, e->key)) {
+			} else if (hashkey == e->hashkey && !strcmp(key, e->key)) {
 				break;
 			} else {
 				continue;
@@ -309,28 +311,29 @@ void *hash_map_remove(struct hash_map *map, const char *key)
 	return value;
 }
 
-char ** hash_map_keys( struct hash_map *map )
+char **hash_map_keys(struct hash_map *map)
 {
-	char **keys = malloc(sizeof(char*)*(map->live_count+1));
-	char *key=0;
-	void *value=0;
-	int i=0;
-	HASH_MAP_ITERATE_READONLY(map,key,value) {
+	char **keys = malloc(sizeof(char *) * (map->live_count + 1));
+	char *key = 0;
+	void *value = 0;
+	int i = 0;
+	HASH_MAP_ITERATE_READONLY(map, key, value)
+	{
 		keys[i++] = strdup(key);
 	}
 	keys[i] = 0;
 	return keys;
 }
 
-void hash_map_keys_delete( char **keys )
+void hash_map_keys_delete(char **keys)
 {
-	for(int i=0;keys[i];i++) {
+	for (int i = 0; keys[i]; i++) {
 		free(keys[i]);
 	}
 	free(keys);
 }
 
-void hash_map_keys_delete_ppp( char ***keys )
+void hash_map_keys_delete_ppp(char ***keys)
 {
 	hash_map_keys_delete(*keys);
 }
@@ -341,7 +344,7 @@ at the first valid entry in the hash_map, or at the INVALID position,
 if the hash_map is empty.
 */
 
-struct hash_map_cursor *hash_map_cursor_create(struct hash_map *map )
+struct hash_map_cursor *hash_map_cursor_create(struct hash_map *map)
 {
 	struct hash_map_cursor *cursor = malloc(sizeof(*cursor));
 
@@ -403,7 +406,7 @@ int hash_map_cursor_get(struct hash_map_cursor *cursor, char **key, void **value
 	/* Should we advance the cursor instead? */
 	if (!e || e == HASH_MAP_TOMBSTONE) {
 		hash_map_cursor_next(cursor);
-		if(cursor->position==HASH_MAP_CURSOR_INVALID) {
+		if (cursor->position == HASH_MAP_CURSOR_INVALID) {
 			return 0;
 		}
 	}
