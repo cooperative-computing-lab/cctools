@@ -392,7 +392,7 @@ int hash_map_cursor_get(struct hash_map_cursor *cursor, char **key, void **value
 	}
 
 	/* If the position is off the end, convert it to invalid and return false. */
-	/* This could happen if a hash_map was shrunk while an iterator was active. */
+	/* This shouldn't happen b/c rehashing is inhibited by cursors. */
 	if (cursor->position >= cursor->map->bucket_count) {
 		cursor->position = HASH_MAP_CURSOR_INVALID;
 		return 0;
@@ -401,14 +401,11 @@ int hash_map_cursor_get(struct hash_map_cursor *cursor, char **key, void **value
 	/* Grab the bucket at that position, which may be null. */
 	struct hash_map_entry *e = cursor->map->buckets[cursor->position];
 
-	/* If there is no object at this position, advance the cursor. */
-	/* This could happen if the item was removed during iteration. */
-	/* Should we advance the cursor instead? */
+	/* If there is no object at this position, return false.. */
+	/* This would only happen if the object was removed */
+	/* after the cursor advanced to this position. */
 	if (!e || e == HASH_MAP_TOMBSTONE) {
-		hash_map_cursor_next(cursor);
-		if (cursor->position == HASH_MAP_CURSOR_INVALID) {
-			return 0;
-		}
+		return 0;
 	}
 
 	/* Otherwise, we have a good value and return true. */
@@ -455,7 +452,10 @@ void hash_map_cursor_delete(struct hash_map_cursor *cursor)
 	free(cursor);
 }
 
+/* Helper function to assist with the auto-cleanup attribute. */
+
 void hash_map_cursor_delete_pp(struct hash_map_cursor **cursor)
 {
 	hash_map_cursor_delete(*cursor);
 }
+
