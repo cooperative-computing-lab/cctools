@@ -184,7 +184,11 @@ The `compute` call above may receive the following keyword arguments:
 
 
 ## Makeflow
-Makeflow is capable of executing workflows using TaskVine workers,
+Sometimes a highly dynamic workflow is not required and all you need is
+a simple set of rules of how to create files.
+Makeflow is also more convenient if you know that your dependencies will be 
+available in the machines that will run your workflow.
+Additionally, Makeflow is capable of executing workflows using TaskVine workers,
 let's look at an example of how this is done.
 
 First, create a file called `example.makeflow` with the following contents:
@@ -212,9 +216,11 @@ capitol.jpg:
     LOCAL $(CURL) -o capitol.jpg $(URL)
 ```
 
+<small>Psst, Makeflow is also capable of using the [JX Workflow Language](https://cctools.readthedocs.io/en/stable/makeflow/#jx-workflow-language).</small>
+
 Assuming you have installed `ndcctools` through conda,
 launch the workflow in TaskVine mode:
-```sh
+```
 makeflow -T vine example.makeflow
 ```
 You can also specify a port by adding the `-p` option:
@@ -243,3 +249,13 @@ Then submit 10 workers by using the selected name:
 vine_submit_workers -T condor -M helloworm 10
 ```
 
+You can monitor the progress of the workflow using `makeflow_monitor`:
+```
+makeflow_monitor example.makeflow
+```
+
+Additionally, [Makeflow supports working with shared file system](https://cctools.readthedocs.io/en/stable/makeflow/#shared-file-systems), 
+simply indicate the directories that are shared:
+```
+makeflow --shared-fs /home --shared-fs /software -T vine -N helloworm example.makeflow
+```
