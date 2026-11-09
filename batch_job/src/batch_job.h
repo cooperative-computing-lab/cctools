@@ -22,6 +22,7 @@ used by each job.  Once submitted to a queue, the batch_job object may be delete
 
 struct batch_queue;
 struct batch_file;
+struct hash_table;
 
 /** Internal description of a single batch job submitted to a queue. */
 struct batch_job {
@@ -31,6 +32,8 @@ struct batch_job {
 	char *command;               /**< The command line to execute. */
 	struct list   *input_files;  /**< Task's required inputs, type batch_file */
 	struct list   *output_files; /**< Task's expected outputs, type batch_file */
+	struct hash_table *input_names;  /**< Index of input_files by inner name. */
+	struct hash_table *output_names; /**< Index of output_files by inner name. */
 	struct rmsummary *resources; /**< Resources assigned to task */
 	struct jx *envlist;          /**< JSON formatted environment list */ 
 	struct batch_job_info *info; /**< Stores the info struct created by batch_queue. */
@@ -52,22 +55,30 @@ void batch_job_delete(struct batch_job *t);
 /** Add file to input list of batch_job
  Creates a new batch_file from outer_name and inner_name.
  This newly created file is add to input_files.
+ If the task already has an input with the same inner_name and outer_name,
+ no new file is added and the existing one is returned. If it already has an
+ input with the same inner_name but a different outer_name, the program exits
+ with a fatal error.
  For clarifications on outer_name, inner_name, and their uses see batch_file.
 @param task The batch_job this file is being added to.
 @param outer_name The name of the file at submission/host site.
 @param inner_name The name of the file at execution site.
-@return A pointer to the newly allocated batch_file struct.
+@return A pointer to the new batch_file struct, or to the existing one if the file was already added.
 */
 struct batch_file * batch_job_add_input_file(struct batch_job *task, const char * outer_name, const char * inner_name);
 
 /** Add file to output list of batch_job
  Creates a new batch_file from outer_name and inner_name.
  This newly created file is add to output_files.
+ If the task already has an output with the same inner_name and outer_name,
+ no new file is added and the existing one is returned. If it already has an
+ output with the same inner_name but a different outer_name, the program exits
+ with a fatal error.
  For clarifications on outer_name, inner_name, and their uses see batch_file.
 @param task The batch_job this file is being added to.
 @param outer_name The name of the file at submission/host site.
 @param inner_name The name of the file at execution site.
-@return A pointer to the newly allocated batch_file struct.
+@return A pointer to the new batch_file struct, or to the existing one if the file was already added.
 */
 struct batch_file * batch_job_add_output_file(struct batch_job *task, const char * outer_name, const char * inner_name);
 
