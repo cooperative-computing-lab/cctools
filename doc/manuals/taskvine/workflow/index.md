@@ -1,6 +1,6 @@
-## Workflow Integration
+# Workflow Integration
 
-### Parsl
+## Parsl
 TaskVine can be used as a workflow execution engine for Parsl workflows.
 To install Parsl along with TaskVine, create a `conda` environment and
 install `parsl` and `ndcctools` packages:
@@ -78,7 +78,7 @@ with compute resources of
 local clusters and various performance optimizations, please refer to
 the [Parsl documentation](https://parsl.readthedocs.io/en/stable/userguide/configuring.html).
 
-### Dask
+## Dask
 
 TaskVine can be used to execute Dask workflows using a manager as Dask
 scheduler. The class `DaskVine` implements a TaskVine manager that has a
@@ -182,3 +182,80 @@ The `compute` call above may receive the following keyword arguments:
 | hoisting\_modules | Deprecated alias for `lib_modules`. |
 | import\_modules | Deprecated alias for `lib_modules`. |
 
+
+## Makeflow
+Sometimes a highly dynamic workflow is not required and all you need is
+a simple set of rules of how to create files.
+Makeflow is also more convenient if you know that your dependencies will be 
+available in the machines that will run your workflow.
+Additionally, Makeflow is capable of executing workflows using TaskVine workers,
+let's look at an example of how this is done.
+
+First, create a file called `example.makeflow` with the following contents:
+```make
+CURL=/usr/bin/curl
+CONVERT=/usr/bin/convert
+URL="https://ccl.cse.nd.edu/images/capitol.jpg"
+
+capitol.anim.gif: capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg
+    LOCAL $(CONVERT) -delay 10 -loop 0 capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg capitol.270.jpg capitol.180.jpg capitol.90.jpg capitol.anim.gif
+
+capitol.90.jpg: capitol.jpg
+    $(CONVERT) -swirl 90 capitol.jpg capitol.90.jpg
+
+capitol.180.jpg: capitol.jpg
+    $(CONVERT) -swirl 180 capitol.jpg capitol.180.jpg
+
+capitol.270.jpg: capitol.jpg
+    $(CONVERT) -swirl 270 capitol.jpg capitol.270.jpg
+
+capitol.360.jpg: capitol.jpg
+    $(CONVERT) -swirl 360 capitol.jpg capitol.360.jpg
+
+capitol.jpg:
+    LOCAL $(CURL) -o capitol.jpg $(URL)
+```
+
+<small>Psst, Makeflow is also capable of using the [JX Workflow Language](https://cctools.readthedocs.io/en/stable/makeflow/#jx-workflow-language).</small>
+
+Assuming you have installed `ndcctools` through conda,
+launch the workflow in TaskVine mode:
+```
+makeflow -T vine example.makeflow
+```
+You can also specify a port by adding the `-p` option:
+```
+makeflow -T vine -p 9127 example.makeflow
+```
+
+Then while connected to your head node, submit 10 workers to Condor ensuring
+that the port value matches:
+```
+vine_submit_workers -T condor $HOSTNAME 9127 10
+```
+
+Makeflow will send tasks to the workers until it completes. 
+Once the workflow finishes, you can send more work to the workers,
+or let them expire, which happens after 15 minutes of them being idle.
+
+### Project names
+Instead of a port you can use project names:
+```
+makeflow -T vine -N helloworm example.makeflow
+```
+
+Then submit 10 workers by using the selected name:
+```
+vine_submit_workers -T condor -M helloworm 10
+```
+
+You can monitor the progress of the workflow using `makeflow_monitor`:
+```
+makeflow_monitor example.makeflow
+```
+
+Additionally, [Makeflow supports working with shared file system](https://cctools.readthedocs.io/en/stable/makeflow/#shared-file-systems), 
+simply indicate the directories that are shared:
+```
+makeflow --shared-fs /home --shared-fs /software -T vine -N helloworm example.makeflow
+```
