@@ -83,63 +83,252 @@ Using a text editor, create a manager program called `quickstart.py` like this:
 ```python
 # quickstart.py
 
+import getpass
+import time
+
 import ndcctools.taskvine as vine
 
-# Create a new manager
-m = vine.Manager([9123, 9129])
-print(f"Listening on port {m.port}")
 
-# Declare a common input file to be shared by multiple tasks.
-f = m.declare_url("https://www.gutenberg.org/cache/epub/2600/pg2600.txt", cache="workflow")
+# This function is the work each task does. It estimates pi by picking
+# random points in a 1x1 square and counting how many land inside a
+# quarter circle of radius 1. The fraction inside is about pi/4.
+#
+# TaskVine sends this function to a worker and runs it there, so any
+# module it uses (like random) must be imported inside the function.
+def count_inside_circle(seed, samples):
+    import random
 
-# Submit several tasks using that file.
-print("Submitting tasks...")
-for keyword in ['needle', 'house', 'water']:
-    task = vine.Task(f"grep {keyword} warandpeace.txt | wc")
-    task.add_input(f, "warandpeace.txt")
-    task.set_cores(1)
-    m.submit(task)
+    # Give each task its own seed so the tasks pick different points.
+    rng = random.Random(seed)
 
-# As they complete, display the results:
-print("Waiting for tasks to complete...")
-while not m.empty():
-    task = m.wait(5)
-    if task:
-        print(f"Task {task.id} completed with result {task.output}")
+    # Each True (point inside the circle) counts as 1 in the sum.
+    return sum(
+        rng.random() ** 2 + rng.random() ** 2 <= 1
+        for _ in range(samples)
+    )
 
-print("All tasks done.")
+
+def main():
+    task_count = 16              # how many tasks to split the work into
+    samples_per_task = 500_000   # how many random points each task tests
+    total_samples = task_count * samples_per_task
+
+    # Create the manager, which hands out tasks and collects results.
+    # port=0 lets the operating system pick any free port, so it never
+    # collides with another program. The project name lets workers find
+    # this manager by name; including your username keeps it unique.
+    # Using "with" shuts the manager down cleanly when the block ends.
+    with vine.Manager(
+        port=0,
+        name=f"taskvine-pi-{getpass.getuser()}",
+    ) as manager:
+        print(f"Listening on port {manager.port} as {manager.name}")
+
+        # Describe the tasks. A PythonTask is one call of a Python
+        # function with the given arguments. Nothing runs yet; these are
+        # just descriptions of the work to be done.
+        tasks = [
+            vine.PythonTask(count_inside_circle, seed, samples_per_task)
+            for seed in range(task_count)
+        ]
+
+        # Start the clock so we can see how long the distributed run takes.
+        start = time.perf_counter()
+
+        # A factory starts worker processes for us. "local" runs them on
+        # this machine; on a cluster you would use "condor" or "slurm".
+        # Each worker gets one core, and at most four run at once.
+        workers = vine.Factory("local", manager=manager)
+        workers.min_workers = 1
+        workers.max_workers = 4
+        workers.cores = 1
+
+        # The workers start when this block begins and are stopped when
+        # it ends, so they don't keep running after the program finishes.
+        with workers:
+            # Hand every task to the manager. The manager sends them to
+            # workers as workers become available.
+            for task in tasks:
+                manager.submit(task)
+
+            total_hits = 0
+
+            # Keep collecting results until no tasks are left.
+            while not manager.empty():
+                # Wait up to 5 seconds for any task to finish. If none
+                # finishes in that time, wait returns None and we try again.
+                task = manager.wait(5)
+                if task is None:
+                    continue
+
+                # Stop with an error if a task failed.
+                if not task.successful():
+                    raise RuntimeError(
+                        f"Task {task.id} failed: {task.result_string}"
+                    )
+
+                # For a PythonTask, task.output is the function's return
+                # value, which here is the number of points inside the circle.
+                total_hits += task.output
+                print(f"Task {task.id} counted {task.output:,} points inside")
+
+        # Combine the results: the fraction of points inside the circle
+        # is about pi/4, so multiply by 4 to estimate pi.
+        elapsed = time.perf_counter() - start
+        estimate = 4 * total_hits / total_samples
+        print(f"pi is approximately {estimate:.6f} ({total_samples:,} samples)")
+        print(f"Completed in {elapsed:.1f} seconds")
+
+
+# Run main() only when this file is run directly as a program.
+if __name__ == "__main__":
+    main()
 ```
 
-Run the manager program at the command line like this:
+Run the program at the command line like this:
 
 ```
-python quickstart.py
+python3 quickstart.py
 ```
 
-It should display output like this:
-```
-Listening on port 9123
-Submitting tasks...
-Waiting for tasks to complete...
+The manager selects an available port and uses a user-specific project name.
+The local factory starts up to four workers, and the manager submits sixteen
+independent computations of 500,000 samples each. As tasks finish, their
+results are collected to estimate pi. The factory and manager both clean up
+when their `with` blocks end. To use a batch system instead, configure the
+factory for that system and its available workers.
+
+### Build on the Quick Start
+
+These short examples use the same `manager` and `workers` context managers
+shown above. Put each task example inside those blocks, submit tasks with
+`manager.submit()`, and collect completions with `manager.wait()` while
+`manager.empty()` is false.
+
+#### Run a Unix command
+
+Use `Task` for a command-line program. Attach every input file under the name
+used by the command:
+
+```python
+# A buffer is a file whose contents come from a string in your program,
+# so you don't need to create a file on disk first.
+words = manager.declare_buffer("vine moves data between workers")
+
+# A Task runs a shell command on a worker. Here it counts the words
+# in words.txt.
+task = vine.Task("wc -w words.txt")
+
+# Each task runs in its own private directory on the worker and only
+# sees the files you attach. This puts the buffer there as "words.txt",
+# the name the command expects.
+task.add_input(words, "words.txt")
+
+# Give the task to the manager to run.
+manager.submit(task)
 ```
 
-The manager is now waiting for workers to connect and begin
-requesting work. (Without any workers, nothing will happen.) You can start one worker on the same machine by opening a new shell and running:
+#### Run a Python function
 
-```
-vine_worker localhost 9123
+Use `PythonTask` to call a Python function remotely:
+
+```python
+# An ordinary Python function. It will run on a worker, not here.
+def count_words(text):
+    return len(text.split())
+
+
+# Create a task that calls count_words("TaskVine runs Python functions").
+# When it finishes, task.output holds the function's return value.
+task = vine.PythonTask(count_words, "TaskVine runs Python functions")
+manager.submit(task)
 ```
 
-The manager will send tasks to the worker for execution.  As they complete, you will see output like this:
-```
-Task 1 completed with result      12     139     824
-Task 3 completed with result      99    1199    6672
-Task 2 completed with result     536    6314   36667
-All tasks done.
+#### Request task resources
+
+Describe the resources a task needs so the worker can schedule it appropriately:
+
+```python
+task = vine.Task("python3 -c 'print(sum(i * i for i in range(1000000)))'")
+
+# Tell TaskVine what this task needs. A worker with more resources can
+# then run several such tasks at once. A task that declares nothing is
+# given a whole worker to itself.
+task.set_cores(1)      # number of CPU cores
+task.set_memory(512)   # memory in MB
+manager.submit(task)
 ```
 
-Congratulations! You have now run a simple manager application that runs tasks on one local worker.
-To scale up, simply run more workers on a cluster or cloud facility.
+#### Share local and URL inputs
+
+Declare each input once and attach it to every task that uses it. TaskVine
+caches workflow inputs for reuse. `data.txt` should be present in the manager's
+working directory:
+
+```python
+# Declare each input file once. cache="workflow" keeps a copy on each
+# worker for the whole run, so tasks that run there can reuse it
+# instead of transferring it again.
+local_data = manager.declare_file("data.txt", cache="workflow")  # a file on this machine
+book = manager.declare_url(                                      # a file downloaded from the web
+    "https://www.gutenberg.org/cache/epub/2600/pg2600.txt",
+    cache="workflow",
+)
+
+# Create one task per word. Every task uses the same two input files.
+for word in ("needle", "house", "water"):
+    task = vine.Task(f"wc -w data.txt; grep -c {word} book.txt")
+
+    # Attach both files under the names used in the command.
+    task.add_input(local_data, "data.txt")
+    task.add_input(book, "book.txt")
+    manager.submit(task)
+```
+
+#### Connect tasks with a temporary file
+
+Use the same file object as one task's output and another task's input.
+TaskVine then schedules the consumer after the producer and keeps the
+intermediate file in the cluster:
+
+```python
+book = manager.declare_url(
+    "https://www.gutenberg.org/cache/epub/2600/pg2600.txt",
+    cache="workflow",
+)
+
+# A temporary file lives only on the workers. It is never sent back to
+# this machine, which saves time when the data is only needed by
+# another task.
+word_count = manager.declare_temp()
+
+# First task: count the words in the book and write the result to
+# count.txt, which becomes the temporary file.
+count = vine.Task("wc -w book.txt > count.txt")
+count.add_input(book, "book.txt")
+count.add_output(word_count, "count.txt")
+manager.submit(count)
+
+# Second task: read the temporary file and double the number.
+# Because it needs word_count as an input, TaskVine automatically waits
+# for the first task to finish before running this one.
+double = vine.Task("awk '{print $1 * 2}' count.txt")
+double.add_input(word_count, "count.txt")
+manager.submit(double)
+```
+
+After submitting the tasks, collect and display each completed task:
+
+```python
+# Keep going until every submitted task has finished.
+while not manager.empty():
+    # Wait up to 5 seconds for a task to finish (None if none did).
+    task = manager.wait(5)
+    if task is not None:
+        # task.output is what the task printed (for a Task) or the
+        # return value (for a PythonTask).
+        print(f"Task {task.id}: {task.output}")
+```
 
 ## Example Applications
 
