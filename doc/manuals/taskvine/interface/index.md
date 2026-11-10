@@ -476,3 +476,158 @@ Pair: [2, 4, 6, 8, 4, 8, 12, 16, 6, 12, 18, 24, 8, 18, 24, 32]
 Tree: 8
 ```
 
+
+### VineReduce
+
+VineReduce is a Python package, built on TaskVine, for applications that run
+the same function on every entry of a large dataset, and then add the outputs
+together into a single result. A typical case is a high energy physics analysis
+that fills histograms from millions of collision events.
+
+You describe the data as one or more named datasets, where each dataset is a
+list of files along with the number of entries in each file. VineReduce cuts
+each file into chunks of entries, runs a **processor** function on each chunk
+as a TaskVine task, and then runs **reducer** tasks that combine the partial
+results, until there is one final result for each processor and dataset.
+Reductions start as soon as there are partial results to combine, rather than
+after all the chunks are done, and partial results stay at the workers as
+temporary files until they are combined. By default, only final results are
+brought back to the manager.
+
+VineReduce is not part of `ndcctools`. Install it with `pip` in the same
+environment as `ndcctools`:
+
+```sh
+conda install -c conda-forge ndcctools
+pip install vine-reduce
+```
+
+VineReduce needs Python 3.12 or newer. At the moment, `pip install vine-reduce`
+also installs coffea, uproot, and other high energy physics packages, even if
+your application does not use them.
+
+The following example counts the words in four books from Project Gutenberg.
+Each author is a dataset, each book is a file, and each line of a book is an
+entry:
+
+```python
+--8<-- "taskvine/interface/vine_reduce_example.py"
+```
+
+The `input` argument describes the datasets with a dictionary of the form
+`{name: {"metadata": {...}, "files": {path: entries}}}`. VineReduce uses the
+number of entries to cut the files into chunks of `chunksize` entries, without
+opening the files. A chunk is simply the path of a file and a range of
+entries, from `chunk.start` up to (but not including) `chunk.stop`.
+
+The functions `read_lines` and `count_words` are executed at the worker. For
+each chunk, the function given as `chunk_to_args` (here `read_lines`) reads the
+entries of the chunk, and what it returns is passed to the processor (here
+`count_words`). Both functions are serialized and sent along with the tasks, so
+they can be defined in the same file as the rest of the application. The input
+files, however, are not sent. The worker opens them by itself, and so the files
+need to be reachable from the workers, either in a shared filesystem, or as
+URLs that `chunk_to_args` knows how to open, such as `https://` or `root://`.
+In this example the worker runs on the same machine as the manager, and so
+local paths are enough.
+
+When no `reducer` is given, VineReduce combines two results `a` and `b` with
+`a += b`. This works for numbers, numpy arrays, histograms, and, as in this
+example, `collections.Counter`. For other kinds of results, give a function of
+two arguments as `reducer`. The reducer must be commutative and associative,
+since partial results are combined in whatever order they finish.
+
+The final result of each processor and dataset is written to
+`results/<dataset>/<processor>/` as a compressed pickle file, which can be read
+back with `vine_reduce.serialization.load`.
+
+Run the example like this:
+
+```
+python vine_reduce_example.py
+```
+
+While it runs, VineReduce shows a line for each task that finishes, and
+progress bars for the chunks, reductions, and datasets done so far. At the
+end, it should display output like this:
+
+```
+tolstoy {'needle': 4, 'house': 614, 'water': 152}
+austen {'needle': 0, 'house': 205, 'water': 12}
+```
+
+If you run the example a second time, it finishes without running any tasks
+and displays the same counts. VineReduce keeps a record of the results it has
+written in `results/vine_reduce.db`, and only computes what is missing. This
+record is tied to the description of the datasets, not to your code: if you
+modify `count_words`, delete the `results` directory before running again.
+The same record is used to continue an interrupted run, although by default
+only final results are recorded. To also save partial results to disk as the
+run goes, set `checkpoint_time` to the number of seconds of task execution
+between checkpoints.
+
+Processor and reducer tasks are placed in separate
+[categories](../resources/index.md#grouping-tasks-with-similar-resource-needs),
+with the maximum resources given to `TaskVineDistributor` as
+`resources_processor` and `resources_reducer`, for example
+`{"cores": 1, "memory_mb": 2000, "disk_mb": 4000}`. VineReduce turns on
+[resource monitoring](../resources/index.md#monitoring-and-enforcement), so
+a task that goes over its resources is terminated. When this happens to a
+processor task, VineReduce cuts its chunk in half and tries again, and also
+halves `chunksize` for the files it has not started yet. When it happens to a
+reducer task, VineReduce combines fewer results at a time (`reduction_size`,
+10 by default).
+
+The example starts its own worker with a
+[factory](../running/index.md#managing-workers-with-the-taskvine-factory).
+To use workers on a cluster instead, give the manager a
+[project name](../running/index.md#project-names-and-the-catalog-server)
+with `TaskVineDistributor(name="my-words")`, remove the factory from the
+script, and start the workers separately, for example:
+
+```
+vine_submit_workers -T condor -M my-words 10
+```
+
+`TaskVineDistributor` encrypts the connections to its workers by default.
+Workers that find the manager by its project name do this automatically, but
+workers given the host and port of the manager need the `--ssl` option.
+
+Workers on a cluster usually do not have the Python packages that your
+functions need. `vine_reduce.get_environment()` packs the current conda
+environment into a [poncho package](../data/index.md#poncho), which
+`TaskVineDistributor` then sends to the workers along with the tasks. The
+package is built once, and it is built again only when the environment
+changes:
+
+```python
+from vine_reduce import TaskVineDistributor, get_environment
+
+distributor = TaskVineDistributor(
+    name="my-words",
+    resources_processor={"cores": 1},
+    resources_reducer={"cores": 1},
+    environment=get_environment(),
+)
+```
+
+If your application already has a TaskVine manager, give it to VineReduce as
+`TaskVineDistributor(manager=m)`, and the VineReduce tasks will share that
+manager and its workers. Finally, if no `distributor` is given at all,
+VineReduce runs the tasks as local processes without TaskVine, which is
+useful to debug a processor on a small input.
+
+VineReduce was written for high energy physics. The
+[vine-cms-analysis-stack](https://github.com/cooperative-computing-lab/vine-cms-analysis-stack)
+repository has an environment and complete examples for CMS analyses written
+with coffea or with ROOT RDataFrame, running on an HTCondor pool. For coffea,
+it uses `VineReduceCoffea`, a version of VineReduce that reads each chunk as
+NanoEvents and merges coffea accumulators. The
+[vine-cms-analysis-stack-tutorials](https://github.com/cooperative-computing-lab/vine-cms-analysis-stack-tutorials)
+repository has a three-hour, hands-on tutorial based on that stack, which
+covers tuning the chunk size and resources, restarting from checkpoints, and
+dealing with chunks that fail. It was written for a session at Notre Dame, and
+some of its steps assume access to the Notre Dame cluster. The source code of
+VineReduce, and the documentation of all of its options, are in the
+[vine-reduce](https://github.com/cooperative-computing-lab/vine-reduce)
+repository.
