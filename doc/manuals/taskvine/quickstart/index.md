@@ -10,13 +10,17 @@ Then, open a terminal and install `ndcctools` like this:
 conda install -c conda-forge ndcctools
 ```
 
-Using a text editor, create a manager program called `quickstart.py` like this:
+Using a text editor, create a program called `quickstart.py` like this:
 
 ```python
---8<-- "quickstart.py"
+--8<-- "taskvine/quickstart/quickstart.py"
 ```
 
-Run the manager program at the command line like this:
+The Factory starts a local worker when the `with` block begins and stops it
+when the block ends. It obtains the connection information from the manager,
+so the program runs both the manager and its worker.
+
+Run the program at the command line like this:
 
 ```
 python quickstart.py
@@ -29,14 +33,8 @@ Submitting tasks...
 Waiting for tasks to complete...
 ```
 
-The manager is now waiting for workers to connect and begin
-requesting work. (Without any workers, nothing will happen.) You can start one worker on the same machine by opening a new shell and running:
-
-```
-vine_worker localhost 9123
-```
-
-The manager will send tasks to the worker for execution.  As they complete, you will see output like this:
+The factory starts the worker automatically. The manager sends tasks to the
+worker for execution. As they complete, you will see output like this:
 ```
 Task 1 completed with result      12     139     824
 Task 3 completed with result      99    1199    6672
@@ -45,7 +43,8 @@ All tasks done.
 ```
 
 Congratulations! You have now run a simple manager application that runs tasks on one local worker.
-To scale up, simply run more workers on a cluster or cloud facility.
+To scale up, configure the Factory to launch more workers on a cluster or cloud
+facility, as described in [Running TaskVine Applications](../running/index.md).
 
 ## Example Applications
 
