@@ -269,6 +269,29 @@ void *hash_map_lookup(struct hash_map *map, const char *key)
 }
 
 /*
+Internal function to remove item at specific position already
+determined to be valid by the caller.  Adjust counts,
+convert the entry to a tombstone, consider rehashing,
+and return the value.
+*/
+
+static void * hash_map_remove_at_position(struct hash_map *map, unsigned position)
+{
+	struct hash_map_entry *e = map->buckets[pos];
+	if(!e || e==HASH_MAP_TOMBSTONE) return 0;
+
+	void *value = e->value;
+	hash_map_entry_delete(e);
+	map->buckets[pos] = HASH_MAP_TOMBSTONE;
+	map->live_count--;
+	map->dead_count++;
+
+	hash_map_consider_rehash(map);
+
+	return value;
+}
+
+/*
 Remove an item from the hash_map.
 This operation is safe because removals happen in place,
 and rehashes are suppressed while cursors are active.
@@ -299,16 +322,7 @@ void *hash_map_remove(struct hash_map *map, const char *key)
 		}
 	}
 
-	/* e now points to the entry to remove */
-	void *value = e->value;
-	hash_map_entry_delete(e);
-	map->buckets[pos] = HASH_MAP_TOMBSTONE;
-	map->live_count--;
-	map->dead_count++;
-
-	hash_map_consider_rehash(map);
-
-	return value;
+	return hash_map_remove_at_position(map,pos);
 }
 
 char **hash_map_keys(struct hash_map *map)
@@ -412,6 +426,25 @@ int hash_map_cursor_get(struct hash_map_cursor *cursor, char **key, void **value
 	*key = e->key;
 	*value = e->value;
 	return 1;
+}
+
+/*
+Remove the item at the current cursor position.
+Further gets at this position will return null,
+until the cursor is advanced to the next position.
+*/
+
+void * hash_map_cursor_remove(struct hash_map_cursor *cursor )
+{
+	if(cursor->position==HASH_MAP_CURSOR_INVALID) {
+		return 0;
+	}
+
+	if(cursor->position>=cursor->map->bucket_count) {
+		return 0;
+	}
+
+	return hash_map_remove_at_position(cursor->map,cursor->position);
 }
 
 /*
