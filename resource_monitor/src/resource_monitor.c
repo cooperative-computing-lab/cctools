@@ -188,9 +188,10 @@ int rmonitor_queue_fd = -1; /* File descriptor of a datagram socket to which (gr
 			      grandchildren processes report to the monitor. */
 static int rmonitor_inotify_fd = -1;
 
-pid_t first_process_pid;	      /* pid of the process given at the command line. */
-int first_process_sigchild_status;    /* exit status flags of the process given at the command line */
-int first_process_already_waited = 0; /* exit status flags of the process given at the command line */
+pid_t first_process_pid;				     /* pid of the process given at the command line. */
+volatile sig_atomic_t first_process_sigchild_status;	     /* exit status flags of the process given at the command line */
+volatile sig_atomic_t first_process_already_waited = 0;	     /* whether the process given at the command line was waited for. */
+static volatile sig_atomic_t first_process_exit_pending = 0; /* set by the SIGCHLD handler, cleared by rmonitor_handle_first_process_exit */
 int first_process_exit_status = 0;
 int first_pid_manually_set = 0; /* whether --pid was used */
 
@@ -1566,41 +1567,64 @@ void rmonitor_forward_signal(const int signal, siginfo_t *info, void *data)
 	}
 }
 
-/* sigchild signal handler */
+/* sigchild signal handler.
+ *
+ * This handler may interrupt the main loop while it is iterating over
+ * processes (or any other table), so it must not touch the tables:
+ * ITABLE_ITERATE here would invalidate the iteration of the main loop.
+ * It only reaps the first process and sets a flag. The rest is done by
+ * rmonitor_handle_first_process_exit, called from the main loop. */
 void rmonitor_check_child(const int signal)
 {
-	uint64_t pid = waitpid(first_process_pid, &first_process_sigchild_status, WNOHANG | WCONTINUED | WUNTRACED);
+	int status;
+	pid_t pid = waitpid(first_process_pid, &status, WNOHANG | WCONTINUED | WUNTRACED);
 
-	if (pid != (uint64_t)first_process_pid)
+	if (pid != first_process_pid)
 		return;
+
+	if (WIFCONTINUED(status)) {
+		return;
+	}
+
+	if (WIFSTOPPED(status) && WSTOPSIG(status) != SIGTTIN && WSTOPSIG(status) != SIGTTOU) {
+		return;
+	}
+
+	first_process_sigchild_status = status;
+	first_process_already_waited = 1;
+	first_process_exit_pending = 1;
+}
+
+/* Finish handling the exit of the first process detected by rmonitor_check_child. */
+void rmonitor_handle_first_process_exit(void)
+{
+	if (!first_process_exit_pending) {
+		return;
+	}
+	first_process_exit_pending = 0;
+
+	int status = first_process_sigchild_status;
 
 	debug(D_RMON, "got SIGCHLD from %d", first_process_pid);
 
-	if (WIFEXITED(first_process_sigchild_status)) {
+	if (WIFEXITED(status)) {
 		debug(D_RMON, "exit\n");
-	} else if (WIFSIGNALED(first_process_sigchild_status)) {
+	} else if (WIFSIGNALED(status)) {
 		debug(D_RMON, "signal\n");
-	} else if (WIFSTOPPED(first_process_sigchild_status)) {
+	} else if (WIFSTOPPED(status)) {
 		debug(D_RMON, "stop\n");
 
-		switch (WSTOPSIG(first_process_sigchild_status)) {
+		switch (WSTOPSIG(status)) {
 		case SIGTTIN:
 			debug(D_NOTICE, "Process asked for input from the terminal, try the -f option to bring the child process in foreground.\n");
 			break;
 		case SIGTTOU:
 			debug(D_NOTICE, "Process wants to write to the standard output, but the current terminal settings do not allow this. Please try the -f option to bring the child process in foreground.\n");
 			break;
-		default:
-			return;
-			break;
 		}
-	} else if (WIFCONTINUED(first_process_sigchild_status)) {
-		debug(D_RMON, "continue\n");
-		return;
 	}
 
-	first_process_already_waited = 1;
-
+	uint64_t pid;
 	struct rmonitor_process_info *p;
 	int iteration;
 
@@ -1648,6 +1672,8 @@ void rmonitor_final_cleanup()
 			rmonitor_check_child(0);
 		}
 	}
+
+	rmonitor_handle_first_process_exit();
 
 	if (lib_helper_extracted) {
 		cleanup_library();
@@ -2104,6 +2130,7 @@ int rmonitor_resources(long int interval /*in seconds */)
 
 		release_waiting_processes();
 
+		rmonitor_handle_first_process_exit();
 		cleanup_zombies();
 
 		if (record_snapshot(snapshot)) {
@@ -2130,6 +2157,7 @@ int rmonitor_resources(long int interval /*in seconds */)
 
 		// cleanup processes which by terminating may have awaken
 		// select.
+		rmonitor_handle_first_process_exit();
 		cleanup_zombies();
 
 		round++;
