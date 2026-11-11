@@ -2096,7 +2096,7 @@ class Factory(object):
     # One of `manager_name`, `manager_host_port`, or `manager` should be specified.
     # If factory_binary or worker_binary is not
     # specified, $PATH will be searched.
-    def __init__(self, batch_type="local", manager=None, manager_host_port=None, manager_name=None, factory_binary=None, worker_binary=None, log_file=os.devnull):
+    def __init__(self, batch_type="local", manager=None, manager_host_port=None, manager_name=None, factory_binary=None, worker_binary=None, log_file=os.devnull, **options):
         self._config_file = None
         self._factory_proc = None
         self._log_file = log_file
@@ -2117,6 +2117,11 @@ class Factory(object):
             # we need to use some other directory.
             self._opts["scratch-dir"] = os.path.dirname(manager.staging_directory)
             pathlib.Path.mkdir(pathlib.Path(self._opts["scratch-dir"]), exist_ok=True, parents=True)
+
+        for name, value in options.items():
+            if name.replace("_", "-") not in self._command_line_options:
+                raise TypeError(f"Unexpected Factory option: {name!r}")
+            setattr(self, name, value)
 
     def _set_manager(self, batch_type, manager, manager_host_port, manager_name):
         if manager:
