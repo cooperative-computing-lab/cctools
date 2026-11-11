@@ -188,9 +188,9 @@ int rmonitor_queue_fd = -1; /* File descriptor of a datagram socket to which (gr
 			      grandchildren processes report to the monitor. */
 static int rmonitor_inotify_fd = -1;
 
-pid_t first_process_pid;	      /* pid of the process given at the command line. */
-volatile sig_atomic_t first_process_sigchild_status; /* exit status flags of the process given at the command line */
-volatile sig_atomic_t first_process_already_waited = 0; /* whether the process given at the command line was waited for. */
+pid_t first_process_pid;				     /* pid of the process given at the command line. */
+volatile sig_atomic_t first_process_sigchild_status;	     /* exit status flags of the process given at the command line */
+volatile sig_atomic_t first_process_already_waited = 0;	     /* whether the process given at the command line was waited for. */
 static volatile sig_atomic_t first_process_exit_pending = 0; /* set by the SIGCHLD handler, cleared by rmonitor_handle_first_process_exit */
 int first_process_exit_status = 0;
 int first_pid_manually_set = 0; /* whether --pid was used */
