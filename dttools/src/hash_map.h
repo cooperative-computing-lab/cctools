@@ -24,6 +24,7 @@ struct hash_map_cursor * hash_map_cursor_create( struct hash_map *map );
 
 void hash_map_cursor_seek( struct hash_map_cursor *cursor, unsigned pos );
 int  hash_map_cursor_get( struct hash_map_cursor *cursor, char **key, void **value );
+void * hash_map_cursor_remove( struct hash_map_cursor *cursor );
 int  hash_map_cursor_next( struct hash_map_cursor *cursor );
 void hash_map_cursor_delete( struct hash_map_cursor *cursor );
 void hash_map_cursor_delete_pp( struct hash_map_cursor **cursor );
