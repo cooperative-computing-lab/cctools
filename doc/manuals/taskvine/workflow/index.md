@@ -6,11 +6,13 @@ To install Parsl along with TaskVine, create a `conda` environment and
 install `parsl` and `ndcctools` packages:
 
 ```sh
-conda install ndcctools parsl
+conda create -y --name parsl-vine
+conda activate parsl-vine
+conda install -y -c conda-forge ndcctools parsl
 ```
-Using Parsl with TaskVine is as easy as loading the TaskVineExecutor
-configuration and running the workflow as usual. For example,
-below is a simple Parsl application executing a function remotely.
+Parsl uses a configuration object to assign the executor module, resource
+types and scaling parameters. A local TaskVine configuration is included in
+the Parsl library. It is used in a simple example below. 
 
 === "Python"
     ```python
@@ -20,63 +22,78 @@ below is a simple Parsl application executing a function remotely.
 
     @python_app
     def double(x):
-        return x*2
+        return x * 2
 
-    with parsl.load(config=config) as dfk:
-        future = double(1)
-        assert future.result() == 2
+    with parsl.load(config=config):
+        futures = [double(i) for i in range(10)]
+        print([f.result() for f in futures])
     ```
 Save this file as `parsl_vine_example.py`. Running
 `python parsl_vine_example.py`
 will automatically spawn a local worker to execute the function call.
 
-In order to use the TaskVineExecutor with remote resources, you will need to create a configuration as shown below. Using the TaskVine Factory is the simplest way of deploying remote workers. Here a configuration for HTCondor is shown. It is necessary to include a `project_name` in the `TaskVineManagerConfig` in order for the Factory to find the manager.
+In order to use the TaskVineExecutor with remote resources, you will need to create your own configuration. 
+Below is the previous application using a configuration for an execution on an HTCondor cluster. 
+It is necessary to include a `project_name` in the `TaskVineManagerConfig` in order for the Factory to find the manager. 
 
 === "Python"
     ```python
-
     import parsl
     from parsl import python_app
     from parsl.config import Config
-    from parsl.executors.taskvine import TaskVineExecutor
-    from parsl.executors.taskvine import TaskVineFactoryConfig
-    from parsl.executors.taskvine import TaskVineManagerConfig
+    from parsl.executors.taskvine import TaskVineExecutor, TaskVineFactoryConfig, TaskVineManagerConfig
 
     config = Config(
         executors=[
             TaskVineExecutor(
-                factory_config=TaskVineFactoryConfig(
-                    batch_type="condor",
-                    min_workers=1,
-                    max_workers=1,
-                    cores=12,
-                ),
                 manager_config=TaskVineManagerConfig(
                     project_name="taskvine_parsl",
-                )
+                ),
+                factory_config=TaskVineFactoryConfig(
+                    batch_type="condor",  # submit workers as HTCondor jobs
+                    min_workers=1,
+                    max_workers=4,
+                    cores=12,             # cores requested per worker
+                ),
             )
         ]
     )
 
-    l = ["Cooperative", "Computing", "Lab"]
-
     @python_app
-    def hello_taskvine(x, l=l):
-        return l[x]
+    def double(x):
+        return x * 2
 
-    with parsl.load(config=config) as dfk:
-        futures = []
-        for i in range(3):
-            futures.append(hello_taskvine(i))
-
-        for i in futures:
-            print(i.result())
+    with parsl.load(config=config):
+        futures = [double(i) for i in range(10)]
+        print([f.result() for f in futures])
     ```
 
-For more details on how to configure Parsl+TaskVine to scale applications
-with compute resources of
-local clusters and various performance optimizations, please refer to
-the [Parsl documentation](https://parsl.readthedocs.io/en/stable/userguide/configuring.html).
+The tables below describe commonly used options. `TaskVineManagerConfig`
+configures the manager that schedules Parsl apps as TaskVine tasks:
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `project_name` | `None` | Name the manager reports to the catalog server. Workers and the factory use it to find the manager. |
+| `port` | `9123` | Port the manager listens on. `0` picks any available port. |
+| `tune_parameters` | `None` | A dictionary of `vine_tune` parameters, e.g. `{"hungry-minimum": 20}`. |
+
+`TaskVineFactoryConfig` configures the [TaskVine Factory](../running/index.md#managing-workers-with-the-taskvine-factory),
+which submits workers to a batch system:
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `batch_type` | `"local"` | Where workers are started: `"local"`, `"condor"`, `"slurm"`, `"sge"`, etc. |
+| `min_workers` | `1` | Minimum number of workers to keep connected. |
+| `max_workers` | `1` | Maximum number of workers to submit. |
+| `cores`, `memory`, `disk`, `gpus` | `None` | Resources each worker requests. Memory and disk are in MB. `None` uses the whole machine the worker lands on. |
+
+
+For the complete list of options, see the Parsl API reference for
+[TaskVineManagerConfig](https://parsl.readthedocs.io/en/stable/stubs/parsl.executors.taskvine.TaskVineManagerConfig.html),
+[TaskVineFactoryConfig](https://parsl.readthedocs.io/en/stable/stubs/parsl.executors.taskvine.TaskVineFactoryConfig.html),
+and [TaskVineExecutor](https://parsl.readthedocs.io/en/stable/stubs/parsl.executors.taskvine.TaskVineExecutor.html).
+For general guidance on configuring Parsl, see the
+[Parsl configuration guide](https://parsl.readthedocs.io/en/stable/userguide/configuration/index.html).
 
 ### Dask
 
