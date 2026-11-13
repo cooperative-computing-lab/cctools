@@ -213,7 +213,7 @@ int hash_table_insert(struct hash_table *table, const char *key, const void *val
 		if (e) {
 			if (e == HASH_TABLE_TOMBSTONE) {
 				/* Use the first tombstone found, but only after ensuring no match. */
-				if(found_tombstone!=HASH_TABLE_CURSOR_INVALID) {
+				if (found_tombstone != HASH_TABLE_CURSOR_INVALID) {
 					found_tombstone = pos;
 				}
 				continue;
@@ -236,8 +236,8 @@ int hash_table_insert(struct hash_table *table, const char *key, const void *val
 		}
 	}
 
-	if(found_tombstone!=HASH_TABLE_CURSOR_INVALID) {
-		pos = found_tombstone;;
+	if (found_tombstone != HASH_TABLE_CURSOR_INVALID) {
+		pos = found_tombstone;
 		table->dead_count--;
 	}
 
