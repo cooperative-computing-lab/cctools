@@ -36,6 +36,8 @@ HASH_TABLE_ITERATE(table, iteration, &key, &value) {
 </pre>
 */
 
+#include "hash_string.h"
+
 /** The type signature for a hash function given to @ref hash_table_create */
 
 typedef unsigned (*hash_func_t) (const char *key);
