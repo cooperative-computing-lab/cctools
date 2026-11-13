@@ -132,7 +132,7 @@ static void hash_table_rehash(struct hash_table *table, unsigned new_bucket_coun
 			unsigned newpos = e->hashkey % new_bucket_count;
 			while (new_buckets[newpos]) {
 				newpos++;
-				if (newpos > new_bucket_count)
+				if (newpos >= new_bucket_count)
 					newpos = 0;
 			}
 			new_buckets[newpos] = e;
@@ -206,14 +206,17 @@ int hash_table_insert(struct hash_table *table, const char *key, const void *val
 
 	unsigned hashkey = table->hashfunc(key);
 	unsigned pos = hashkey % table->bucket_count;
+	unsigned found_tombstone = HASH_TABLE_CURSOR_INVALID;
 
 	for (;; pos = (pos + 1) % table->bucket_count) {
 		struct hash_table_entry *e = table->buckets[pos];
 		if (e) {
 			if (e == HASH_TABLE_TOMBSTONE) {
-				/* tombstone: insert here */
-				table->dead_count--;
-				break;
+				/* Use the first tombstone found, but only after ensuring no match. */
+				if(found_tombstone!=HASH_TABLE_CURSOR_INVALID) {
+					found_tombstone = pos;
+				}
+				continue;
 			}
 			if (hashkey == e->hashkey && !strcmp(key, e->key)) {
 				if (value == e->value) {
@@ -231,6 +234,11 @@ int hash_table_insert(struct hash_table *table, const char *key, const void *val
 			/* empty bucket: insert here */
 			break;
 		}
+	}
+
+	if(found_tombstone!=HASH_TABLE_CURSOR_INVALID) {
+		pos = found_tombstone;;
+		table->dead_count--;
 	}
 
 	table->live_count++;
