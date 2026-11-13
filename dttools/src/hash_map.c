@@ -1,5 +1,5 @@
 
-#include "hash_map.h"
+#include "hash_table.h"
 #include "debug.h"
 #include "xxmalloc.h"
 
@@ -7,39 +7,39 @@
 #include <stdlib.h>
 #include <string.h>
 
-struct hash_map_entry {
+struct hash_table_entry {
 	char *key;
 	void *value;
 	unsigned hashkey;
 };
 
-struct hash_map {
-	struct hash_map_entry **buckets;
+struct hash_table {
+	struct hash_table_entry **buckets;
 	hash_func_t hashfunc;
 	unsigned bucket_count;	 /* Length of the buckets array. */
 	unsigned live_count;	 /* Number of valid entries in array. */
 	unsigned dead_count;	 /* Number of tombstone entries in array. */
-	unsigned active_cursors; /* Number of cursors created on this map. */
+	unsigned active_cursors; /* Number of cursors created on this table. */
 };
 
-struct hash_map_cursor {
+struct hash_table_cursor {
 	unsigned position;
-	struct hash_map *map;
+	struct hash_table *table;
 };
 
-#define HASH_MAP_LOAD_FACTOR_MIN 10
-#define HASH_MAP_LOAD_FACTOR_MAX 30
-#define HASH_MAP_SIZE_MIN 127
+#define HASH_TABLE_LOAD_FACTOR_MIN 10
+#define HASH_TABLE_LOAD_FACTOR_MAX 30
+#define HASH_TABLE_SIZE_MIN 127
 
 /* A value indicating a deleted object occupied this bucket. */
-#define HASH_MAP_TOMBSTONE ((struct hash_map_entry *)(-1))
+#define HASH_TABLE_TOMBSTONE ((struct hash_table_entry *)(-1))
 
 /* A value indicating that a cursor does not point to a valid entry. */
-#define HASH_MAP_CURSOR_INVALID ((unsigned)-1)
+#define HASH_TABLE_CURSOR_INVALID ((unsigned)-1)
 
-static struct hash_map_entry *hash_map_entry_create(const char *key, void *value, unsigned hashkey)
+static struct hash_table_entry *hash_table_entry_create(const char *key, void *value, unsigned hashkey)
 {
-	struct hash_map_entry *e = malloc(sizeof(*e));
+	struct hash_table_entry *e = malloc(sizeof(*e));
 	e->key = xxstrdup(key);
 	/* Note that e->value is neither allocated nor deleted by this module. */
 	e->value = value;
@@ -47,47 +47,47 @@ static struct hash_map_entry *hash_map_entry_create(const char *key, void *value
 	return e;
 }
 
-static void hash_map_entry_delete(struct hash_map_entry *e)
+static void hash_table_entry_delete(struct hash_table_entry *e)
 {
 	free(e->key);
 	/* Note that e->value is neither allocated nor deleted by this module. */
 	free(e);
 }
 
-struct hash_map *hash_map_create(unsigned bucket_count, hash_func_t hashfunc)
+struct hash_table *hash_table_create(unsigned bucket_count, hash_func_t hashfunc)
 {
-	struct hash_map *map = malloc(sizeof(*map));
+	struct hash_table *table = malloc(sizeof(*table));
 
 	if (bucket_count < 1)
-		bucket_count = HASH_MAP_SIZE_MIN;
+		bucket_count = HASH_TABLE_SIZE_MIN;
 	if (!hashfunc)
 		hashfunc = hash_string;
 
-	map->buckets = calloc(bucket_count, sizeof(struct hash_map_entry *));
-	map->hashfunc = hashfunc;
-	map->bucket_count = bucket_count;
-	map->live_count = 0;
-	map->dead_count = 0;
-	map->active_cursors = 0;
+	table->buckets = calloc(bucket_count, sizeof(struct hash_table_entry *));
+	table->hashfunc = hashfunc;
+	table->bucket_count = bucket_count;
+	table->live_count = 0;
+	table->dead_count = 0;
+	table->active_cursors = 0;
 
-	return map;
+	return table;
 }
 
-void hash_map_delete(struct hash_map *map)
+void hash_table_delete(struct hash_table *table)
 {
-	hash_map_clear(map, 0);
-	free(map->buckets);
-	free(map);
+	hash_table_clear(table, 0);
+	free(table->buckets);
+	free(table);
 }
 
-int hash_map_size(struct hash_map *map)
+int hash_table_size(struct hash_table *table)
 {
-	return map->live_count;
+	return table->live_count;
 }
 
-double hash_map_load(struct hash_map *map)
+double hash_table_load(struct hash_table *table)
 {
-	return ((double)map->live_count) / map->bucket_count;
+	return ((double)table->live_count) / table->bucket_count;
 }
 
 /*
@@ -98,21 +98,21 @@ shortcuts the usual delete function, so as to avoid
 since the likely next step is to delete the table.
 */
 
-void hash_map_clear(struct hash_map *map, void (*deletefunc)(void *))
+void hash_table_clear(struct hash_table *table, void (*deletefunc)(void *))
 {
-	for (unsigned i = 0; i < map->bucket_count; i++) {
-		struct hash_map_entry *e = map->buckets[i];
+	for (unsigned i = 0; i < table->bucket_count; i++) {
+		struct hash_table_entry *e = table->buckets[i];
 		if (e) {
-			if (e != HASH_MAP_TOMBSTONE) {
+			if (e != HASH_TABLE_TOMBSTONE) {
 				if (deletefunc)
 					deletefunc(e->value);
-				hash_map_entry_delete(e);
+				hash_table_entry_delete(e);
 			}
-			map->buckets[i] = 0;
+			table->buckets[i] = 0;
 		}
 	}
-	map->live_count = 0;
-	map->dead_count = 0;
+	table->live_count = 0;
+	table->dead_count = 0;
 }
 
 /*
@@ -121,13 +121,13 @@ transferring all of the live objects over, and disposing of the old bucket array
 Note that a rehash may invalidate current cursors into the table.
 */
 
-static void hash_map_rehash(struct hash_map *map, unsigned new_bucket_count)
+static void hash_table_rehash(struct hash_table *table, unsigned new_bucket_count)
 {
-	struct hash_map_entry **new_buckets = calloc(new_bucket_count, sizeof(struct hash_map_entry *));
+	struct hash_table_entry **new_buckets = calloc(new_bucket_count, sizeof(struct hash_table_entry *));
 
-	for (unsigned i = 0; i < map->bucket_count; i++) {
-		struct hash_map_entry *e = map->buckets[i];
-		if (e && e != HASH_MAP_TOMBSTONE) {
+	for (unsigned i = 0; i < table->bucket_count; i++) {
+		struct hash_table_entry *e = table->buckets[i];
+		if (e && e != HASH_TABLE_TOMBSTONE) {
 			unsigned newpos = e->hashkey % new_bucket_count;
 			while (new_buckets[newpos]) {
 				newpos++;
@@ -138,49 +138,49 @@ static void hash_map_rehash(struct hash_map *map, unsigned new_bucket_count)
 		}
 	}
 
-	free(map->buckets);
+	free(table->buckets);
 
-	map->buckets = new_buckets;
-	map->bucket_count = new_bucket_count;
-	map->dead_count = 0;
+	table->buckets = new_buckets;
+	table->bucket_count = new_bucket_count;
+	table->dead_count = 0;
 }
 
-static void hash_map_shrink(struct hash_map *map)
+static void hash_table_shrink(struct hash_table *table)
 {
-	unsigned new_bucket_count = ((map->bucket_count + 1) / 2) - 1;
-	hash_map_rehash(map, new_bucket_count);
+	unsigned new_bucket_count = ((table->bucket_count + 1) / 2) - 1;
+	hash_table_rehash(table, new_bucket_count);
 }
 
-static void hash_map_grow(struct hash_map *map)
+static void hash_table_grow(struct hash_table *table)
 {
-	unsigned new_bucket_count = ((map->bucket_count + 1) * 2) - 1;
-	hash_map_rehash(map, new_bucket_count);
+	unsigned new_bucket_count = ((table->bucket_count + 1) * 2) - 1;
+	hash_table_rehash(table, new_bucket_count);
 }
 
 /* Consider the current size of the table and grow or shrink as necessary. */
 
-int hash_map_consider_rehash(struct hash_map *map)
+int hash_table_consider_rehash(struct hash_table *table)
 {
 	/* Never rehash the table while cursors are actively iterating. */
-	if (map->active_cursors > 0)
+	if (table->active_cursors > 0)
 		return 0;
 
-	unsigned live_load = map->live_count * 100 / map->bucket_count;
-	unsigned total_load = (map->live_count + map->dead_count) * 100 / map->bucket_count;
+	unsigned live_load = table->live_count * 100 / table->bucket_count;
+	unsigned total_load = (table->live_count + table->dead_count) * 100 / table->bucket_count;
 
-	if (live_load < HASH_MAP_LOAD_FACTOR_MIN && map->bucket_count > HASH_MAP_SIZE_MIN) {
-		hash_map_shrink(map);
-		return map->bucket_count;
-	} else if (total_load > HASH_MAP_LOAD_FACTOR_MAX) {
-		hash_map_grow(map);
-		return map->bucket_count;
+	if (live_load < HASH_TABLE_LOAD_FACTOR_MIN && table->bucket_count > HASH_TABLE_SIZE_MIN) {
+		hash_table_shrink(table);
+		return table->bucket_count;
+	} else if (total_load > HASH_TABLE_LOAD_FACTOR_MAX) {
+		hash_table_grow(table);
+		return table->bucket_count;
 	} else {
 		return 0;
 	}
 }
 
 /*
-Insert an item into the hash_map and then rehash if necessary.
+Insert an item into the hash_table and then rehash if necessary.
 Note that *any* insertion is disallowed while a cursor is active,
 because insertion might require a rehash which would confuse cursors.
 
@@ -192,26 +192,26 @@ We prefer to establish a strict, easily testable rule rather than
 leave a rare, difficult to test bug.
 */
 
-int hash_map_insert(struct hash_map *map, const char *key, void *value)
+int hash_table_insert(struct hash_table *table, const char *key, void *value)
 {
-	if (!map || !key)
+	if (!table || !key)
 		return 0;
 
-	if (map->active_cursors) {
-		fatal("hash_map_insert attempted on a table with active cursors!");
+	if (table->active_cursors) {
+		fatal("hash_table_insert attempted on a table with active cursors!");
 		/* NOTREACHED */
 		return 0;
 	}
 
-	unsigned hashkey = map->hashfunc(key);
-	unsigned pos = hashkey % map->bucket_count;
+	unsigned hashkey = table->hashfunc(key);
+	unsigned pos = hashkey % table->bucket_count;
 
-	for (;; pos = (pos + 1) % map->bucket_count) {
-		struct hash_map_entry *e = map->buckets[pos];
+	for (;; pos = (pos + 1) % table->bucket_count) {
+		struct hash_table_entry *e = table->buckets[pos];
 		if (e) {
-			if (e == HASH_MAP_TOMBSTONE) {
+			if (e == HASH_TABLE_TOMBSTONE) {
 				/* tombstone: insert here */
-				map->dead_count--;
+				table->dead_count--;
 				break;
 			}
 			if (hashkey == e->hashkey && !strcmp(key, e->key)) {
@@ -232,28 +232,28 @@ int hash_map_insert(struct hash_map *map, const char *key, void *value)
 		}
 	}
 
-	map->live_count++;
-	map->buckets[pos] = hash_map_entry_create(key, value, hashkey);
+	table->live_count++;
+	table->buckets[pos] = hash_table_entry_create(key, value, hashkey);
 
-	hash_map_consider_rehash(map);
+	hash_table_consider_rehash(table);
 
 	return 1;
 }
 
-void *hash_map_lookup(struct hash_map *map, const char *key)
+void *hash_table_lookup(struct hash_table *table, const char *key)
 {
-	if (!map || !key)
+	if (!table || !key)
 		return 0;
 
-	struct hash_map_entry *e = 0;
+	struct hash_table_entry *e = 0;
 
-	unsigned hashkey = map->hashfunc(key);
-	unsigned pos = hashkey % map->bucket_count;
+	unsigned hashkey = table->hashfunc(key);
+	unsigned pos = hashkey % table->bucket_count;
 
-	for (;; pos = (pos + 1) % map->bucket_count) {
-		e = map->buckets[pos];
+	for (;; pos = (pos + 1) % table->bucket_count) {
+		e = table->buckets[pos];
 		if (e) {
-			if (e == HASH_MAP_TOMBSTONE) {
+			if (e == HASH_TABLE_TOMBSTONE) {
 				continue;
 			} else if (hashkey == e->hashkey && !strcmp(key, e->key)) {
 				break;
@@ -275,42 +275,42 @@ convert the entry to a tombstone, consider rehashing,
 and return the value.
 */
 
-static void * hash_map_remove_at_position(struct hash_map *map, unsigned position)
+static void * hash_table_remove_at_position(struct hash_table *table, unsigned position)
 {
-	struct hash_map_entry *e = map->buckets[pos];
-	if(!e || e==HASH_MAP_TOMBSTONE) return 0;
+	struct hash_table_entry *e = table->buckets[pos];
+	if(!e || e==HASH_TABLE_TOMBSTONE) return 0;
 
 	void *value = e->value;
-	hash_map_entry_delete(e);
-	map->buckets[pos] = HASH_MAP_TOMBSTONE;
-	map->live_count--;
-	map->dead_count++;
+	hash_table_entry_delete(e);
+	table->buckets[pos] = HASH_TABLE_TOMBSTONE;
+	table->live_count--;
+	table->dead_count++;
 
-	hash_map_consider_rehash(map);
+	hash_table_consider_rehash(table);
 
 	return value;
 }
 
 /*
-Remove an item from the hash_map.
+Remove an item from the hash_table.
 This operation is safe because removals happen in place,
 and rehashes are suppressed while cursors are active.
 */
 
-void *hash_map_remove(struct hash_map *map, const char *key)
+void *hash_table_remove(struct hash_table *table, const char *key)
 {
-	if (!map || !key)
+	if (!table || !key)
 		return 0;
 
-	struct hash_map_entry *e = 0;
+	struct hash_table_entry *e = 0;
 
-	unsigned hashkey = map->hashfunc(key);
-	unsigned pos = hashkey % map->bucket_count;
+	unsigned hashkey = table->hashfunc(key);
+	unsigned pos = hashkey % table->bucket_count;
 
-	for (;; pos = (pos + 1) % map->bucket_count) {
-		e = map->buckets[pos];
+	for (;; pos = (pos + 1) % table->bucket_count) {
+		e = table->buckets[pos];
 		if (e) {
-			if (e == HASH_MAP_TOMBSTONE) {
+			if (e == HASH_TABLE_TOMBSTONE) {
 				continue;
 			} else if (hashkey == e->hashkey && !strcmp(key, e->key)) {
 				break;
@@ -322,16 +322,16 @@ void *hash_map_remove(struct hash_map *map, const char *key)
 		}
 	}
 
-	return hash_map_remove_at_position(map,pos);
+	return hash_table_remove_at_position(table,pos);
 }
 
-char **hash_map_keys(struct hash_map *map)
+char **hash_table_keys(struct hash_table *table)
 {
-	char **keys = malloc(sizeof(char *) * (map->live_count + 1));
+	char **keys = malloc(sizeof(char *) * (table->live_count + 1));
 	char *key = 0;
 	void *value = 0;
 	int i = 0;
-	HASH_MAP_ITERATE_READONLY(map, key, value)
+	HASH_TABLE_ITERATE_READONLY(table, key, value)
 	{
 		keys[i++] = strdup(key);
 	}
@@ -339,7 +339,7 @@ char **hash_map_keys(struct hash_map *map)
 	return keys;
 }
 
-void hash_map_keys_delete(char **keys)
+void hash_table_keys_delete(char **keys)
 {
 	for (int i = 0; keys[i]; i++) {
 		free(keys[i]);
@@ -347,47 +347,47 @@ void hash_map_keys_delete(char **keys)
 	free(keys);
 }
 
-void hash_map_keys_delete_ppp(char ***keys)
+void hash_table_keys_delete_ppp(char ***keys)
 {
-	hash_map_keys_delete(*keys);
+	hash_table_keys_delete(*keys);
 }
 
 /*
 Create a new cursor object, which will be initially positioned
-at the first valid entry in the hash_map, or at the INVALID position,
-if the hash_map is empty.
+at the first valid entry in the hash_table, or at the INVALID position,
+if the hash_table is empty.
 */
 
-struct hash_map_cursor *hash_map_cursor_create(struct hash_map *map)
+struct hash_table_cursor *hash_table_cursor_create(struct hash_table *table)
 {
-	struct hash_map_cursor *cursor = malloc(sizeof(*cursor));
+	struct hash_table_cursor *cursor = malloc(sizeof(*cursor));
 
 	cursor->position = 0;
-	cursor->map = map;
-	cursor->map->active_cursors++;
+	cursor->table = table;
+	cursor->table->active_cursors++;
 
-	hash_map_cursor_seek(cursor, 0);
+	hash_table_cursor_seek(cursor, 0);
 
 	return cursor;
 }
 
 /*
-Move the cursor to the first valid entry in the hash_map
+Move the cursor to the first valid entry in the hash_table
 at a location equal or greater than the position argument.
 If there is no such entry, go to the INVALID position.
 A position of zero indicates the first valid entry.
 (It's not clear if this function is useful for any position other than zero.)
 */
 
-void hash_map_cursor_seek(struct hash_map_cursor *cursor, unsigned position)
+void hash_table_cursor_seek(struct hash_table_cursor *cursor, unsigned position)
 {
-	if (position >= cursor->map->bucket_count) {
-		cursor->position = HASH_MAP_CURSOR_INVALID;
+	if (position >= cursor->table->bucket_count) {
+		cursor->position = HASH_TABLE_CURSOR_INVALID;
 	} else {
 		cursor->position = position;
-		struct hash_map_entry *e = cursor->map->buckets[cursor->position];
-		if (!e || e == HASH_MAP_TOMBSTONE) {
-			hash_map_cursor_next(cursor);
+		struct hash_table_entry *e = cursor->table->buckets[cursor->position];
+		if (!e || e == HASH_TABLE_TOMBSTONE) {
+			hash_table_cursor_next(cursor);
 		}
 	}
 }
@@ -398,27 +398,27 @@ give back that key:value and return true.
 Otherwise return false.
 */
 
-int hash_map_cursor_get(struct hash_map_cursor *cursor, char **key, void **value)
+int hash_table_cursor_get(struct hash_table_cursor *cursor, char **key, void **value)
 {
 	/* If the cursor is already invalid, return false. */
-	if (cursor->position == HASH_MAP_CURSOR_INVALID) {
+	if (cursor->position == HASH_TABLE_CURSOR_INVALID) {
 		return 0;
 	}
 
 	/* If the position is off the end, convert it to invalid and return false. */
 	/* This shouldn't happen b/c rehashing is inhibited by cursors. */
-	if (cursor->position >= cursor->map->bucket_count) {
-		cursor->position = HASH_MAP_CURSOR_INVALID;
+	if (cursor->position >= cursor->table->bucket_count) {
+		cursor->position = HASH_TABLE_CURSOR_INVALID;
 		return 0;
 	}
 
 	/* Grab the bucket at that position, which may be null. */
-	struct hash_map_entry *e = cursor->map->buckets[cursor->position];
+	struct hash_table_entry *e = cursor->table->buckets[cursor->position];
 
 	/* If there is no object at this position, return false.. */
 	/* This would only happen if the object was removed */
 	/* after the cursor advanced to this position. */
-	if (!e || e == HASH_MAP_TOMBSTONE) {
+	if (!e || e == HASH_TABLE_TOMBSTONE) {
 		return 0;
 	}
 
@@ -434,42 +434,42 @@ Further gets at this position will return null,
 until the cursor is advanced to the next position.
 */
 
-void * hash_map_cursor_remove(struct hash_map_cursor *cursor )
+void * hash_table_cursor_remove(struct hash_table_cursor *cursor )
 {
-	if(cursor->position==HASH_MAP_CURSOR_INVALID) {
+	if(cursor->position==HASH_TABLE_CURSOR_INVALID) {
 		return 0;
 	}
 
-	if(cursor->position>=cursor->map->bucket_count) {
+	if(cursor->position>=cursor->table->bucket_count) {
 		return 0;
 	}
 
-	return hash_map_remove_at_position(cursor->map,cursor->position);
+	return hash_table_remove_at_position(cursor->table,cursor->position);
 }
 
 /*
-Advance the cursor to the next valid position in the hash_map
+Advance the cursor to the next valid position in the hash_table
 and return true. If there is no valid next position, then
 return false.
 */
 
-int hash_map_cursor_next(struct hash_map_cursor *cursor)
+int hash_table_cursor_next(struct hash_table_cursor *cursor)
 {
-	if (cursor->position == HASH_MAP_CURSOR_INVALID) {
+	if (cursor->position == HASH_TABLE_CURSOR_INVALID) {
 		return 0;
 	}
 
 	while (1) {
 		cursor->position++;
 
-		if (cursor->position >= cursor->map->bucket_count) {
-			cursor->position = HASH_MAP_CURSOR_INVALID;
+		if (cursor->position >= cursor->table->bucket_count) {
+			cursor->position = HASH_TABLE_CURSOR_INVALID;
 			return 0;
 		}
 
-		struct hash_map_entry *e = cursor->map->buckets[cursor->position];
+		struct hash_table_entry *e = cursor->table->buckets[cursor->position];
 
-		if (e == HASH_MAP_TOMBSTONE) {
+		if (e == HASH_TABLE_TOMBSTONE) {
 			continue;
 		} else if (e) {
 			return 1;
@@ -479,16 +479,16 @@ int hash_map_cursor_next(struct hash_map_cursor *cursor)
 	}
 }
 
-void hash_map_cursor_delete(struct hash_map_cursor *cursor)
+void hash_table_cursor_delete(struct hash_table_cursor *cursor)
 {
-	cursor->map->active_cursors--;
+	cursor->table->active_cursors--;
 	free(cursor);
 }
 
 /* Helper function to assist with the auto-cleanup attribute. */
 
-void hash_map_cursor_delete_pp(struct hash_map_cursor **cursor)
+void hash_table_cursor_delete_pp(struct hash_table_cursor **cursor)
 {
-	hash_map_cursor_delete(*cursor);
+	hash_table_cursor_delete(*cursor);
 }
 

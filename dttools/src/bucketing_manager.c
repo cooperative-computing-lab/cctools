@@ -353,9 +353,8 @@ void bucketing_manager_add_resource_report(bucketing_manager_t *m, int task_id, 
 		char *res_name;
 		bucketing_state_t *state;
 		double old_val, new_val;
-
-		int iteration = hash_table_firstkey(ht);
-		while (hash_table_nextkey(ht, iteration, &res_name, (void **)&state)) {
+		int iteration;
+		HASH_TABLE_ITERATE(ht, iteration, res_name, state) {
 			old_val = rmsummary_get(max_seen_r, res_name);
 			new_val = rmsummary_get(r, res_name);
 			rmsummary_set(max_seen_r, res_name, max(old_val, new_val));

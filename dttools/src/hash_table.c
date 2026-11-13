@@ -1,719 +1,495 @@
-/*
-Copyright (C) 2003-2004 Douglas Thain and the University of Wisconsin
-Copyright (C) 2022 The University of Notre Dame
-This software is distributed under the GNU General Public License.
-See the file COPYING for details.
-*/
 
 #include "hash_table.h"
 #include "debug.h"
 #include "xxmalloc.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#define DEFAULT_SIZE 127
-#define DEFAULT_MAX_LOAD 0.75
-#define DEFAULT_MIN_LOAD 0.125
-#define DEFAULT_FUNC hash_string
-
-struct entry {
+struct hash_table_entry {
 	char *key;
 	void *value;
-	unsigned hash;
-	struct entry *next;
-	int deleted;
+	unsigned hashkey;
 };
 
 struct hash_table {
-	hash_func_t hash_func;
-	int bucket_count;
-	int size;
-	struct entry **buckets;
-	int ibucket;
-	struct entry *ientry;
-	int iteration_index;
-	int need_compact;
+	struct hash_table_entry **buckets;
+	hash_func_t hashfunc;
+	unsigned bucket_count;	 /* Length of the buckets array. */
+	unsigned live_count;	 /* Number of valid entries in array. */
+	unsigned dead_count;	 /* Number of tombstone entries in array. */
+	unsigned active_cursors; /* Number of cursors created on this table. */
 };
 
-struct hash_table *hash_table_create(int bucket_count, hash_func_t func)
-{
-	struct hash_table *h;
+struct hash_table_cursor {
+	unsigned position;
+	struct hash_table *table;
+};
 
-	h = (struct hash_table *)malloc(sizeof(struct hash_table));
-	if (!h)
-		return 0;
+#define HASH_TABLE_LOAD_FACTOR_MIN 10
+#define HASH_TABLE_LOAD_FACTOR_MAX 30
+#define HASH_TABLE_SIZE_MIN 127
+
+/* A value indicating a deleted object occupied this bucket. */
+#define HASH_TABLE_TOMBSTONE ((struct hash_table_entry *)(-1))
+
+/* A value indicating that a cursor does not point to a valid entry. */
+#define HASH_TABLE_CURSOR_INVALID ((unsigned)-1)
+
+static struct hash_table_entry *hash_table_entry_create(const char *key, const void *value, unsigned hashkey)
+{
+	struct hash_table_entry *e = malloc(sizeof(*e));
+	e->key = xxstrdup(key);
+	/* Note that e->value is neither allocated nor deleted by this module. */
+	e->value = (void*) value;
+	e->hashkey = hashkey;
+	return e;
+}
+
+static void hash_table_entry_delete(struct hash_table_entry *e)
+{
+	free(e->key);
+	/* Note that e->value is neither allocated nor deleted by this module. */
+	free(e);
+}
+
+struct hash_table *hash_table_create(unsigned bucket_count, hash_func_t hashfunc)
+{
+	struct hash_table *table = malloc(sizeof(*table));
 
 	if (bucket_count < 1)
-		bucket_count = DEFAULT_SIZE;
-	if (!func)
-		func = DEFAULT_FUNC;
+		bucket_count = HASH_TABLE_SIZE_MIN;
+	if (!hashfunc)
+		hashfunc = hash_string;
 
-	h->size = 0;
-	h->ientry = 0;
-	h->iteration_index = 0;
-	h->need_compact = 0;
-	h->hash_func = func;
-	h->bucket_count = bucket_count;
-	h->buckets = (struct entry **)calloc(bucket_count, sizeof(struct entry *));
-	if (!h->buckets) {
-		free(h);
+	table->buckets = calloc(bucket_count, sizeof(struct hash_table_entry *));
+	table->hashfunc = hashfunc;
+	table->bucket_count = bucket_count;
+	table->live_count = 0;
+	table->dead_count = 0;
+	table->active_cursors = 0;
+
+	return table;
+}
+
+void hash_table_delete(struct hash_table *table)
+{
+	hash_table_clear(table, 0);
+	free(table->buckets);
+	free(table);
+}
+
+int hash_table_size(struct hash_table *table)
+{
+	return table->live_count;
+}
+
+double hash_table_load(struct hash_table *table)
+{
+	return ((double)table->live_count) / table->bucket_count;
+}
+
+/*
+Remove and dispose of all items in the hash table, applying
+the providing deletefunc to each one.  Note that this routine
+shortcuts the usual delete function, so as to avoid
+(a) a table full of tombstones and (b) a forced rehash,
+since the likely next step is to delete the table.
+*/
+
+void hash_table_clear(struct hash_table *table, void (*deletefunc)(void *))
+{
+	for (unsigned i = 0; i < table->bucket_count; i++) {
+		struct hash_table_entry *e = table->buckets[i];
+		if (e) {
+			if (e != HASH_TABLE_TOMBSTONE) {
+				if (deletefunc)
+					deletefunc(e->value);
+				hash_table_entry_delete(e);
+			}
+			table->buckets[i] = 0;
+		}
+	}
+	table->live_count = 0;
+	table->dead_count = 0;
+}
+
+/*
+Force a rehash of the table by allocating a table with "new_bucket_count",
+transferring all of the live objects over, and disposing of the old bucket array.
+Note that a rehash may invalidate current cursors into the table.
+*/
+
+static void hash_table_rehash(struct hash_table *table, unsigned new_bucket_count)
+{
+	struct hash_table_entry **new_buckets = calloc(new_bucket_count, sizeof(struct hash_table_entry *));
+
+	for (unsigned i = 0; i < table->bucket_count; i++) {
+		struct hash_table_entry *e = table->buckets[i];
+		if (e && e != HASH_TABLE_TOMBSTONE) {
+			unsigned newpos = e->hashkey % new_bucket_count;
+			while (new_buckets[newpos]) {
+				newpos++;
+				if (newpos > new_bucket_count)
+					newpos = 0;
+			}
+			new_buckets[newpos] = e;
+		}
+	}
+
+	free(table->buckets);
+
+	table->buckets = new_buckets;
+	table->bucket_count = new_bucket_count;
+	table->dead_count = 0;
+}
+
+static void hash_table_shrink(struct hash_table *table)
+{
+	unsigned new_bucket_count = ((table->bucket_count + 1) / 2) - 1;
+	hash_table_rehash(table, new_bucket_count);
+}
+
+static void hash_table_grow(struct hash_table *table)
+{
+	unsigned new_bucket_count = ((table->bucket_count + 1) * 2) - 1;
+	hash_table_rehash(table, new_bucket_count);
+}
+
+/* Consider the current size of the table and grow or shrink as necessary. */
+
+int hash_table_consider_rehash(struct hash_table *table)
+{
+	/* Never rehash the table while cursors are actively iterating. */
+	if (table->active_cursors > 0)
+		return 0;
+
+	unsigned live_load = table->live_count * 100 / table->bucket_count;
+	unsigned total_load = (table->live_count + table->dead_count) * 100 / table->bucket_count;
+
+	if (live_load < HASH_TABLE_LOAD_FACTOR_MIN && table->bucket_count > HASH_TABLE_SIZE_MIN) {
+		hash_table_shrink(table);
+		return table->bucket_count;
+	} else if (total_load > HASH_TABLE_LOAD_FACTOR_MAX) {
+		hash_table_grow(table);
+		return table->bucket_count;
+	} else {
+		return 0;
+	}
+}
+
+/*
+Insert an item into the hash_table and then rehash if necessary.
+Note that *any* insertion is disallowed while a cursor is active,
+because insertion might require a rehash which would confuse cursors.
+
+Why not just optimistically permit insertions as long as there is room?
+Because this would result in a *rare* failure when repeated inserts
+left no room in the table, requiring a (prohibited) rehash.
+
+We prefer to establish a strict, easily testable rule rather than
+leave a rare, difficult to test bug.
+*/
+
+int hash_table_insert(struct hash_table *table, const char *key, const void *value)
+{
+	if (!table || !key)
+		return 0;
+
+	if (table->active_cursors) {
+		fatal("hash_table_insert attempted on a table with active cursors!");
+		/* NOTREACHED */
 		return 0;
 	}
 
-	return h;
-}
+	unsigned hashkey = table->hashfunc(key);
+	unsigned pos = hashkey % table->bucket_count;
 
-void hash_table_clear(struct hash_table *h, void (*delete_func)(void *))
-{
-	struct entry *e, *f;
-	int i;
-
-	for (i = 0; i < h->bucket_count; i++) {
-		e = h->buckets[i];
-		while (e) {
-			if (delete_func && !e->deleted)
-				delete_func(e->value);
-			f = e->next;
-			free(e->key);
-			free(e);
-			e = f;
-		}
-	}
-
-	for (i = 0; i < h->bucket_count; i++) {
-		h->buckets[i] = 0;
-	}
-
-	h->size = 0;
-	h->need_compact = 0;
-	h->iteration_index++;
-}
-
-void hash_table_delete(struct hash_table *h)
-{
-	hash_table_clear(h, 0);
-	free(h->buckets);
-	free(h);
-}
-
-char **hash_table_keys_array(struct hash_table *h)
-{
-	char **keys = (char **)malloc(sizeof(char *) * (h->size + 1));
-	int ikey = 0;
-
-	struct entry *e, *f;
-	int i;
-
-	for (i = 0; i < h->bucket_count; i++) {
-		e = h->buckets[i];
-		while (e) {
-			if (!e->deleted) {
-				keys[ikey] = strdup(e->key);
-				ikey++;
+	for (;; pos = (pos + 1) % table->bucket_count) {
+		struct hash_table_entry *e = table->buckets[pos];
+		if (e) {
+			if (e == HASH_TABLE_TOMBSTONE) {
+				/* tombstone: insert here */
+				table->dead_count--;
+				break;
 			}
-			f = e->next;
-			e = f;
+			if (hashkey == e->hashkey && !strcmp(key, e->key)) {
+				if (value == e->value) {
+					/* identical key:value exists */
+					return 1;
+				} else {
+					notice(D_DEBUG, "key %s already exists in hash table with different value, ignoring new value.", key);
+					return 0;
+				}
+			} else {
+				/* different key: keep looking */
+				continue;
+			}
+		} else {
+			/* empty bucket: insert here */
+			break;
 		}
 	}
 
-	keys[h->size] = NULL;
+	table->live_count++;
+	table->buckets[pos] = hash_table_entry_create(key, value, hashkey);
 
+	hash_table_consider_rehash(table);
+
+	return 1;
+}
+
+void *hash_table_lookup(struct hash_table *table, const char *key)
+{
+	if (!table || !key)
+		return 0;
+
+	struct hash_table_entry *e = 0;
+
+	unsigned hashkey = table->hashfunc(key);
+	unsigned pos = hashkey % table->bucket_count;
+
+	for (;; pos = (pos + 1) % table->bucket_count) {
+		e = table->buckets[pos];
+		if (e) {
+			if (e == HASH_TABLE_TOMBSTONE) {
+				continue;
+			} else if (hashkey == e->hashkey && !strcmp(key, e->key)) {
+				break;
+			} else {
+				continue;
+			}
+		} else {
+			return 0;
+		}
+	}
+
+	return e->value;
+}
+
+/*
+Internal function to remove item at specific position already
+determined to be valid by the caller.  Adjust counts,
+convert the entry to a tombstone, consider rehashing,
+and return the value.
+*/
+
+static void * hash_table_remove_at_position(struct hash_table *table, unsigned position)
+{
+	struct hash_table_entry *e = table->buckets[position];
+	if(!e || e==HASH_TABLE_TOMBSTONE) return 0;
+
+	void *value = e->value;
+	hash_table_entry_delete(e);
+	table->buckets[position] = HASH_TABLE_TOMBSTONE;
+	table->live_count--;
+	table->dead_count++;
+
+	hash_table_consider_rehash(table);
+
+	return value;
+}
+
+/*
+Remove an item from the hash_table.
+This operation is safe because removals happen in place,
+and rehashes are suppressed while cursors are active.
+*/
+
+void *hash_table_remove(struct hash_table *table, const char *key)
+{
+	if (!table || !key)
+		return 0;
+
+	struct hash_table_entry *e = 0;
+
+	unsigned hashkey = table->hashfunc(key);
+	unsigned pos = hashkey % table->bucket_count;
+
+	for (;; pos = (pos + 1) % table->bucket_count) {
+		e = table->buckets[pos];
+		if (e) {
+			if (e == HASH_TABLE_TOMBSTONE) {
+				continue;
+			} else if (hashkey == e->hashkey && !strcmp(key, e->key)) {
+				break;
+			} else {
+				continue;
+			}
+		} else {
+			return 0;
+		}
+	}
+
+	return hash_table_remove_at_position(table,pos);
+}
+
+char **hash_table_keys(struct hash_table *table)
+{
+	char **keys = malloc(sizeof(char *) * (table->live_count + 1));
+	char *key = 0;
+	void *value = 0;
+	int i = 0;
+	int iteration;
+	HASH_TABLE_ITERATE(table, iteration, key, value)
+	{
+		keys[i++] = strdup(key);
+	}
+	keys[i] = 0;
 	return keys;
 }
 
-void hash_table_free_keys_array(char **keys)
+void hash_table_keys_delete(char **keys)
 {
-	int i = 0;
-	while (keys[i]) {
+	for (int i = 0; keys[i]; i++) {
 		free(keys[i]);
-		i++;
 	}
-
 	free(keys);
 }
 
-void *hash_table_lookup(struct hash_table *h, const char *key)
+void hash_table_keys_delete_ppp(char ***keys)
 {
-	struct entry *e;
-	unsigned hash, index;
+	hash_table_keys_delete(*keys);
+}
 
-	hash = h->hash_func(key);
-	index = hash % h->bucket_count;
-	e = h->buckets[index];
+/*
+Create a new cursor object, which will be initially positioned
+at the first valid entry in the hash_table, or at the INVALID position,
+if the hash_table is empty.
+*/
 
-	while (e) {
-		if (hash == e->hash && !strcmp(key, e->key)) {
-			if (!e->deleted) {
-				return e->value;
-			}
-			return 0;
+struct hash_table_cursor *hash_table_cursor_create(struct hash_table *table)
+{
+	struct hash_table_cursor *cursor = malloc(sizeof(*cursor));
+
+	cursor->position = 0;
+	cursor->table = table;
+	cursor->table->active_cursors++;
+
+	hash_table_cursor_seek(cursor, 0);
+
+	return cursor;
+}
+
+/*
+Move the cursor to the first valid entry in the hash_table
+at a location equal or greater than the position argument.
+If there is no such entry, go to the INVALID position.
+A position of zero indicates the first valid entry.
+(It's not clear if this function is useful for any position other than zero.)
+*/
+
+void hash_table_cursor_seek(struct hash_table_cursor *cursor, unsigned position)
+{
+	if (position >= cursor->table->bucket_count) {
+		cursor->position = HASH_TABLE_CURSOR_INVALID;
+	} else {
+		cursor->position = position;
+		struct hash_table_entry *e = cursor->table->buckets[cursor->position];
+		if (!e || e == HASH_TABLE_TOMBSTONE) {
+			hash_table_cursor_next(cursor);
 		}
-		e = e->next;
 	}
-
-	return 0;
 }
 
-int hash_table_size(struct hash_table *h)
+/*
+If the cursor points to a valid position,
+give back that key:value and return true.
+Otherwise return false.
+*/
+
+int hash_table_cursor_get(struct hash_table_cursor *cursor, char **key, void **value)
 {
-	return h->size;
-}
-
-double hash_table_load(struct hash_table *h)
-{
-	return ((double)h->size) / h->bucket_count;
-}
-
-static int insert_to_buckets_aux(struct entry **buckets, int bucket_count, struct entry *new_entry)
-{
-	unsigned index;
-	struct entry *e;
-
-	index = new_entry->hash % bucket_count;
-	e = buckets[index];
-
-	while (e) {
-		/* check that this key does not already exist in the table */
-		if (new_entry->hash == e->hash && !strcmp(new_entry->key, e->key)) {
-			return 0;
-		}
-		e = e->next;
-	}
-
-	new_entry->next = buckets[index];
-	buckets[index] = new_entry;
-
-	return 1;
-}
-
-static int hash_table_double_buckets(struct hash_table *h)
-{
-	int new_count = (2 * (h->bucket_count + 1)) - 1;
-	struct entry **new_buckets = (struct entry **)calloc(new_count, sizeof(struct entry *));
-	if (!new_buckets) {
+	/* If the cursor is already invalid, return false. */
+	if (cursor->position == HASH_TABLE_CURSOR_INVALID) {
 		return 0;
 	}
 
-	struct entry *e, *f;
-	for (int i = 0; i < h->bucket_count; i++) {
-		e = h->buckets[i];
-		while (e) {
-			f = e->next;
-			if (!e->deleted) {
-				e->next = NULL;
-				insert_to_buckets_aux(new_buckets, new_count, e);
-			}
-			e = f;
-		}
-	}
-
-	/* Make the old point to the new */
-	free(h->buckets);
-	h->buckets = new_buckets;
-	h->bucket_count = new_count;
-	h->need_compact = 0;
-
-	h->iteration_index++;
-
-	return 1;
-}
-
-static int hash_table_reduce_buckets(struct hash_table *h)
-{
-	int new_count = ((h->bucket_count + 1) / 2) - 1;
-
-	/* DEFAULT_SIZE is the minimum size */
-	if (new_count < DEFAULT_SIZE) {
-		return 1;
-	}
-
-	/* Table cannot be reduced above DEFAULT_MAX_LOAD */
-	if (((float)h->size / new_count) > DEFAULT_MAX_LOAD) {
-		return 1;
-	}
-
-	struct entry **new_buckets = (struct entry **)calloc(new_count, sizeof(struct entry *));
-	if (!new_buckets) {
+	/* If the position is off the end, convert it to invalid and return false. */
+	/* This shouldn't happen b/c rehashing is inhibited by cursors. */
+	if (cursor->position >= cursor->table->bucket_count) {
+		cursor->position = HASH_TABLE_CURSOR_INVALID;
 		return 0;
 	}
 
-	struct entry *e, *f;
-	for (int i = 0; i < h->bucket_count; i++) {
-		e = h->buckets[i];
-		while (e) {
-			f = e->next;
-			if (!e->deleted) {
-				e->next = NULL;
-				insert_to_buckets_aux(new_buckets, new_count, e);
-			}
-			e = f;
-		}
+	/* Grab the bucket at that position, which may be null. */
+	struct hash_table_entry *e = cursor->table->buckets[cursor->position];
+
+	/* If there is no object at this position, return false.. */
+	/* This would only happen if the object was removed */
+	/* after the cursor advanced to this position. */
+	if (!e || e == HASH_TABLE_TOMBSTONE) {
+		return 0;
 	}
 
-	/* Make the old point to the new */
-	free(h->buckets);
-	h->buckets = new_buckets;
-	h->bucket_count = new_count;
-	h->need_compact = 0;
-
-	h->iteration_index++;
-
+	/* Otherwise, we have a good value and return true. */
+	*key = e->key;
+	*value = e->value;
 	return 1;
 }
 
-/* Compact the table by removing deleted entries. This does not change the size of the table, or the number of buckets. */
-void hash_table_compact(struct hash_table *h)
+/*
+Remove the item at the current cursor position.
+Further gets at this position will return null,
+until the cursor is advanced to the next position.
+*/
+
+void * hash_table_cursor_remove(struct hash_table_cursor *cursor )
 {
-	struct entry *e, *f;
-	int i;
-
-	if (!h->need_compact) {
-		return;
+	if(cursor->position==HASH_TABLE_CURSOR_INVALID) {
+		return 0;
 	}
 
-	for (i = 0; i < h->bucket_count; i++) {
-		e = h->buckets[i];
-
-		/* find the head of the bucket and remove deleted entries */
-		while (e && e->deleted) {
-			f = e->next;
-			free(e->key);
-			free(e);
-			e = f;
-		}
-		h->buckets[i] = e;
-
-		/* remove deleted entries from the rest of the bucket */
-		while (e) {
-			f = e->next;
-			while (f && f->deleted) {
-				e->next = f->next;
-				free(f->key);
-				free(f);
-				f = e->next;
-			}
-			e = f;
-		}
+	if(cursor->position>=cursor->table->bucket_count) {
+		return 0;
 	}
 
-	h->need_compact = 0;
-	if (((float)h->size / h->bucket_count) < DEFAULT_MIN_LOAD) {
-		hash_table_reduce_buckets(h);
-	}
+	return hash_table_remove_at_position(cursor->table,cursor->position);
 }
 
-int hash_table_insert(struct hash_table *h, const char *key, const void *value)
+/*
+Advance the cursor to the next valid position in the hash_table
+and return true. If there is no valid next position, then
+return false.
+*/
+
+int hash_table_cursor_next(struct hash_table_cursor *cursor)
 {
-	struct entry *e;
-	unsigned hash, index;
+	if (cursor->position == HASH_TABLE_CURSOR_INVALID) {
+		return 0;
+	}
 
-	if (((float)h->size / h->bucket_count) > DEFAULT_MAX_LOAD)
-		hash_table_double_buckets(h);
+	while (1) {
+		cursor->position++;
 
-	hash = h->hash_func(key);
-	index = hash % h->bucket_count;
-	e = h->buckets[index];
+		if (cursor->position >= cursor->table->bucket_count) {
+			cursor->position = HASH_TABLE_CURSOR_INVALID;
+			return 0;
+		}
 
-	while (e) {
-		if (hash == e->hash && !strcmp(key, e->key)) {
-			if (!e->deleted) {
-				if (e->value != value) {
-					notice(D_DEBUG, "key %s already exists in hash table with different value, ignoring new value.", key);
-				}
-				return 0;
-			}
-			e->value = (void *)value;
-			e->deleted = 0;
-			h->size++;
-			h->iteration_index++;
+		struct hash_table_entry *e = cursor->table->buckets[cursor->position];
+
+		if (e == HASH_TABLE_TOMBSTONE) {
+			continue;
+		} else if (e) {
 			return 1;
-		}
-		e = e->next;
-	}
-
-	e = (struct entry *)xxmalloc(sizeof(struct entry));
-
-	e->key = xxstrdup(key);
-	e->value = (void *)value;
-	e->hash = hash;
-	e->deleted = 0;
-
-	int inserted = insert_to_buckets_aux(h->buckets, h->bucket_count, e);
-	if (inserted) {
-		h->size++;
-		h->iteration_index++;
-	} else {
-		if (value != NULL) {
-			/* signal possible memory leak. Only if hash table is being used as set we do not print the message. */
-			notice(D_ERROR, "Failed to insert key %s into hash table.", key);
-		}
-		free(e->key);
-		free(e);
-	}
-
-	return inserted;
-}
-
-/* keys are not really removed, just marked as deleted. A call to hash_table_compact will remove them. */
-void *hash_table_remove(struct hash_table *h, const char *key)
-{
-	struct entry *e;
-	void *value;
-	unsigned hash, index;
-
-	hash = h->hash_func(key);
-	index = hash % h->bucket_count;
-	e = h->buckets[index];
-
-	while (e) {
-		if (hash == e->hash && !strcmp(key, e->key)) {
-			if (e->deleted) {
-				return 0;
-			}
-			e->deleted = 1;
-			h->need_compact = 1;
-			value = e->value;
-
-			h->size--;
-			return value;
-		}
-
-		e = e->next;
-	}
-
-	return 0;
-}
-
-static void hash_table_reset_to_first(struct hash_table *h)
-{
-	h->ientry = 0;
-	for (h->ibucket = 0; h->ibucket < h->bucket_count; h->ibucket++) {
-		h->ientry = h->buckets[h->ibucket];
-		if (h->ientry && !h->ientry->deleted)
-			break;
-	}
-}
-
-int hash_table_fromkey(struct hash_table *h, const char *key)
-{
-	if (key) {
-		h->iteration_index++;
-
-		unsigned hash = h->hash_func(key);
-		h->ibucket = hash % h->bucket_count;
-		h->ientry = h->buckets[h->ibucket];
-
-		while (h->ientry) {
-			if (hash == h->ientry->hash && !strcmp(key, h->ientry->key) && !h->ientry->deleted) {
-				return h->iteration_index;
-			}
-			h->ientry = h->ientry->next;
-		}
-	}
-
-	hash_table_reset_to_first(h);
-	return h->iteration_index;
-}
-
-void *hash_table_pop(struct hash_table *t)
-{
-	char *key;
-	void *value;
-
-	if (hash_table_nextkey(t, t->iteration_index, &key, (void **)&value)) {
-		t->iteration_index++;
-		return hash_table_remove(t, key);
-	}
-
-	hash_table_firstkey(t);
-
-	if (hash_table_nextkey(t, t->iteration_index, &key, (void **)&value)) {
-		return hash_table_remove(t, key);
-	}
-
-	return NULL;
-}
-
-int hash_table_firstkey(struct hash_table *h)
-{
-	hash_table_compact(h);
-	h->iteration_index++;
-	hash_table_reset_to_first(h);
-	return h->iteration_index;
-}
-
-int hash_table_nextkey(struct hash_table *h, int iteration, char **key, void **value)
-{
-	if (!h) {
-		return 0;
-	}
-
-	if (iteration != h->iteration_index) {
-		fatal("cctools bug: the hash table iteration has not been reset since last modification");
-	}
-
-	if (h->ientry) {
-		*key = h->ientry->key;
-		*value = h->ientry->value;
-
-		h->ientry = h->ientry->next;
-		while (h->ientry && h->ientry->deleted) {
-			h->ientry = h->ientry->next;
-		}
-		if (!h->ientry) {
-			h->ibucket++;
-			for (; h->ibucket < h->bucket_count; h->ibucket++) {
-				h->ientry = h->buckets[h->ibucket];
-				if (h->ientry && !h->ientry->deleted)
-					break;
-			}
-		}
-		return 1;
-	} else {
-		return 0;
-	}
-}
-
-int hash_table_randomkey(struct hash_table *h, int *offset_bookkeep)
-{
-	h->iteration_index++;
-
-	h->ientry = 0;
-	if (h->bucket_count < 1) {
-		return h->iteration_index;
-	}
-
-	int ibucket_start = random() % h->bucket_count;
-
-	for (h->ibucket = ibucket_start; h->ibucket < h->bucket_count; h->ibucket++) {
-		h->ientry = h->buckets[h->ibucket];
-		if (h->ientry && !h->ientry->deleted) {
-			*offset_bookkeep = h->ibucket;
-			return h->iteration_index;
-		}
-	}
-
-	for (h->ibucket = 0; h->ibucket < ibucket_start; h->ibucket++) {
-		h->ientry = h->buckets[h->ibucket];
-		if (h->ientry && !h->ientry->deleted) {
-			*offset_bookkeep = h->ibucket;
-			return h->iteration_index;
-		}
-	}
-
-	return h->iteration_index;
-}
-
-int hash_table_nextkey_with_offset(struct hash_table *h, int iteration, int offset_bookkeep, char **key, void **value)
-{
-	if (iteration != h->iteration_index) {
-		fatal("cctools bug: the hash table iteration has not been reset since last modification");
-	}
-
-	if (h->bucket_count < 1) {
-		return 0;
-	}
-
-	offset_bookkeep = offset_bookkeep % h->bucket_count;
-
-	if (h->ientry) {
-		*key = h->ientry->key;
-		*value = h->ientry->value;
-
-		h->ientry = h->ientry->next;
-		while (h->ientry && h->ientry->deleted) {
-			h->ientry = h->ientry->next;
-		}
-		if (!h->ientry) {
-			h->ibucket = (h->ibucket + 1) % h->bucket_count;
-			for (; h->ibucket != offset_bookkeep; h->ibucket = (h->ibucket + 1) % h->bucket_count) {
-				h->ientry = h->buckets[h->ibucket];
-				if (h->ientry && !h->ientry->deleted) {
-					break;
-				}
-			}
-		}
-		return 1;
-	}
-
-	return 0;
-}
-
-void hash_table_foreach_ro(struct hash_table *h, void (*func)(const char *key, void *value, void *arg), void *arg)
-{
-	struct entry *e;
-	int i;
-
-	int prev_iteration = h->iteration_index;
-
-	for (i = 0; i < h->bucket_count; i++) {
-		e = h->buckets[i];
-		while (e) {
-			if (!e->deleted) {
-				func(e->key, e->value, arg);
-			}
-			e = e->next;
-
-			if (h->iteration_index != prev_iteration) {
-				fatal("cctools bug: the hash table iteration has been modified since last call to hash_table_foreach_ro");
-			}
+		} else {
+			continue;
 		}
 	}
 }
 
-typedef unsigned long int ub4; /* unsigned 4-byte quantities */
-typedef unsigned char ub1;     /* unsigned 1-byte quantities */
-
-#define hashsize(n) ((ub4)1 << (n))
-#define hashmask(n) (hashsize(n) - 1)
-
-/*
---------------------------------------------------------------------
-mix -- mix 3 32-bit values reversibly.
-For every delta with one or two bits set, and the deltas of all three
-  high bits or all three low bits, whether the original value of a,b,c
-  is almost all zero or is uniformly distributed,
-* If mix() is run forward or backward, at least 32 bits in a,b,c
-  have at least 1/4 probability of changing.
-* If mix() is run forward, every bit of c will change between 1/3 and
-  2/3 of the time.  (Well, 22/100 and 78/100 for some 2-bit deltas.)
-mix() was built out of 36 single-cycle latency instructions in a
-  structure that could supported 2x parallelism, like so:
-	  a -= b;
-	  a -= c; x = (c>>13);
-	  b -= c; a ^= x;
-	  b -= a; x = (a<<8);
-	  c -= a; b ^= x;
-	  c -= b; x = (b>>13);
-	  ...
-  Unfortunately, superscalar Pentiums and Sparcs can't take advantage
-  of that parallelism.  They've also turned some of those single-cycle
-  latency instructions into multi-cycle latency instructions.  Still,
-  this is the fastest good hash I could find.  There were about 2^^68
-  to choose from.  I only looked at a billion or so.
---------------------------------------------------------------------
-*/
-
-#define mix(a, b, c) \
-	{ \
-		a -= b; \
-		a -= c; \
-		a ^= (c >> 13); \
-		b -= c; \
-		b -= a; \
-		b ^= (a << 8); \
-		c -= a; \
-		c -= b; \
-		c ^= (b >> 13); \
-		a -= b; \
-		a -= c; \
-		a ^= (c >> 12); \
-		b -= c; \
-		b -= a; \
-		b ^= (a << 16); \
-		c -= a; \
-		c -= b; \
-		c ^= (b >> 5); \
-		a -= b; \
-		a -= c; \
-		a ^= (c >> 3); \
-		b -= c; \
-		b -= a; \
-		b ^= (a << 10); \
-		c -= a; \
-		c -= b; \
-		c ^= (b >> 15); \
-	}
-
-/*
---------------------------------------------------------------------
-hash() -- hash a variable-length key into a 32-bit value
-  k       : the key (the unaligned variable-length array of bytes)
-  len     : the length of the key, counting by bytes
-  initval : can be any 4-byte value
-Returns a 32-bit value.  Every bit of the key affects every bit of
-the return value.  Every 1-bit and 2-bit delta achieves avalanche.
-About 6*len+35 instructions. The best hash table sizes are powers of 2.  There is no need to do
-mod a prime (mod is sooo slow!).  If you need less than 32 bits,
-use a bitmask.  For example, if you need only 10 bits, do
-  h = (h & hashmask(10));
-In which case, the hash table should have hashsize(10) elements. If you are hashing n strings (ub1 **)k, do it like
-this: for (i=0, h=0; i<n; ++i) h = hash( k[i], len[i], h); By Bob Jenkins, 1996.  bob_jenkins@burtleburtle.net.  You may
-use this code any way you wish, private, educational, or commercial.  It's free. See
-http://burtleburtle.net/bob/hash/evahash.html Use for hash table lookup, or anything where one collision in 2^^32 is
-acceptable.  Do NOT use for cryptographic purposes.
---------------------------------------------------------------------
-*/
-
-/* Ignoring implicit-fallthrough warnings, as fallthrough is what we want in the following switch-case */
-/* *k the key */
-/* length the length of the key */
-/* initval the previous hash, or an arbitrary value */
-static ub4 jenkins_hash(register const ub1 *k, register ub4 length, register ub4 initval)
+void hash_table_cursor_delete(struct hash_table_cursor *cursor)
 {
-	register ub4 a, b, c, len; /* Set up the internal state */
-	len = length;
-	a = b = 0x9e3779b9;			   /* the golden ratio; an arbitrary value */
-	c = initval; /* the previous hash value */ /*---------------------------------------- handle most of the key */
-	while (len >= 12) {
-		a += (k[0] + ((ub4)k[1] << 8) + ((ub4)k[2] << 16) + ((ub4)k[3] << 24));
-		b += (k[4] + ((ub4)k[5] << 8) + ((ub4)k[6] << 16) + ((ub4)k[7] << 24));
-		c += (k[8] + ((ub4)k[9] << 8) + ((ub4)k[10] << 16) + ((ub4)k[11] << 24));
-		mix(a, b, c);
-		k += 12;
-		len -= 12;
-	}
-	/*------------------------------------- handle the last 11 bytes */
-	c += length;
-	switch (len) { /* all the case statements fall through */
-	case 11:
-		c += ((ub4)k[10] << 24);
-		/* falls through */
-	case 10:
-		c += ((ub4)k[9] << 16);
-		/* falls through */
-	case 9:
-		/* the first byte of c is reserved for the length */
-		c += ((ub4)k[8] << 8);
-		/* falls through */
-	case 8:
-		b += ((ub4)k[7] << 24);
-		/* falls through */
-	case 7:
-		b += ((ub4)k[6] << 16);
-		/* falls through */
-	case 6:
-		b += ((ub4)k[5] << 8);
-		/* falls through */
-	case 5:
-		b += k[4];
-		/* falls through */
-	case 4:
-		a += ((ub4)k[3] << 24);
-		/* falls through */
-	case 3:
-		a += ((ub4)k[2] << 16);
-		/* falls through */
-	case 2:
-		a += ((ub4)k[1] << 8);
-		/* falls through */
-	case 1:
-		a += k[0];
-		/* falls through */
-	case 0:
-	default:
-		/* case 0: nothing left to add */
-		break;
-	}
-	mix(a, b, c);
-	/*-------------------------------------------- report the result */
-	return c;
+	cursor->table->active_cursors--;
+	free(cursor);
 }
 
-unsigned hash_string(const char *s)
+/* Helper function to assist with the auto-cleanup attribute. */
+
+void hash_table_cursor_delete_pp(struct hash_table_cursor **cursor)
 {
-	return jenkins_hash((const ub1 *)s, strlen(s), 0);
+	hash_table_cursor_delete(*cursor);
 }
 
-/* vim: set noexpandtab tabstop=8: */
