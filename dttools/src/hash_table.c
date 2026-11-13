@@ -336,6 +336,16 @@ void * hash_table_pop(struct hash_table *table)
 	return value;
 }
 
+void hash_table_foreach_ro(struct hash_table *table, void (*func)(const char *key, void *value, void *arg), void *arg)
+{
+	int iteration;
+	char *key;
+	void *value;
+	HASH_TABLE_ITERATE(table,iteration,key,value) {
+		func(key,value,arg);
+	}
+}
+
 char **hash_table_keys(struct hash_table *table)
 {
 	char **keys = malloc(sizeof(char *) * (table->live_count + 1));
