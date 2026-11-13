@@ -43,7 +43,7 @@ static struct hash_table_entry *hash_table_entry_create(const char *key, const v
 	struct hash_table_entry *e = malloc(sizeof(*e));
 	e->key = xxstrdup(key);
 	/* Note that e->value is neither allocated nor deleted by this module. */
-	e->value = (void*) value;
+	e->value = (void *)value;
 	e->hashkey = hashkey;
 	return e;
 }
@@ -276,10 +276,11 @@ convert the entry to a tombstone, consider rehashing,
 and return the value.
 */
 
-static void * hash_table_remove_at_position(struct hash_table *table, unsigned position)
+static void *hash_table_remove_at_position(struct hash_table *table, unsigned position)
 {
 	struct hash_table_entry *e = table->buckets[position];
-	if(!e || e==HASH_TABLE_TOMBSTONE) return 0;
+	if (!e || e == HASH_TABLE_TOMBSTONE)
+		return 0;
 
 	void *value = e->value;
 	hash_table_entry_delete(e);
@@ -323,7 +324,7 @@ void *hash_table_remove(struct hash_table *table, const char *key)
 		}
 	}
 
-	return hash_table_remove_at_position(table,pos);
+	return hash_table_remove_at_position(table, pos);
 }
 
 char **hash_table_keys(struct hash_table *table)
@@ -436,17 +437,17 @@ Further gets at this position will return null,
 until the cursor is advanced to the next position.
 */
 
-void * hash_table_cursor_remove(struct hash_table_cursor *cursor )
+void *hash_table_cursor_remove(struct hash_table_cursor *cursor)
 {
-	if(cursor->position==HASH_TABLE_CURSOR_INVALID) {
+	if (cursor->position == HASH_TABLE_CURSOR_INVALID) {
 		return 0;
 	}
 
-	if(cursor->position>=cursor->table->bucket_count) {
+	if (cursor->position >= cursor->table->bucket_count) {
 		return 0;
 	}
 
-	return hash_table_remove_at_position(cursor->table,cursor->position);
+	return hash_table_remove_at_position(cursor->table, cursor->position);
 }
 
 /*
@@ -498,26 +499,27 @@ void hash_table_cursor_delete_pp(struct hash_table_cursor **cursor)
 
 /* Remove the first object that is conveniently available. */
 
-void * hash_table_remove_any(struct hash_table *table)
+void *hash_table_remove_any(struct hash_table *table)
 {
 	struct hash_table_cursor *cursor = hash_table_cursor_create(table);
-	void * value = hash_table_cursor_remove(cursor);
+	void *value = hash_table_cursor_remove(cursor);
 	hash_table_cursor_delete(cursor);
 	return value;
 }
 
 /* Remove an object from a random position in the table. */
 
-void * hash_table_remove_random(struct hash_table *table)
+void *hash_table_remove_random(struct hash_table *table)
 {
 	struct hash_table_cursor *cursor = hash_table_cursor_create(table);
 
 	/* Put the cursor at the object following a random position. */
-	hash_table_cursor_seek(cursor,rand()%table->bucket_count);
+	hash_table_cursor_seek(cursor, rand() % table->bucket_count);
 
 	/* But if that was already off the end, go back to the beginning */
-	if(cursor->position==HASH_TABLE_CURSOR_INVALID) hash_table_cursor_seek(cursor,0);
-	
+	if (cursor->position == HASH_TABLE_CURSOR_INVALID)
+		hash_table_cursor_seek(cursor, 0);
+
 	/* Now return that value, if any. */
 	void *value = hash_table_cursor_remove(cursor);
 
@@ -531,8 +533,8 @@ void hash_table_foreach_ro(struct hash_table *table, void (*func)(const char *ke
 	int iteration;
 	char *key;
 	void *value;
-	HASH_TABLE_ITERATE(table,iteration,key,value) {
-		func(key,value,arg);
+	HASH_TABLE_ITERATE(table, iteration, key, value)
+	{
+		func(key, value, arg);
 	}
 }
-

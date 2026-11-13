@@ -138,7 +138,8 @@ void vine_cache_prune(struct vine_cache *c, vine_cache_level_t level)
 {
 	char *cachename;
 	struct vine_cache_file *f;
-	HASH_TABLE_ITERATE_SNAPSHOT(c->table,cachename,f) {
+	HASH_TABLE_ITERATE_SNAPSHOT(c->table, cachename, f)
+	{
 		if (f->cache_level <= level) {
 			vine_cache_remove(c, cachename, 0);
 		}

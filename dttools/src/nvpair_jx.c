@@ -73,7 +73,8 @@ struct jx *nvpair_to_jx(struct nvpair *nv)
 	double double_value;
 
 	int iteration;
-	HASH_TABLE_ITERATE(nv->table,iteration,key,value) {
+	HASH_TABLE_ITERATE(nv->table, iteration, key, value)
+	{
 		if (!strcmp(value, "true")) {
 			jvalue = jx_boolean(1);
 		} else if (!strcmp(value, "false")) {

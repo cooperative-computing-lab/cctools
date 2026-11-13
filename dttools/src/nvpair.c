@@ -207,7 +207,8 @@ void nvpair_export(struct nvpair *nv)
 {
 	char *name, *value;
 	int iteration;
-	HASH_TABLE_ITERATE(nv->table,iteration,name,value) {
+	HASH_TABLE_ITERATE(nv->table, iteration, name, value)
+	{
 		setenv(name, value, 1);
 	}
 }

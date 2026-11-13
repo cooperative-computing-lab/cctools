@@ -1034,7 +1034,7 @@ int vine_manager_release_random_worker(struct vine_manager *q)
 	}
 
 	struct vine_worker_info *w = hash_table_remove_random(q->worker_table);
-	if(w) {
+	if (w) {
 		debug(D_VINE | D_NOTICE, "Intentionally evicting worker %s", w->hostname);
 		release_worker(q, w);
 		return 1;

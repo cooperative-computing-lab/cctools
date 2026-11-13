@@ -111,4 +111,3 @@ void *hash_cache_lookup(struct hash_cache *cache, const char *key)
 
 	return result;
 }
-
