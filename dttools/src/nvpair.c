@@ -25,7 +25,7 @@ struct nvpair *nvpair_create()
 {
 	struct nvpair *n;
 	n = xxmalloc(sizeof(*n));
-	n->table = hash_table_create(7, hash_string);
+	n->table = hash_table_create(7, 0);
 	return n;
 }
 
