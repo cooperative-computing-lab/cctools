@@ -111,28 +111,3 @@ void *hash_cache_lookup(struct hash_cache *cache, const char *key)
 
 	return result;
 }
-
-int hash_cache_firstkey(struct hash_cache *cache)
-{
-	return hash_table_firstkey(cache->table);
-}
-
-int hash_cache_nextkey(struct hash_cache *cache, int iteration, char **key, void **item)
-{
-	struct entry *e;
-	time_t current = time(0);
-
-	while (hash_table_nextkey(cache->table, iteration, key, (void **)&e)) {
-		if (e->expires < current) {
-			hash_cache_remove(cache, *key);
-			continue;
-		} else {
-			*item = e->value;
-			return 1;
-		}
-	}
-
-	return 0;
-}
-
-/* vim: set noexpandtab tabstop=8: */

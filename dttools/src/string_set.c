@@ -5,7 +5,7 @@ See the file COPYING for details.
 */
 
 #include "string_set.h"
-#include "hash_table.h"
+#include "hash_string.h"
 
 #include <stdlib.h>
 #include <string.h>

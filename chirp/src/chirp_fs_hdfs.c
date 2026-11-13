@@ -10,6 +10,7 @@ See the file COPYING for details.
 
 #include "debug.h"
 #include "hash_table.h"
+#include "hash_string.h"
 #include "macros.h"
 #include "path.h"
 #include "stringtools.h"

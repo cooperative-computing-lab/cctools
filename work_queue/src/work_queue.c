@@ -7343,7 +7343,7 @@ struct list * work_queue_cancel_all_tasks(struct work_queue *q) {
 void release_all_workers(struct work_queue *q) {
 	struct work_queue_worker *w;
 
-	while ((w = hash_table_pop(q->worker_table))) {
+	while ((w = hash_table_remove_any(q->worker_table))) {
 	    release_worker(q, w);
 	}
 }

@@ -137,20 +137,13 @@ Remove all entries with a cache level <= level.
 void vine_cache_prune(struct vine_cache *c, vine_cache_level_t level)
 {
 	char *cachename;
-	char **cachenames = hash_table_keys_array(c->table);
-	int i = 0;
-
 	struct vine_cache_file *f;
-	while ((cachename = cachenames[i])) {
-		i++;
-		f = hash_table_lookup(c->table, cachename);
-
+	HASH_TABLE_ITERATE_SNAPSHOT(c->table, cachename, f)
+	{
 		if (f->cache_level <= level) {
 			vine_cache_remove(c, cachename, 0);
 		}
 	}
-
-	hash_table_free_keys_array(cachenames);
 }
 
 /*
@@ -950,11 +943,15 @@ If any have definitively failed, they are removed from the cache.
 
 int vine_cache_check_xfer_files(struct vine_cache *c, struct link *manager)
 {
-	char *cachename;
+	char *key;
 	void *dummy; // processing_transfers is used as a key set; values are unused.
 	int iteration;
-	HASH_TABLE_ITERATE(c->processing_transfers, iteration, cachename, dummy)
+
+	HASH_TABLE_ITERATE(c->processing_transfers, iteration, key, dummy)
 	{
+		/* Duplicate the key, because the item may get removed from the table, freeing the key. */
+		char *cachename = strdup(key);
+
 		struct vine_cache_file *f = hash_table_lookup(c->table, cachename);
 		if (f) {
 			vine_cache_check_file(c, f, cachename, manager);
@@ -970,6 +967,9 @@ int vine_cache_check_xfer_files(struct vine_cache *c, struct link *manager)
 		}
 
 		/* Note that f may no longer be valid at this point */
+
+		/* Discard the duplicated key. */
+		free(cachename);
 	}
 
 	return 1;
