@@ -326,6 +326,16 @@ void *hash_table_remove(struct hash_table *table, const char *key)
 	return hash_table_remove_at_position(table,pos);
 }
 
+void * hash_table_pop(struct hash_table *table)
+{
+	char *key=0;
+	void *value=0;
+	struct hash_table_cursor *cursor = hash_table_cursor_create(table);
+	hash_table_cursor_get(cursor,&key,&value);
+	hash_table_cursor_delete(cursor);
+	return value;
+}
+
 char **hash_table_keys(struct hash_table *table)
 {
 	char **keys = malloc(sizeof(char *) * (table->live_count + 1));
