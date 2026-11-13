@@ -25,14 +25,14 @@ static struct hash_cache *addr_to_name = 0;
 static int domain_name_cache_init()
 {
 	if (!name_to_addr) {
-		name_to_addr = hash_cache_create(127, hash_string, free);
+		name_to_addr = hash_cache_create(0, 0, free);
 		if (!name_to_addr) {
 			return 0;
 		}
 	}
 
 	if (!addr_to_name) {
-		addr_to_name = hash_cache_create(127, hash_string, free);
+		addr_to_name = hash_cache_create(0, 0, free);
 		if (!addr_to_name) {
 			return 0;
 		}
