@@ -1,6 +1,5 @@
 /*
-Copyright (C) 2003-2004 Douglas Thain and the University of Wisconsin
-Copyright (C) 2022 The University of Notre Dame
+Copyright (C) 2026 The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
@@ -150,16 +149,53 @@ char **hash_table_keys(struct hash_table *h);
 
 
 /** Free an array generated from hash_table_free_keys_array.
-@param keys NULL-termianted array of size with a copy of keys.
+@param keys NULL-terminated array of size with a copy of keys.
 */
 void hash_table_keys_delete(char **keys);
 void hash_table_keys_delete_ppp( char ***keys );
 
+/** Create a cursor for iterating over the values of a table.
+@param table A pointer to a hash table.
+@return A pointer to a cursor object.
+*/
+
 struct hash_table_cursor * hash_table_cursor_create( struct hash_table *table );
 
+/** Move a cursor to a specific position in the table.
+The position zero indicates the first available object
+in the table, allowing for iterating over the entire
+set of objects in the table.  Positions other than zero
+are currently undefined.
+@param cursor A pointer to a cursor object.
+@param pos The desired position of the cursor.
+*/
+
 void hash_table_cursor_seek( struct hash_table_cursor *cursor, unsigned pos );
+
+/** Get the item under a cursor.
+If the cursor is positioned over a valid object,
+fill in the key and value and return true.
+If the cursor is invalid, simply return false.
+@param cursor A pointer to a cursor object.
+@param key A pointer to be filled in with the current key.
+@param value A pointer to be filled in with the current value.
+@return True if the cursor was positioned over a valid object.
+*/
+
 int  hash_table_cursor_get( struct hash_table_cursor *cursor, char **key, void **value );
+
+/** Move the cursor to the next object.
+Continue iteration by moving the cursor to the next available object and return true.
+If there are no more objects, move it to the invalid position and return false.
+@param A pointer to a cursor object.
+@return True if the cursor is now positioned over a valid object.
+*/
 int  hash_table_cursor_next( struct hash_table_cursor *cursor );
+
+/** Delete a cursor.
+@param A pointer to a cursor object.
+*/
+
 void hash_table_cursor_delete( struct hash_table_cursor *cursor );
 void hash_table_cursor_delete_pp( struct hash_table_cursor **cursor );
 

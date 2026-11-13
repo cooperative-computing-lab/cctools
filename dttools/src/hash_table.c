@@ -1,3 +1,8 @@
+/*
+Copyright (C) 2026 The University of Notre Dame
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
+*/
 
 #include "hash_table.h"
 #include "hash_string.h"
@@ -223,11 +228,11 @@ int hash_table_insert(struct hash_table *table, const char *key, const void *val
 					/* identical key:value exists */
 					return 1;
 				} else {
-					static int duplicate_key_warnings=0;
+					static int duplicate_key_warnings = 0;
 					duplicate_key_warnings++;
-					if(duplicate_key_warnings<10) {
+					if (duplicate_key_warnings < 10) {
 						notice(D_DEBUG, "key %s already exists in hash table with different value, ignoring new value.", key);
-					} else if(duplicate_key_warnings==10) {
+					} else if (duplicate_key_warnings == 10) {
 						notice(D_DEBUG, "[additional warnings suppressed]");
 					}
 					return 0;
