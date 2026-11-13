@@ -104,28 +104,10 @@ Causes a delete (D) record to be generated in the log.
 
 struct jx * deltadb_remove( struct deltadb *db, const char *key );
 
-/** Begin iteration over all keys in the database.
-This function begins a new iteration over the database.
-allowing you to visit every primary key in the database.
-Next, invoke @ref deltadb_nextkey to retrieve each value in order.
-@param db The database to access.
-@return Iteration index
-*/
 
-int deltadb_firstkey( struct deltadb *db );
+/* Hack to extract the hashtable for iteration macro below. */
+struct hash_table * deltadb_internal_table( struct deltadb *db );
 
-/** Continue iteration over the database.
-This function returns the next primary key and object in the iteration.
-@param db The database to access.
-@param Iteration index
-@param key A pointer to an unset char pointer, which will be made to point to the primary key.
-@param j A pointer to an unset jx pointer, which will be made to point to the next object.
-@return Zero if there are no more elements to visit, non-zero otherwise.
-*/
-
-int deltadb_nextkey( struct deltadb *db, int iteration, char **key, struct jx **j );
-
-
-#define DELTA_DB_ITERATE(db, iteration, key, j) iteration = deltadb_firstkey(db); while(deltadb_nextkey(db, iteration, &key, &j))
+#define DELTA_DB_ITERATE(db, iteration, key, j) HASH_TABLE_ITERATE(deltadb_internal_table(db),iteration,key,j)
 
 #endif
