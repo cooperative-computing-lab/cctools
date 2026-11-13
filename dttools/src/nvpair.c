@@ -206,20 +206,10 @@ double nvpair_lookup_float(struct nvpair *n, const char *name)
 void nvpair_export(struct nvpair *nv)
 {
 	char *name, *value;
-	int iteration = nvpair_first_item(nv);
-	while (nvpair_next_item(nv, iteration, &name, &value)) {
+	int iteration;
+	HASH_TABLE_ITERATE(nv->table,iteration,name,value) {
 		setenv(name, value, 1);
 	}
-}
-
-int nvpair_first_item(struct nvpair *nv)
-{
-	return hash_table_firstkey(nv->table);
-}
-
-int nvpair_next_item(struct nvpair *nv, int iteration, char **name, char **value)
-{
-	return hash_table_nextkey(nv->table, iteration, name, (void **)value);
 }
 
 void nvpair_print_text(struct nvpair *n, FILE *s)
