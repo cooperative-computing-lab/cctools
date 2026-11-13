@@ -326,26 +326,6 @@ void *hash_table_remove(struct hash_table *table, const char *key)
 	return hash_table_remove_at_position(table,pos);
 }
 
-void * hash_table_pop(struct hash_table *table)
-{
-	char *key=0;
-	void *value=0;
-	struct hash_table_cursor *cursor = hash_table_cursor_create(table);
-	hash_table_cursor_get(cursor,&key,&value);
-	hash_table_cursor_delete(cursor);
-	return value;
-}
-
-void hash_table_foreach_ro(struct hash_table *table, void (*func)(const char *key, void *value, void *arg), void *arg)
-{
-	int iteration;
-	char *key;
-	void *value;
-	HASH_TABLE_ITERATE(table,iteration,key,value) {
-		func(key,value,arg);
-	}
-}
-
 char **hash_table_keys(struct hash_table *table)
 {
 	char **keys = malloc(sizeof(char *) * (table->live_count + 1));
@@ -513,3 +493,46 @@ void hash_table_cursor_delete_pp(struct hash_table_cursor **cursor)
 {
 	hash_table_cursor_delete(*cursor);
 }
+
+/* Utility functions that depend upon cursors for common operations. */
+
+/* Remove the first object that is conveniently available. */
+
+void * hash_table_remove_any(struct hash_table *table)
+{
+	struct hash_table_cursor *cursor = hash_table_cursor_create(table);
+	void * value = hash_table_cursor_remove(cursor);
+	hash_table_cursor_delete(cursor);
+	return value;
+}
+
+/* Remove an object from a random position in the table. */
+
+void * hash_table_remove_random(struct hash_table *table)
+{
+	struct hash_table_cursor *cursor = hash_table_cursor_create(table);
+
+	/* Put the cursor at the object following a random position. */
+	hash_table_cursor_seek(cursor,rand()%table->bucket_count);
+
+	/* But if that was already off the end, go back to the beginning */
+	if(cursor->position==HASH_TABLE_CURSOR_INVALID) hash_table_cursor_seek(cursor,0);
+	
+	/* Now return that value, if any. */
+	void *value = hash_table_cursor_remove(cursor);
+
+	hash_table_cursor_delete(cursor);
+
+	return value;
+}
+
+void hash_table_foreach_ro(struct hash_table *table, void (*func)(const char *key, void *value, void *arg), void *arg)
+{
+	int iteration;
+	char *key;
+	void *value;
+	HASH_TABLE_ITERATE(table,iteration,key,value) {
+		func(key,value,arg);
+	}
+}
+
