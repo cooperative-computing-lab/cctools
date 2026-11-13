@@ -1,5 +1,6 @@
 
 #include "hash_table.h"
+#include "hash_string.h"
 #include "debug.h"
 #include "xxmalloc.h"
 
@@ -492,4 +493,3 @@ void hash_table_cursor_delete_pp(struct hash_table_cursor **cursor)
 {
 	hash_table_cursor_delete(*cursor);
 }
-

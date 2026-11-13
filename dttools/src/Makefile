@@ -58,6 +58,7 @@ SOURCES = \
 	gpu_info.c \
 	hash_cache.c \
 	hash_table.c \
+	hash_string.c \
 	hdfs_library.c \
 	histogram.c \
 	hmac.c \
@@ -160,6 +161,7 @@ HEADERS_PUBLIC = \
 	full_io.h \
 	getopt_aux.h \
 	hash_table.h \
+	hash_string.h \
 	histogram.h \
 	host_memory_info.h \
 	http_query.h \
@@ -213,6 +215,12 @@ all: $(TARGETS) catalog_query
 libdttools.a: $(OBJECTS)
 
 $(MOST_PROGRAMS) $(TEST_PROGRAMS): libdttools.a
+
+# Select a few key modules that should be compiled with optimization for speed.
+# We do not enable optimizations for other modules, to improve debuggability.
+
+hash_string.o: hash_string.c
+	$(CCTOOLS_CC) -O3 -o $@ -c $(CCTOOLS_INTERNAL_CCFLAGS) $(LOCAL_CCFLAGS) $<
 
 jx_parse.o: jx_parse.c
 	$(CCTOOLS_CC) -O3 -o $@ -c $(CCTOOLS_INTERNAL_CCFLAGS) $(LOCAL_CCFLAGS) $<
