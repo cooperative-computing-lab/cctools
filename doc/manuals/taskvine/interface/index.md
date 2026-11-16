@@ -631,3 +631,249 @@ some of its steps assume access to the Notre Dame cluster. The source code of
 VineReduce, and the documentation of all of its options, are in the
 [vine-reduce](https://github.com/cooperative-computing-lab/vine-reduce)
 repository.
+
+### VineGraph
+
+VineGraph is a Python interface to TaskVine for applications that are a graph
+of Python function calls, where the result of one call is an argument of
+others. You describe the calls, and VineGraph runs each one as a task as soon
+as the results it reads are ready. Results stay at the workers and move
+directly from worker to worker, so only the results you ask for are brought
+back to the manager.
+
+VineGraph is designed for workers that come and go. While the graph runs, it
+copies results to the manager in the background, and it frees a result at the
+workers only when the tasks that read it are themselves safe. When a worker is
+lost, only the few tasks whose results were not yet copied run again, rather
+than everything that led up to them.
+
+VineGraph is the `vine_graph` module of `ndcctools.taskvine`. At the moment,
+it is only available on the `vine-graph` development branch, and is not yet
+part of a released `ndcctools`.
+
+There are two objects to know. A `Graph` describes tasks and does not run
+anything. An `Executor` runs tasks on TaskVine workers. The following example
+describes nine tasks as a graph, runs them, and then submits three more calls
+one at a time:
+
+```python
+--8<-- "taskvine/interface/vine_graph_example.py"
+```
+
+Each call of `graph.add(function, arguments...)` records one task, and returns
+a `Node` that stands for the result of that task. Passing a `Node` to another
+`add` makes the second task read the result of the first. A `Node` may appear
+anywhere inside the arguments, for example inside a list or a dictionary. A
+part of a result can be selected with `node[key]` or `node.attr(name)`, as with
+`summary["mean"]` above, and then only that part is sent to the task that
+reads it.
+
+`executor.run(graph, targets)` runs the targets and every task that they
+read, and returns a dictionary from each target to its result. If no targets
+are given, it runs the tasks that no other task reads. The functions
+themselves are executed at the workers, so they must be defined at the top
+level of the program, and the main program should be guarded with
+`if __name__ == "__main__"`, as in the example.
+
+Run the example like this:
+
+```
+python vine_graph_example.py
+```
+
+It should display output like this:
+
+```
+Listening on port 9123
+overall mean 100.02
+first sample 100000 values, largest 159.48
+a new sample differs from the overall mean by -0.006
+```
+
+The example starts its own local worker with a factory. To use workers
+somewhere else, give the executor a port or a name, and start workers for it
+in the usual way:
+
+```python
+executor = vg.Executor(port=9123, name="my-graph")
+```
+
+```sh
+vine_submit_workers -T condor -M my-graph 10
+```
+
+The remaining examples in this section assume that `executor` is an open
+`Executor` with at least one worker, and that `vg` is the `vine_graph` module.
+
+#### Futures
+
+`executor.submit(function, arguments...)` runs one call right away and returns
+a `Future`. A `Future` given as an argument makes the new task wait for that
+result, so a program can decide what to submit next from the results that it
+has seen so far. `future.result()` waits for the task and returns its result,
+and `executor.as_completed(futures)` gives back each future as its task
+finishes:
+
+```python
+def square(x):
+    return x * x
+
+def add(a, b):
+    return a + b
+
+squares = [executor.submit(square, x) for x in range(4)]
+total = executor.submit(add, executor.submit(add, squares[0], squares[1]), executor.submit(add, squares[2], squares[3]))
+
+for future in executor.as_completed(squares):
+    print("a square is", future.result())
+
+print("the sum of the squares is", total.result())
+```
+
+A task of a graph can be submitted in the same way with
+`executor.submit(node)`, which runs the task after the tasks that it reads.
+As long as a `Future` exists, the executor keeps its result, so tasks submitted
+later can read it without running anything again.
+
+A future also has `done()`, `exception()`, `cancel()`, and
+`add_done_callback(function)`, which behave like those of Python's
+`concurrent.futures`. `executor.wait(futures)` waits for several futures, or
+for every task submitted so far if it is given none.
+
+#### Files
+
+Tasks can read and write files as well as Python values. `vg.File(path)` names
+a file on the local filesystem, and a task that takes it as an argument
+receives the path of its own copy at the worker. `node.file(path)` declares a
+file that a task writes in its working directory, and can be given to other
+tasks, or asked for as a target, in which case the result is the path of a
+local copy:
+
+```python
+def sort_lines(source, output):
+    with open(source) as f:
+        lines = sorted(f)
+    with open(output, "w") as f:
+        f.writelines(lines)
+    return len(lines)
+
+def first_line(path):
+    with open(path) as f:
+        return f.readline().strip()
+
+with open("fruit.txt", "w") as f:
+    f.write("pear\napple\nquince\n")
+
+graph = vg.Graph()
+sorter = graph.add(sort_lines, vg.File("fruit.txt"), "sorted.txt")
+sorted_file = sorter.file("sorted.txt")
+first = graph.add(first_line, sorted_file)
+
+results = executor.run(graph, [sorter, first, sorted_file])
+print(results[sorter], "lines, the first is", results[first])
+print("sorted copy at", results[sorted_file])
+```
+
+File results are placed in the directory given as `output_dir` when the
+executor is created (`./outputs` by default), and stay there after the
+executor is closed.
+
+#### When a Task Fails
+
+If a function raises an exception, its task fails, and so does every task that
+needs its result. The rest of the graph keeps running. Asking for the result of
+a failed task raises `vg.TaskError`, which says which task failed (`source`),
+why (`reason`), and carries the original exception (`exception`):
+
+```python
+def divide(a, b):
+    return a / b
+
+quotient = executor.submit(divide, 1, 0)
+shifted = executor.submit(add, quotient, 10)
+
+try:
+    shifted.result()
+except vg.TaskError as error:
+    print("reason:", error.reason)
+    print("exception:", repr(error.exception))
+```
+
+The `reason` is `"function"` when the function raised an exception or exited
+with an error, `"signal"` when it was killed by a signal, and `"workers"` or
+`"retries"` when the task could not be completed after several attempts on
+different workers.
+
+To debug a function without any workers, create the executor with
+`local=True`. Each task then runs in the current process when it is
+submitted, with the same results and the same errors:
+
+```python
+with vg.Executor(local=True) as local_executor:
+    print(local_executor.submit(add, 1, 2).result())
+```
+
+#### Sharing Modules and Data Between Tasks
+
+Each worker runs tasks from a long-running library process, and every task
+starts as a copy of that process. Anything loaded into the library is
+therefore loaded once per worker, rather than once per task. `library_modules`
+lists modules to import in the library, and `hoist` gives objects to load
+there by name. A task that takes `vg.Hoisted(name)` as an argument receives
+the object:
+
+```python
+def look_up(table, key):
+    return table[key]
+
+table = {number: number * number for number in range(100_000)}
+
+with vg.Executor(port=9124, library_modules=["json"], hoist={"squares": table}) as hoisting_executor:
+    future = hoisting_executor.submit(look_up, vg.Hoisted("squares"), 12)
+    print(future.result())
+```
+
+Hoisting suits a few large objects that most tasks read, such as a model or a
+lookup table. Each task gets its own copy, so a change that a task makes stays
+within that task.
+
+#### Dask Graphs
+
+An existing Dask task graph can be converted to a `Graph` with
+`adaptors.from_dask`. The keys of the Dask graph become the keys of the
+tasks, and `graph.node(key)` returns the `Node` of a key:
+
+```python
+from operator import mul
+from ndcctools.taskvine.vine_graph import adaptors
+
+dask_graph = {"x": 3, "y": (mul, "x", 2), "z": (add, "y", "x")}
+graph = adaptors.from_dask(dask_graph)
+print(executor.run(graph, [graph.node("z")])[graph.node("z")])
+```
+
+#### Watching and Tuning a Run
+
+A background thread advances the run, so tasks keep running while the program
+does other work. `executor.progress()` reports how many tasks were submitted,
+completed, and failed, `executor.capacity()` the workers and cores connected,
+and `executor.stats()` a dictionary of measurements of the run:
+
+```python
+progress = executor.progress()
+print(progress.completed, "of", progress.total, "tasks completed,", progress.failed, "failed")
+print(executor.capacity().workers, "workers connected")
+```
+
+Settings are given by name with `executor.set_params`, or as `params` when the
+executor is created. `max-retries` is the number of attempts allowed to a task
+when workers fail, and `progress-bar` turns the progress bar on or off. Any
+other name is passed to the manager as a `vine_tune` parameter:
+
+```python
+executor.set_params({"max-retries": 3, "progress-bar": 0})
+```
+
+Finally, close the executor when the work is done, or use it in a `with`
+block as in the first example. Closing it releases the workers' copies of
+every result. File results that were returned stay in the output directory.
