@@ -362,6 +362,49 @@ static void test_cursor_removal(void)
 	printf("ok\n");
 }
 
+/* Verify safety of nested iteration with delete in the middle. */
+
+static void test_nested_removal(void)
+{
+	printf("  %-28s ... ", "remove in nested iteration");
+	fflush(stdout);
+
+	struct hash_table *h = hash_table_create(0, 0);
+	reset_model();
+	for (int k = 0; k < 100; k++) {
+		CHECK(hash_table_insert(h, keys[k], &values_a[k]) == 1, "insert %d", k);
+		model[k] = &values_a[k];
+		model_count++;
+	}
+
+	int total_count = 0;
+	
+	char *key;
+	void *value;
+	int iteration = 0;
+	HASH_TABLE_ITERATE(h, iteration, key, value)
+	{
+		char *inner_key;
+		void *inner_value;
+		int   inner_iteration;
+		HASH_TABLE_ITERATE(h, inner_iteration, inner_key, inner_value)
+		{
+			if(total_count%9==0) {
+				int k = key_number(inner_key);
+				hash_table_remove(h,inner_key);
+				/* cannot use inner_key at this point */
+				model[k] = 0;
+				model_count--;
+			}
+			total_count++;
+		}
+	}
+	CHECK(total_count==820,"total_count %d",total_count);
+	verify_all(h);
+	hash_table_delete(h);
+	printf("ok\n");
+}
+
 /* clear with a delete callback must invoke it exactly once per live value. */
 static int delete_calls = 0;
 static void count_delete(void *v)
@@ -420,6 +463,7 @@ int main(int argc, char **argv)
 	run_config("7 distinct hash values", 0, hash_few_values, KEY_UNIVERSE, ops / 4);
 
 	test_cursor_removal();
+	test_nested_removal();
 	test_clear_callback();
 
 	printf("PASS (%lu checks)\n", checks);
