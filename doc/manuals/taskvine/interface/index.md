@@ -691,6 +691,38 @@ first sample 100000 values, largest 159.48
 a new sample differs from the overall mean by -0.006
 ```
 
+A task is always a Python function call. To run a command line program as a
+task, call it from a function, and give its input files as `vg.File(path)`,
+which the function receives as the path of its copy at the worker. To be told
+when a task finishes without waiting for it, give the future a function with
+`add_done_callback`, which is called with the future once the task completes
+or fails. The callback runs in a thread of the executor, shortly after the
+task finishes. The following lines, added to the example above where
+`executor` is open, count the words of a file with `wc` and print the count
+from a callback:
+
+```python
+import subprocess
+import threading
+
+def count_words(path):
+    output = subprocess.run(["wc", "-w", path], capture_output=True, text=True, check=True).stdout
+    return int(output.split()[0])
+
+reported = threading.Event()
+
+def report(future):
+    print("words:", future.result())
+    reported.set()
+
+with open("notes.txt", "w") as f:
+    f.write("results stay at the workers\n")
+
+future = executor.submit(count_words, vg.File("notes.txt"))
+future.add_done_callback(report)
+reported.wait()
+```
+
 The example starts its own local worker with a factory. To use workers
 somewhere else, create the executor with a port or a name, such as
 `vg.Executor(port=9123, name="my-graph")`, and start workers for it in the
