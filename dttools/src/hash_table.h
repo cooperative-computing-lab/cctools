@@ -22,7 +22,7 @@ file = hash_table_remove(h,pathname);
 
 </pre>
 
-To list all of the items in a hash table, use @ref hash_table_firstkey and @ref hash_table_nextkey like this:
+Use the following macro to safely iterate over all items in a table:
 
 <pre>
 char *key;
@@ -33,6 +33,11 @@ HASH_TABLE_ITERATE(table, iteration, &key, &value) {
 	printf("table contains: %s\n",key);
 }
 </pre>
+
+Note that iteration has several important properties:
+- @ref HASH_TABLE_ITERATE can be safely nested, because each call uses an independent cursor.
+- @ref hash_table_insert is not permitted during iteration, to avoid a rehash upsetting the iteration order.
+- @ref hash_table_remove is permitted during iteration, but the current key string becomes invalid immediately after removal.
 */
 
 #include "hash_string.h"
@@ -131,16 +136,9 @@ The table must not be modified during the call; if an insert occurs, the program
 
 void hash_table_foreach_ro(struct hash_table *h, void (*func)(const char *key, void *value, void *arg), void *arg);
 
-/** A default hash function.
-@param s A string to hash.
-@return An integer hash of the string.
-*/
-
-unsigned hash_string(const char *s);
-
-/** Return a NULL-termianted array with a copy of all the current keys.
+/** Return a NULL-terminated array with a copy of all the current keys.
 It is the responsibility of the caller to free this array with
-hash_table_free_keys_array.
+@ref hash_table_keys_delete.
 @param h A pointer to a hash table.
 @return NULL-termianted array of size with a copy of all the current keys.
 */
