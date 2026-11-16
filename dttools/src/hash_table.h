@@ -37,7 +37,7 @@ HASH_TABLE_ITERATE(table, iteration, &key, &value) {
 Note that iteration has several important properties:
 - @ref HASH_TABLE_ITERATE can be safely nested, because each call uses an independent cursor.
 - @ref hash_table_insert is not permitted during iteration, to avoid a rehash upsetting the iteration order.
-- @ref hash_table_remove is permitted during iteration, but the current key string becomes invalid immediately after removal.
+- @ref hash_table_remove is permitted during iteration, and the "key" value remains valid until the end of the loop.
 */
 
 #include "hash_string.h"
