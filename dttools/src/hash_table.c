@@ -23,10 +23,10 @@ struct hash_table_entry {
 struct hash_table {
 	struct hash_table_entry **buckets;
 	hash_func_t hashfunc;
-	unsigned bucket_count;	 /* Length of the buckets array. */
-	unsigned live_count;	 /* Number of valid entries in array. */
-	unsigned dead_count;	 /* Number of tombstone entries in array. */
-	unsigned active_cursors; /* Number of cursors created on this table. */
+	unsigned bucket_count;	  /* Length of the buckets array. */
+	unsigned live_count;	  /* Number of valid entries in array. */
+	unsigned dead_count;	  /* Number of tombstone entries in array. */
+	unsigned active_cursors;  /* Number of cursors created on this table. */
 	struct list *delete_list; /* Entries selected for deletion after current iteration. */
 };
 
@@ -78,7 +78,7 @@ struct hash_table *hash_table_create(unsigned bucket_count, hash_func_t hashfunc
 	table->dead_count = 0;
 	table->active_cursors = 0;
 	table->delete_list = list_create();
-	
+
 	return table;
 }
 
@@ -306,7 +306,7 @@ HASH_TABLE_ITERATE(table,key,value) {
     // key is still valid here
     printf("%s\n",key);
 }
-    
+
 */
 
 static void *hash_table_remove_at_position(struct hash_table *table, unsigned position)
@@ -317,8 +317,8 @@ static void *hash_table_remove_at_position(struct hash_table *table, unsigned po
 
 	void *value = e->value;
 
-	if(table->active_cursors>0) {
-		list_push_head(table->delete_list,e);
+	if (table->active_cursors > 0) {
+		list_push_head(table->delete_list, e);
 	} else {
 		hash_table_entry_delete(e);
 	}
@@ -334,9 +334,9 @@ static void *hash_table_remove_at_position(struct hash_table *table, unsigned po
 
 /* Perform the actual delete of items removed during iteration */
 
-static void hash_table_do_deferred_deletes( struct hash_table *table )
+static void hash_table_do_deferred_deletes(struct hash_table *table)
 {
-	list_clear(table->delete_list,(void*)hash_table_entry_delete);
+	list_clear(table->delete_list, (void *)hash_table_entry_delete);
 }
 
 /*
@@ -531,7 +531,7 @@ int hash_table_cursor_next(struct hash_table_cursor *cursor)
 void hash_table_cursor_delete(struct hash_table_cursor *cursor)
 {
 	cursor->table->active_cursors--;
-	if(cursor->table->active_cursors==0) {
+	if (cursor->table->active_cursors == 0) {
 		hash_table_do_deferred_deletes(cursor->table);
 	}
 	free(cursor);
