@@ -202,6 +202,11 @@ struct catalog_query *catalog_query_create(const char *hosts, struct jx *filter_
 			}
 		}
 
+		/* A host answered, so we are done. */
+		if (q) {
+			break;
+		}
+
 		/* If we tried all the hosts without success, wait a bit and try again. */
 		sleep(backoff_interval);
 
