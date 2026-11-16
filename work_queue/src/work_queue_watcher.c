@@ -67,12 +67,7 @@ struct work_queue_watcher * work_queue_watcher_create()
 
 void work_queue_watcher_delete( struct work_queue_watcher *w )
 {
-	struct entry *e;
-
-	list_first_item(w->watchlist);
-	while((e=list_pop_head(w->watchlist))) {
-		entry_delete(e);
-	}
+	list_clear(w->watchlist,(void*)entry_delete);
 	list_delete(w->watchlist);
 	free(w);
 }
