@@ -222,22 +222,38 @@ By default, the factory submits as many tasks that are waiting and running up
 to a specified maximum. To run more than one task in a worker, please refer
 to the following section on describing [task resources](#task-resources) and [worker resources](#worker-resources).
 
-We can also create a factory directly in python. Creating a factory object does not
-immediately launch it, so this is a good time to configure the resources,
-number of workers, etc. Factory objects function as Python context managers, so
-to indicate that a set of commands should be run with a factory running, wrap
-them in a with statement. The factory will be cleaned up automatically at the
-end of the block. As an example:
+We can also create a factory directly in Python, passing worker resources and
+limits as constructor arguments. Factory objects function as Python context
+managers: entering the `with` block starts the factory, and leaving the block
+stops it automatically. For an existing manager `m`, this example launches
+workers through Condor and obtains the manager name from `m`:
 
 ```python
-workers = vine.Factory("condor", "myproject")
-workers.cores = 4
-workers.memory = 4000
-workers.disk = 5000
-workers.max_workers = 20
-with workers:
+m.set_name("myproject")
+with vine.Factory(
+    batch_type="condor",
+    manager=m,
+    cores=4,
+    memory=4000,
+    disk=5000,
+    max_workers=20,
+) as workers:
     while not m.empty():
         t = m.wait(5)
         ...
 ```
+
+You can also set individual attributes after constructing the factory, before
+starting it:
+
+```python
+workers = vine.Factory(batch_type="condor", manager=m)
+workers.cores = 4
+workers.memory = 4000
+workers.disk = 5000
+workers.max_workers = 20
+```
+
+Creating the object alone does not start the factory. Use `with workers:` to
+start it with these settings and stop it automatically when the block ends.
 
