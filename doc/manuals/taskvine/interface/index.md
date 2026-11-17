@@ -664,8 +664,9 @@ can be selected with `node[key]`, as with `summary["mean"]` above, and then
 only that part is sent to the task that reads it.
 
 `executor.run(graph, targets)` runs the targets and every task that they
-read, and returns a dictionary from each target to its result. If no targets
-are given, it runs the tasks that no other task reads.
+read, and returns a dictionary from each target to its result. Given a single
+target, it returns the result of that target. If no targets are given, it runs
+the tasks that no other task reads.
 
 `executor.submit(function, arguments...)` runs one call right away and returns
 a `Future`. A `Future` given as an argument makes the new task wait for that
@@ -691,37 +692,47 @@ first sample 100000 values, largest 159.48
 a new sample differs from the overall mean by -0.006
 ```
 
-A task is always a Python function call. To run a command line program as a
-task, call it from a function, and give its input files as `vg.File(path)`,
-which the function receives as the path of its copy at the worker. To be told
-when a task finishes without waiting for it, give the future a function with
-`add_done_callback`, which is called with the future once the task completes
-or fails. The callback runs in a thread of the executor, shortly after the
-task finishes. The following lines, added to the example above where
-`executor` is open, count the words of a file with `wc` and print the count
-from a callback:
+A task may also be a command line program. Give a `vg.Command` to `add` or
+`submit` in place of a function. `inputs` lists the files that the command
+reads, and `outputs` lists the files that it writes. An input is a local file,
+or a file written by another task, which is named with `node.file(name)`. The
+result of the task is the standard output of the command. The following
+lines, added to the example above where `executor` is open, sort a file with
+one command and count its lines with another:
 
 ```python
-import subprocess
-import threading
+with open("names.txt", "w") as f:
+    f.write("pear\napple\nfig\n")
 
-def count_words(path):
-    output = subprocess.run(["wc", "-w", path], capture_output=True, text=True, check=True).stdout
-    return int(output.split()[0])
-
-reported = threading.Event()
-
-def report(future):
-    print("words:", future.result())
-    reported.set()
-
-with open("notes.txt", "w") as f:
-    f.write("results stay at the workers\n")
-
-future = executor.submit(count_words, vg.File("notes.txt"))
-future.add_done_callback(report)
-reported.wait()
+commands = vg.Graph()
+ordered = commands.add(vg.Command("sort names.txt > sorted.txt", inputs=["names.txt"], outputs=["sorted.txt"]))
+count = commands.add(vg.Command("wc -l < sorted.txt", inputs=[ordered.file("sorted.txt")]))
+print("lines:", executor.run(commands, count).strip())
 ```
+
+Each input appears in the working directory of the command under its own file
+name. To give it another name, or to give the result of another task as a
+file, write `inputs` as a dictionary from names to sources, such as
+`inputs={"data.txt": "names.txt"}`. If a command exits with a non-zero status,
+its task fails with `vg.TaskError` like any other, and the message shows the
+error output of the command.
+
+To be told when a task finishes without waiting for it, give the future a
+function with `add_done_callback`, which is called with the future once the
+task completes or fails:
+
+```python
+def report(future):
+    print("shift:", future.result())
+
+future = executor.submit(difference, 3, 1)
+future.add_done_callback(report)
+executor.wait()
+```
+
+The callback runs in a thread of the executor, shortly after the task
+finishes. `executor.wait()` waits for every submitted task, because closing
+the executor cancels the tasks that have not finished.
 
 The example starts its own local worker with a factory. To use workers
 somewhere else, create the executor with a port or a name, such as
