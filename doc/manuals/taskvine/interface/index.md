@@ -631,3 +631,111 @@ some of its steps assume access to the Notre Dame cluster. The source code of
 VineReduce, and the documentation of all of its options, are in the
 [vine-reduce](https://github.com/cooperative-computing-lab/vine-reduce)
 repository.
+
+### VineGraph
+
+VineGraph is a Python interface to TaskVine for applications that are a graph
+of Python function calls, where the result of one call is an argument of
+others. You describe the calls, and VineGraph runs each one as a task as soon
+as the results it reads are ready. Results stay at the workers and move
+directly from worker to worker, and only the results you ask for are brought
+back to the manager. While the graph runs, results are also copied to the
+manager in the background, so that when a worker is lost, only the few tasks
+whose results were not yet copied run again.
+
+VineGraph is the `vine_graph` module of `ndcctools.taskvine`. At the moment,
+it is only available on the `vine-graph` development branch, and is not yet
+part of a released `ndcctools`.
+
+There are two objects to know. A `Graph` describes tasks and does not run
+anything. An `Executor` runs tasks on TaskVine workers. The following example
+describes nine tasks as a graph, runs them, and then submits three more calls
+one at a time:
+
+```python
+--8<-- "taskvine/interface/vine_graph_example.py"
+```
+
+Each call of `graph.add(function, arguments...)` records one task, and returns
+a `Node` that stands for the result of that task. Passing a `Node` to another
+`add` makes the second task read the result of the first. A `Node` may appear
+anywhere inside the arguments, for example inside a list. A part of a result
+can be selected with `node[key]`, as with `summary["mean"]` above, and then
+only that part is sent to the task that reads it.
+
+`executor.run(graph, targets)` runs the targets and every task that they
+read, and returns a dictionary from each target to its result. Given a single
+target, it returns the result of that target. If no targets are given, it runs
+the tasks that no other task reads.
+
+`executor.submit(function, arguments...)` runs one call right away and returns
+a `Future`. A `Future` given as an argument makes the new task wait for that
+result, so a program can decide what to submit next from the results it has
+seen so far. `future.result()` waits for the task and returns its result. If
+the function of a task raises an exception, `result()` and `run()` raise
+`vg.TaskError`, which carries the original exception.
+
+The functions are executed at the workers, so they must be defined at the top
+level of the program, and the main program should be guarded with
+`if __name__ == "__main__"`, as in the example. Run it like this:
+
+```
+python vine_graph_example.py
+```
+
+It should display output like this:
+
+```
+Listening on port 9123
+overall mean 100.02
+first sample 100000 values, largest 159.48
+a new sample differs from the overall mean by -0.006
+```
+
+A task may also be a command line program. Give a `vg.Command` to `add` or
+`submit` in place of a function. `inputs` lists the files that the command
+reads, and `outputs` lists the files that it writes. An input is a local file,
+or a file written by another task, which is named with `node.file(name)`. The
+result of the task is the standard output of the command. The following
+lines, added to the example above where `executor` is open, sort a file with
+one command and count its lines with another:
+
+```python
+with open("names.txt", "w") as f:
+    f.write("pear\napple\nfig\n")
+
+commands = vg.Graph()
+ordered = commands.add(vg.Command("sort names.txt > sorted.txt", inputs=["names.txt"], outputs=["sorted.txt"]))
+count = commands.add(vg.Command("wc -l < sorted.txt", inputs=[ordered.file("sorted.txt")]))
+print("lines:", executor.run(commands, count).strip())
+```
+
+Each input appears in the working directory of the command under its own file
+name. To give it another name, or to give the result of another task as a
+file, write `inputs` as a dictionary from names to sources, such as
+`inputs={"data.txt": "names.txt"}`. If a command exits with a non-zero status,
+its task fails with `vg.TaskError` like any other, and the message shows the
+error output of the command.
+
+To be told when a task finishes without waiting for it, give the future a
+function with `add_done_callback`, which is called with the future once the
+task completes or fails:
+
+```python
+def report(future):
+    print("shift:", future.result())
+
+future = executor.submit(difference, 3, 1)
+future.add_done_callback(report)
+executor.wait()
+```
+
+The callback runs in a thread of the executor, shortly after the task
+finishes. `executor.wait()` waits for every submitted task, because closing
+the executor cancels the tasks that have not finished.
+
+The example starts its own local worker with a factory. To use workers
+somewhere else, create the executor with a port or a name, such as
+`vg.Executor(port=9123, name="my-graph")`, and start workers for it in the
+usual way. To debug the functions without any workers, create it with
+`vg.Executor(local=True)`, which runs each task in the current process.
