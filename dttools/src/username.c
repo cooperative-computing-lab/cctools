@@ -65,8 +65,18 @@ int username_set(const char *name)
 	if (result < 0)
 		return 0;
 
-	setuid(uid);
-	setgid(gid);
+	/* Drop the group id before the user id: once setuid() below gives up
+	root, this process will typically no longer have permission to change
+	its group id at all, so doing it in the other order would usually
+	leave the process running as the target user but still holding its
+	*original* group id. Both calls' return values are checked -- silently
+	continuing after either fails could leave the process holding more
+	privilege than the caller believes it dropped. */
+	if (setgid(gid) < 0)
+		return 0;
+
+	if (setuid(uid) < 0)
+		return 0;
 
 	return 1;
 }

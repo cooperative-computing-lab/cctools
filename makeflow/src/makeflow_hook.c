@@ -41,8 +41,8 @@ struct list * makeflow_hook_self = NULL;
 			break; \
 		} \
 	} \
-	list_cursor_destroy(cur); \
-	list_cursor_destroy(scur); \
+	list_cursor_delete(cur); \
+	list_cursor_delete(scur); \
 	return rc; \
 } while (0)
 
@@ -94,14 +94,14 @@ int makeflow_hook_register(struct makeflow_hook *hook, struct jx **args) {
 		for (list_seek(cur, -1), list_seek(acur, -1); 
 			 list_get(cur, (void**)&h) && list_get(acur, (void**)&h_args); 
 			 list_prev(cur), list_prev(acur)){
-			if(h && !strcmp(h->module_name, hook->module_name)){
+			if(h && !strcmp(h->module_name?h->module_name:"", hook->module_name?hook->module_name:"")){
 				*args = h_args;
 				rc = MAKEFLOW_HOOK_SKIP;
 				break;
 			}
 		}
-		list_cursor_destroy(cur);
-		list_cursor_destroy(acur);
+		list_cursor_delete(cur);
+		list_cursor_delete(acur);
 	}
 
 	if(rc == MAKEFLOW_HOOK_SUCCESS){
@@ -150,9 +150,9 @@ int makeflow_hook_create(){
 			break;
 		}
 	}
-	list_cursor_destroy(cur);
-	list_cursor_destroy(acur);
-	list_cursor_destroy(scur);
+	list_cursor_delete(cur);
+	list_cursor_delete(acur);
+	list_cursor_delete(scur);
 
 	return rc;
 }
@@ -200,8 +200,8 @@ int makeflow_hook_dag_loop(struct dag *d){
 			break;
 		}
 	}
-	list_cursor_destroy(cur);
-	list_cursor_destroy(scur);
+	list_cursor_delete(cur);
+	list_cursor_delete(scur);
 
 	return rc;
 }

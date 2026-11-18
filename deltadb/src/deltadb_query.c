@@ -61,8 +61,8 @@ void deltadb_query_delete( struct deltadb_query *query )
 
 	char *key;
 	struct jx *jobject;
-	hash_table_firstkey(query->table);
-	while(hash_table_nextkey(query->table,&key,(void**)&jobject)) {
+	int iteration;
+	HASH_TABLE_ITERATE(query->table, iteration, key, jobject) {
 		jx_delete(jobject);
 	}
 	hash_table_delete(query->table);
@@ -239,8 +239,8 @@ static void display_reduce_exprs( struct deltadb_query *query, time_t current )
 
 	char *key;
 	struct jx *jobject;
-	hash_table_firstkey(query->table);
-	while(hash_table_nextkey(query->table,&key,(void**)&jobject)) {
+	int iteration;
+	HASH_TABLE_ITERATE(query->table, iteration, key, jobject) {
 		/* Update each local reduction with its value. */
 		update_reductions(query,key,jobject,DELTADB_SCOPE_SPATIAL);
 	}
@@ -262,9 +262,9 @@ static void display_reduce_exprs( struct deltadb_query *query, time_t current )
 			struct jx *column = jx_object(0);
 			char *key;
 			void *value;
+			int iteration;
 			struct deltadb_reduction *temporal;
-			hash_table_firstkey(r->temporal_table);
-			while(hash_table_nextkey(r->temporal_table,&key,&value)){
+						HASH_TABLE_ITERATE(r->temporal_table, iteration, key, value) {
 				temporal = (struct deltadb_reduction *) value;
 				char *value_str = deltadb_reduction_string(temporal);
 				jx_insert_string(column, key, value_str);
@@ -294,8 +294,8 @@ static void display_output_exprs( struct deltadb_query *query, time_t current )
 
 	char *key;
 	struct jx *jobject;
-	hash_table_firstkey(query->table);
-	while(hash_table_nextkey(query->table,&key,(void**)&jobject)) {
+	int iteration;
+	HASH_TABLE_ITERATE(query->table, iteration, key, jobject) {
 
 		/* Skip if the where expression doesn't match */
 
@@ -336,8 +336,8 @@ static void display_output_objects( struct deltadb_query *query, time_t current 
 
 	char *key;
 	struct jx *jobject;
-	hash_table_firstkey(query->table);
-	while(hash_table_nextkey(query->table,&key,(void**)&jobject)) {
+	int iteration;
+	HASH_TABLE_ITERATE(query->table, iteration, key, jobject) {
 
 		/* Skip if the where expression doesn't match */
 		if(!deltadb_boolean_expr(query->where_expr,jobject)) continue;

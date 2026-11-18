@@ -35,8 +35,6 @@
 #ifdef SWIGPYTHON
 	if (PyLong_Check($input))
 		$1 = (time_t) PyLong_AsLong($input);
-	else if (PyInt_Check($input))
-		$1 = (time_t) PyInt_AsLong($input);
 	else if (PyFloat_Check($input))
 		$1 = (time_t) PyFloat_AsDouble($input);
 	else {

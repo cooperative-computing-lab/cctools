@@ -183,8 +183,8 @@ int main (int argc, char *argv[])
 	assert(!list_tell(cur, &pos));
 
 	// delete the cursors and try to delete while there are items
-	list_cursor_destroy(cur);
-	list_cursor_destroy(alt);
+	list_cursor_delete(cur);
+	list_cursor_delete(alt);
 	ok = list_destroy(list);
 	assert(!ok);
 
@@ -204,7 +204,7 @@ int main (int argc, char *argv[])
 	assert(!ok);
 
 	// delete said cursor
-	list_cursor_destroy(cur);
+	list_cursor_delete(cur);
 
 	// finally delete the list
 	ok = list_destroy(list);

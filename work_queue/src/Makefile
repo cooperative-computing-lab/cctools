@@ -15,8 +15,7 @@ SOURCES_WORKER = \
 	work_queue_cache.o \
 	work_queue_process.o \
 	work_queue_coprocess.o \
-	work_queue_watcher.o \
-	work_queue_gpus.o
+	work_queue_watcher.o
 
 PUBLIC_HEADERS = work_queue.h
 

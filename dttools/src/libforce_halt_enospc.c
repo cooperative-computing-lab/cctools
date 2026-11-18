@@ -44,7 +44,7 @@ int open(const char *path, int flags, ...)
 			fprintf(stderr, "OPEN ERROR: device capacity reached.\n");
 			return fd;
 		}
-		err_fd = original_open(filename, O_RDWR | O_CREAT);
+		err_fd = original_open(filename, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
 		if(err_fd < 0) { fprintf(stderr, "OPEN ERROR: could not alert resource management system that loop device is full.\n"); }
 		fprintf(stderr, "OPEN ERROR: device capacity reached.\n");
 		return fd;
@@ -74,7 +74,7 @@ ssize_t write(int fd, const void *buf, size_t count) {
 			original_write(STDERR_FILENO, "WRITE ERROR: device capacity reached.\n", 39);
 			return real_count;
 		}
-		fd = open(filename, O_RDWR | O_CREAT);
+		fd = open(filename, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
 		if(fd < 0) { original_write(STDERR_FILENO, "WRITE ERROR: could not alert resource management system that loop device is full.\n", 77); }	
 		original_write(STDERR_FILENO, "WRITE ERROR: device capacity reached.\n", 39);
 		return real_count;

@@ -121,8 +121,11 @@ Worker environment options:
 - **--worker-binary=_&lt;file&gt;_**<br />
  Alternate binary instead of work_queue_worker.
 - **--wrapper=_&lt;cmd&gt;_**<br />
- Wrap factory with this command prefix.
-- **--wrapper-input=_&lt;file&gt;_**<br /> Add this input file needed by the wrapper.
+ Wrap worker with this command prefix.
+- **--task-wrapper=_&lt;cmd&gt;_**<br />
+ Wrap tasks with this command prefix.
+- **--wrapper-input=_&lt;file&gt;_**<br />
+Add this input file needed by a task or worker wrapper.
 - **--python-env=_&lt;file.tar.gz&gt;_**<br /> Run each worker inside this python environment.
 
 

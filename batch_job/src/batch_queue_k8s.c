@@ -84,7 +84,12 @@ typedef struct k8s_job_info {
 static k8s_job_info *create_k8s_job_info(int job_id, const char *cmd,
 		const char *extra_input_files, const char *extra_output_files)
 {
-	k8s_job_info *new_job_info = malloc(sizeof(k8s_job_info));
+	/* calloc, not malloc: failed_info is only ever set on the
+	kubectl-failed-task path (batch_queue_k8s_get_kubectl_failed_task());
+	zeroing it here means delete_k8s_job_info() can safely free() it
+	unconditionally instead of freeing garbage on the ordinary
+	successful-completion path. */
+	k8s_job_info *new_job_info = calloc(1, sizeof(k8s_job_info));
 	new_job_info->job_id = job_id;
 	new_job_info->cmd = xxstrdup(cmd);
 	new_job_info->extra_input_files = xxstrdup(extra_input_files);
@@ -93,6 +98,17 @@ static k8s_job_info *create_k8s_job_info(int job_id, const char *cmd,
 	new_job_info->is_failed = 0;
 
 	return new_job_info;
+}
+
+static void delete_k8s_job_info(k8s_job_info *info)
+{
+	if (info) {
+		free(info->cmd);
+		free(info->extra_input_files);
+		free(info->extra_output_files);
+		free(info->failed_info);
+		free(info);
+	}
 }
 
 struct allocatable_resources {
@@ -416,6 +432,12 @@ static void batch_queue_k8s_handle_complete_task(char *pod_id, int job_id,
 		process_wait(timeout);
 		process_wait(timeout);
 	}
+
+	/* curr_k8s_job_info's last use was the is_running check just above --
+	retire it now instead of leaving it (and its three strdup'd string
+	fields) in k8s_job_info_table for the rest of the manager's life. */
+	itable_remove(k8s_job_info_table, job_id);
+	delete_k8s_job_info(curr_k8s_job_info);
 }
 
 static k8s_job_info *batch_queue_k8s_get_kubectl_failed_task()
@@ -548,10 +570,15 @@ static batch_queue_id_t batch_queue_k8s_wait(struct batch_queue *q,
 		// 1. Check if there is a task failed because of local kubectl failure
 		k8s_job_info *failed_job_info = batch_queue_k8s_get_kubectl_failed_task();
 		if (failed_job_info != NULL) {
-			char *pod_id = string_format("%s-%d", mf_uuid->str, failed_job_info->job_id);
-			batch_queue_k8s_handle_complete_task(pod_id, failed_job_info->job_id, failed_job_info, 0, failed_job_info->exit_code, info_out, running_pod_lst, q);
+			/* capture job_id before handle_complete_task(), which now
+			retires and frees failed_job_info -- reading
+			failed_job_info->job_id after that call would be a
+			use-after-free. */
+			int fjid = failed_job_info->job_id;
+			char *pod_id = string_format("%s-%d", mf_uuid->str, fjid);
+			batch_queue_k8s_handle_complete_task(pod_id, fjid, failed_job_info, 0, failed_job_info->exit_code, info_out, running_pod_lst, q);
 			free(pod_id);
-			return failed_job_info->job_id;
+			return fjid;
 		}
 
 		// 2. Generate the list of running pod
@@ -573,12 +600,12 @@ static batch_queue_id_t batch_queue_k8s_wait(struct batch_queue *q,
 		// 3. Iterate the running pods, execute tasks that have container ready
 		char *curr_pod_id;
 		int retry_get_pod_status = 0;
-		list_first_item(running_pod_lst);
 		debug(D_BATCH, "there are %d of running pods", list_size(running_pod_lst));
 		debug(D_BATCH, "there are %d of terminating pods", list_size(terminating_pod_lst));
 		debug(D_BATCH, "there are %d of creating pods", list_size(creating_pod_lst));
-		while ((curr_pod_id = (char *)list_next_item(running_pod_lst))) {
 
+		LIST_ITERATE(running_pod_lst, curr_pod_id)
+		{
 			char *get_log_cmd = string_format("kubectl exec %s -- tail -1 %s.log",
 					curr_pod_id,
 					curr_pod_id);
@@ -689,6 +716,19 @@ static int batch_queue_k8s_free(struct batch_queue *q)
 			k8s_script_file_name,
 			kubectl_failed_log);
 	system(cmd_rm_tmp_files);
+
+	if (k8s_job_info_table) {
+		int iteration;
+		uint64_t job_id;
+		k8s_job_info *info;
+		ITABLE_ITERATE(k8s_job_info_table, iteration, job_id, info)
+		{
+			delete_k8s_job_info(info);
+		}
+		itable_delete(k8s_job_info_table);
+		k8s_job_info_table = NULL;
+	}
+
 	return 0;
 }
 

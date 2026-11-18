@@ -7,6 +7,7 @@ See the file COPYING for details.
 #ifndef CATALOG_QUERY_H
 #define CATALOG_QUERY_H
 
+#include <stdlib.h>
 #include <time.h>
 #include "jx.h"
 
@@ -17,8 +18,23 @@ Query the global catalog server for server descriptions.
 #define CATALOG_HOST_DEFAULT "catalog.cse.nd.edu,backup-catalog.cse.nd.edu"
 #define CATALOG_PORT_DEFAULT 9097
 
-#define CATALOG_HOST (getenv("CATALOG_HOST") ? getenv("CATALOG_HOST") : CATALOG_HOST_DEFAULT )
-#define CATALOG_PORT (getenv("CATALOG_PORT") ? atoi(getenv("CATALOG_PORT")) : CATALOG_PORT_DEFAULT )
+/* Each environment variable is read exactly once per call, rather than
+ * once to check it and again to use it, so callers always get a
+ * consistent, non-null result. */
+static inline char *catalog_host_env_or_default(void)
+{
+	char *host = getenv("CATALOG_HOST");
+	return host ? host : CATALOG_HOST_DEFAULT;
+}
+
+static inline int catalog_port_env_or_default(void)
+{
+	const char *port = getenv("CATALOG_PORT");
+	return port ? atoi(port) : CATALOG_PORT_DEFAULT;
+}
+
+#define CATALOG_HOST catalog_host_env_or_default()
+#define CATALOG_PORT catalog_port_env_or_default()
 
 /** Catalog update control flags.
 These control the behavior of @ref catalog_query_send_update

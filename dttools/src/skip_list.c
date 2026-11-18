@@ -8,7 +8,6 @@ See the file COPYING for details.
 #include "xxmalloc.h"
 
 #include <limits.h>
-#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -240,6 +239,19 @@ bool skip_list_delete(struct skip_list *sl)
 	return true;
 }
 
+void skip_list_clear(struct skip_list *sl, void (*delete_func)(void *item))
+{
+	if (!sl)
+		return;
+
+	void *item;
+
+	while ((item = skip_list_pop_head(sl))) {
+		if (delete_func)
+			delete_func(item);
+	}
+}
+
 struct skip_list_cursor *skip_list_cursor_create(struct skip_list *sl)
 {
 	debug_assert(sl);
@@ -259,6 +271,11 @@ void skip_list_cursor_delete(struct skip_list_cursor *cur)
 	skip_list_node_unref(cur->target, cur->list);
 	skip_list_unref(cur->list);
 	free(cur);
+}
+
+void skip_list_cursor_delete_vpp(struct skip_list_cursor **cur)
+{
+	skip_list_cursor_delete(*cur);
 }
 
 struct skip_list_cursor *skip_list_cursor_clone(struct skip_list_cursor *cur)
@@ -345,14 +362,14 @@ bool seek_forward(struct skip_list_cursor *cur, int index)
 			return false;
 		}
 
-		// Skip dead nodes without counting them
-		// and try to delete them if their refcount is 0
-		if (cur->target->dead) {
-			// Save next pointer before delete_node potentially frees the node
+		/* Skip dead nodes without counting them */
+		while (cur->target->dead) {
 			struct skip_list_node *next = cur->target->forward[0];
 			delete_node(cur->target, sl);
 			cur->target = next;
-			continue;
+			if (cur->target == sl->tail) {
+				return false;
+			}
 		}
 
 		index--;
@@ -381,14 +398,14 @@ bool seek_backward(struct skip_list_cursor *cur, int index)
 			return false;
 		}
 
-		// Skip dead nodes without counting them
-		// and try to delete them if their refcount is 0
-		if (cur->target->dead) {
-			// Save previous pointer before delete_node potentially frees the node
+		/* Skip dead nodes without counting them */
+		while (cur->target->dead) {
 			struct skip_list_node *prev = cur->target->backward[0];
 			delete_node(cur->target, sl);
 			cur->target = prev;
-			continue;
+			if (cur->target == sl->head) {
+				return false;
+			}
 		}
 
 		index++;
@@ -538,10 +555,11 @@ bool skip_list_get(struct skip_list_cursor *cur, void **item)
 	if (cur->target->dead)
 		return false;
 	if (item) {
-		// if item is not given, then we are simply checking if the cursor is
-		// at a valid position
 		*item = cur->target->data;
 	}
+
+	// if item is not given, then we are simply checking if the cursor is
+	// at a valid position
 	return true;
 }
 
@@ -684,7 +702,8 @@ void skip_list_insert_arr(struct skip_list *sl, void *item, double *priority)
 	/* For each level, find the insertion point */
 	for (int i = sl->level; i >= 0; i--) {
 		while (x->forward[i] != sl->tail &&
-				compare_priority(x->forward[i]->priority, priority, sl->priority_size) > 0) {
+				(x->forward[i]->dead ||
+						compare_priority(x->forward[i]->priority, priority, sl->priority_size) > 0)) {
 			x = x->forward[i];
 		}
 		update[i] = x;

@@ -18,6 +18,7 @@ See the file COPYING for details.
 #include "catalog_query.h"
 #include "datagram.h"
 #include "domain_name_cache.h"
+#include "envtools.h"
 #include "hash_table.h"
 #include "interfaces_address.h"
 #include "itable.h"
@@ -396,6 +397,8 @@ static void delete_feature(struct work_queue_task *t, const char *name);
 static struct work_queue_factory_info *create_factory_info(struct work_queue *q, const char *name);
 static void remove_factory_info(struct work_queue *q, const char *name);
 
+void work_queue_file_delete(struct work_queue_file *tf);
+
 static void fill_deprecated_queue_stats(struct work_queue *q, struct work_queue_stats *s);
 static void fill_deprecated_tasks_stats(struct work_queue_task *t);
 
@@ -432,13 +435,13 @@ static int64_t overcommitted_resource_total(struct work_queue *q, int64_t total)
 
 //Returns count of workers according to type
 static int count_workers(struct work_queue *q, int type) {
+	int iteration;
 	struct work_queue_worker *w;
 	char* id;
 
 	int count = 0;
 
-	hash_table_firstkey(q->worker_table);
-	while(hash_table_nextkey(q->worker_table, &id, (void**)&w)) {
+	HASH_TABLE_ITERATE(q->worker_table, iteration, id, w) {
 		if(w->type & type) {
 			count++;
 		}
@@ -449,12 +452,12 @@ static int count_workers(struct work_queue *q, int type) {
 
 //Returns count of workers that are available to run tasks.
 static int available_workers(struct work_queue *q) {
+	int iteration;
 	struct work_queue_worker *w;
 	char* id;
 	int available_workers = 0;
 
-	hash_table_firstkey(q->worker_table);
-	while(hash_table_nextkey(q->worker_table, &id, (void**)&w)) {
+	HASH_TABLE_ITERATE(q->worker_table, iteration, id, w) {
 		if(strcmp(w->hostname, "unknown") != 0) {
 			if(overcommitted_resource_total(q, w->resources->cores.total) > w->resources->cores.inuse || w->resources->disk.total > w->resources->disk.inuse || overcommitted_resource_total(q, w->resources->memory.total) > w->resources->memory.inuse){
 				available_workers++;
@@ -467,12 +470,12 @@ static int available_workers(struct work_queue *q) {
 
 //Returns count of workers that are running at least 1 task.
 static int workers_with_tasks(struct work_queue *q) {
+	int iteration;
 	struct work_queue_worker *w;
 	char* id;
 	int workers_with_tasks = 0;
 
-	hash_table_firstkey(q->worker_table);
-	while(hash_table_nextkey(q->worker_table, &id, (void**)&w)) {
+	HASH_TABLE_ITERATE(q->worker_table, iteration, id, w) {
 		if(strcmp(w->hostname, "unknown")){
 			if(itable_size(w->current_tasks)){
 				workers_with_tasks++;
@@ -632,9 +635,9 @@ void work_queue_broadcast_message(struct work_queue *q, const char *msg) {
 
 	struct work_queue_worker *w;
 	char* id;
+	int iteration;
 
-	hash_table_firstkey(q->worker_table);
-	while(hash_table_nextkey(q->worker_table, &id, (void**)&w)) {
+	HASH_TABLE_ITERATE(q->worker_table, iteration, id, w) {
 		send_worker_msg(q, w, "%s", msg);
 	}
 }
@@ -958,11 +961,12 @@ static int factory_trim_workers(struct work_queue *q, struct work_queue_factory_
 	struct work_queue_worker *w;
 	char *key;
 	int trimmed_workers = 0;
+	int iteration;
 
 	struct hash_table *idle_workers = hash_table_create(0, 0);
-	hash_table_firstkey(q->worker_table);
-	while ( f->connected_workers - trimmed_workers > f->max_workers &&
-			hash_table_nextkey(q->worker_table, &key, (void **) &w) ) {
+	HASH_TABLE_ITERATE(q->worker_table, iteration, key, w) {
+		if (f->connected_workers - trimmed_workers <= f->max_workers)
+			break;
 		if ( w->factory_name &&
 				!strcmp(f->name, w->factory_name) &&
 				itable_size(w->current_tasks) < 1 ) {
@@ -971,10 +975,8 @@ static int factory_trim_workers(struct work_queue *q, struct work_queue_factory_
 		}
 	}
 
-	hash_table_firstkey(idle_workers);
-	while (hash_table_nextkey(idle_workers, &key, (void **) &w)) {
+	HASH_TABLE_ITERATE(idle_workers, iteration, key, w) {
 		hash_table_remove(idle_workers, key);
-		hash_table_firstkey(idle_workers);
 		shut_down_worker(q, w);
 	}
 	hash_table_delete(idle_workers);
@@ -993,7 +995,11 @@ static struct work_queue_factory_info *create_factory_info(struct work_queue *q,
 	f->connected_workers = 0;
 	f->max_workers = INT_MAX;
 	f->seen_at_catalog = 0;
-	hash_table_insert(q->factory_table, name, f);
+	if(!hash_table_insert(q->factory_table, name, f)) {
+		free(f->name);
+		free(f);
+		return hash_table_lookup(q->factory_table, name);
+	}
 	return f;
 }
 
@@ -1043,10 +1049,11 @@ void update_read_catalog_factory(struct work_queue *q, time_t stoptime) {
 	buffer_init(&filter);
 	char *factory_name = NULL;
 	struct work_queue_factory_info *f = NULL;
+	int iteration;
+
 	buffer_putfstring(&filter, "type == \"wq_factory\" && (");
 
-	hash_table_firstkey(q->factory_table);
-	while ( hash_table_nextkey(q->factory_table, &factory_name, (void **)&f) ) {
+	HASH_TABLE_ITERATE(q->factory_table, iteration, factory_name, f) {
 		buffer_putfstring(&filter, "%sfactory_name == \"%s\"", first_name ? "" : " || ", factory_name);
 		first_name = 0;
 		f->seen_at_catalog = 0;
@@ -1070,8 +1077,7 @@ void update_read_catalog_factory(struct work_queue *q, time_t stoptime) {
 
 	// Remove outdated factories
 	struct list *outdated_factories = list_create();
-	hash_table_firstkey(q->factory_table);
-	while ( hash_table_nextkey(q->factory_table, &factory_name, (void **) &f) ) {
+	HASH_TABLE_ITERATE(q->factory_table, iteration, factory_name, f) {
 		if ( !f->seen_at_catalog && f->connected_workers < 1 ) {
 			list_push_tail(outdated_factories, f);
 		}
@@ -1184,21 +1190,19 @@ static void clean_task_state(struct work_queue_task *t, int full_clean) {
 
 static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 {
+	int iteration;
 	char *key, *value;
 	struct work_queue_task *t;
 	uint64_t taskid;
 
 	if(!q || !w) return;
 
-	hash_table_firstkey(w->current_files);
-	while(hash_table_nextkey(w->current_files, &key, (void **) &value)) {
+	HASH_TABLE_ITERATE(w->current_files, iteration, key, value) {
 		hash_table_remove(w->current_files, key);
 		free(value);
-		hash_table_firstkey(w->current_files);
 	}
 
-	itable_firstkey(w->current_tasks);
-	while(itable_nextkey(w->current_tasks, &taskid, (void **)&t)) {
+	ITABLE_ITERATE(w->current_tasks, iteration, taskid, t) {
 		if (t->time_when_commit_end >= t->time_when_commit_start) {
 			timestamp_t delta_time = timestamp_get() - t->time_when_commit_end;
 			t->time_workers_execute_failure += delta_time;
@@ -1207,8 +1211,6 @@ static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 
 		clean_task_state(t, 0);
 		reap_task_from_worker(q, w, t, WORK_QUEUE_TASK_READY);
-
-		itable_firstkey(w->current_tasks);
 	}
 
 	itable_clear(w->current_tasks,0);
@@ -1652,7 +1654,9 @@ static work_queue_result_code_t get_output_file( struct work_queue *q, struct wo
 		struct stat local_info;
 		if (stat(f->payload,&local_info) == 0) {
 			struct remote_file_info *remote_info = remote_file_info_create(f->type,local_info.st_size,local_info.st_mtime);
-			hash_table_insert(w->current_files, f->cached_name, remote_info);
+			if(!hash_table_insert(w->current_files, f->cached_name, remote_info)) {
+				free(remote_info);
+			}
 		} else {
 			debug(D_NOTICE, "Cannot stat file %s: %s", f->payload, strerror(errno));
 		}
@@ -1667,8 +1671,7 @@ static work_queue_result_code_t get_output_files( struct work_queue *q, struct w
 	work_queue_result_code_t result = WQ_SUCCESS;
 
 	if(t->output_files) {
-		list_first_item(t->output_files);
-		while((f = list_next_item(t->output_files))) {
+		LIST_ITERATE(t->output_files,f) {
 			// non-file objects are handled by the worker.
 			if(f->type!=WORK_QUEUE_FILE) continue;
 		     
@@ -1705,8 +1708,7 @@ static work_queue_result_code_t get_monitor_output_file( struct work_queue *q, s
 	const char *summary_name = RESOURCE_MONITOR_REMOTE_NAME ".summary";
 
 	if(t->output_files) {
-		list_first_item(t->output_files);
-		while((f = list_next_item(t->output_files))) {
+		LIST_ITERATE(t->output_files,f) {
 			if(!strcmp(summary_name, f->remote_name)) {
 				result = get_output_file(q,w,t,f);
 				break;
@@ -1733,8 +1735,7 @@ static void delete_worker_files( struct work_queue *q, struct work_queue_worker 
 
 	if(!files) return;
 
-	list_first_item(files);
-	while((tf = list_next_item(files))) {
+	LIST_ITERATE(files,tf) {
 		delete_worker_file(q, w, tf->cached_name, tf->flags, except_flags);
 	}
 }
@@ -2132,8 +2133,7 @@ static work_queue_result_code_t get_update( struct work_queue *q, struct work_qu
 	struct work_queue_file *f;
 	const char *local_name = 0;
 
-	list_first_item(t->output_files);
-	while((f=list_next_item(t->output_files))) {
+	LIST_ITERATE(t->output_files,f) {
 		if(!strcmp(path,f->remote_name)) {
 			local_name = f->payload;
 			break;
@@ -2387,9 +2387,9 @@ static struct jx *blocked_to_json( struct work_queue  *q ) {
 
 	char *hostname;
 	struct blocklist_host_info *info;
+	int iteration;
 
-	hash_table_firstkey(q->worker_blocklist);
-	while(hash_table_nextkey(q->worker_blocklist, &hostname, (void *) &info)) {
+	HASH_TABLE_ITERATE(q->worker_blocklist, iteration, hostname, info) {
 		if(info->blocked) {
 			jx_array_insert(j, jx_string(hostname));
 		}
@@ -2399,27 +2399,23 @@ static struct jx *blocked_to_json( struct work_queue  *q ) {
 }
 
 static struct rmsummary  *total_resources_needed(struct work_queue *q) {
-
 	struct work_queue_task *t;
 
 	struct rmsummary *total = rmsummary_create(0);
 
 	/* for waiting tasks, we use what they would request if dispatched right now. */
 
-	struct skip_list_cursor *cursor = skip_list_cursor_create(q->ready_list);
-	skip_list_seek(cursor, 0);
-	SKIP_LIST_ITERATE(cursor, t) {
+	SKIP_LIST_ITERATE(q->ready_list, t) {
 		const struct rmsummary *s = task_min_resources(q, t);
 		rmsummary_add(total, s);
 	}
-	skip_list_cursor_delete(cursor);
 
 	/* for running tasks, we use what they have been allocated already. */
 	char *key;
 	struct work_queue_worker *w;
-	hash_table_firstkey(q->worker_table);
+	int iteration;
 
-	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
+	HASH_TABLE_ITERATE(q->worker_table, iteration, key, w) {
 		if(w->resources->tag < 0) {
 			continue;
 		}
@@ -2434,6 +2430,7 @@ static struct rmsummary  *total_resources_needed(struct work_queue *q) {
 }
 
 static const struct rmsummary *largest_seen_resources(struct work_queue *q, const char *category) {
+	int iteration;
 	char *key;
 	struct category *c;
 
@@ -2441,8 +2438,7 @@ static const struct rmsummary *largest_seen_resources(struct work_queue *q, cons
 		c = work_queue_category_lookup_or_create(q, category);
 		return c->max_allocation;
 	} else {
-		hash_table_firstkey(q->categories);
-		while(hash_table_nextkey(q->categories, &key, (void **) &c)) {
+		HASH_TABLE_ITERATE(q->categories, iteration, key, c) {
 			rmsummary_merge_max(q->max_task_resources_requested, c->max_allocation);
 		}
 		return q->max_task_resources_requested;
@@ -2475,8 +2471,8 @@ static int count_workers_for_waiting_tasks(struct work_queue *q, const struct rm
 
 	char *key;
 	struct work_queue_worker *w;
-	hash_table_firstkey(q->worker_table);
-	while(hash_table_nextkey(q->worker_table, &key, (void**)&w)) {
+	int iteration;
+	HASH_TABLE_ITERATE(q->worker_table, iteration, key, w) {
 		count += check_worker_fit(w, s);
 	}
 
@@ -2609,8 +2605,8 @@ static struct jx *categories_to_jx(struct work_queue *q) {
 
 	struct category *c;
 	char *category_name;
-	hash_table_firstkey(q->categories);
-	while(hash_table_nextkey(q->categories, &category_name, (void **) &c)) {
+	int iteration;
+	HASH_TABLE_ITERATE(q->categories, iteration, category_name, c) {
 		struct jx *j = category_to_jx(q, category_name);
 		if(j) {
 			jx_array_insert(a, j);
@@ -2692,6 +2688,10 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 	jx_insert_integer(j,"tasks_running",info.tasks_running);
 	jx_insert_integer(j,"tasks_with_results",info.tasks_with_results);
 	jx_insert_integer(j,"tasks_left",q->num_tasks_left);
+
+	// workers the manager is waiting for before dispatching the first task.
+	// Drops to 0 once reached. Used by work_queue_factory.
+	jx_insert_integer(j,"wait_for_workers",q->wait_for_workers);
 
 	jx_insert_integer(j,"tasks_submitted",info.tasks_submitted);
 	jx_insert_integer(j,"tasks_dispatched",info.tasks_dispatched);
@@ -2824,6 +2824,10 @@ static struct jx * queue_lean_to_jx( struct work_queue *q, struct link *foreman_
 	jx_insert_integer(j,"tasks_on_workers",info.tasks_on_workers);
 	jx_insert_integer(j,"tasks_left",q->num_tasks_left);
 
+	// workers the manager is waiting for before dispatching the first task.
+	// Drops to 0 once reached. Used by work_queue_factory.
+	jx_insert_integer(j,"wait_for_workers",q->wait_for_workers);
+
 	//capacity information the factory needs
 	jx_insert_integer(j,"capacity_tasks",info.capacity_tasks);
 	jx_insert_integer(j,"capacity_cores",info.capacity_cores);
@@ -2869,12 +2873,12 @@ static struct jx * queue_lean_to_jx( struct work_queue *q, struct link *foreman_
 
 void current_tasks_to_jx( struct jx *j, struct work_queue_worker *w )
 {
+	int iteration;
 	struct work_queue_task *t;
 	uint64_t taskid;
 	int n = 0;
 
-	itable_firstkey(w->current_tasks);
-	while(itable_nextkey(w->current_tasks, &taskid, (void**)&t)) {
+	ITABLE_ITERATE(w->current_tasks, iteration, taskid, t) {
 		char task_string[WORK_QUEUE_LINE_MAX];
 
 		sprintf(task_string, "current_task_%03d_id", n);
@@ -3041,9 +3045,9 @@ static struct jx *construct_status_message( struct work_queue *q, const char *re
 		struct work_queue_worker *w;
 		struct jx *j;
 		uint64_t taskid;
+		int iteration;
 
-		itable_firstkey(q->tasks);
-		while(itable_nextkey(q->tasks,&taskid,(void**)&t)) {
+		ITABLE_ITERATE(q->tasks, iteration, taskid, t) {
 			w = itable_lookup(q->worker_task_map, taskid);
 			work_queue_task_state_t state = (uintptr_t) itable_lookup(q->task_state_map, taskid);
 			if(w) {
@@ -3072,9 +3076,9 @@ static struct jx *construct_status_message( struct work_queue *q, const char *re
 		struct work_queue_worker *w;
 		struct jx *j;
 		char *key;
+		int iteration;
 
-		hash_table_firstkey(q->worker_table);
-		while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
+		HASH_TABLE_ITERATE(q->worker_table, iteration, key, w) {
 			// If the worker has not been initialized, ignore it.
 			if(!strcmp(w->hostname, "unknown")) continue;
 			j = worker_to_jx(q, w);
@@ -3121,7 +3125,7 @@ static work_queue_msg_code_t process_resource( struct work_queue *q, struct work
 	char resource_name[WORK_QUEUE_LINE_MAX];
 	struct work_queue_resource r;
 
-	int n = sscanf(line, "resource %s %"PRId64" %"PRId64" %"PRId64, resource_name, &r.total, &r.smallest, &r.largest);
+	int n = sscanf(line, "resource %s %lf %lf %lf", resource_name, &r.total, &r.smallest, &r.largest);
 
 	if(n == 2 && !strcmp(resource_name,"tag"))
 	{
@@ -3239,6 +3243,7 @@ static int build_poll_table(struct work_queue *q, struct link *manager)
 	int n = 0;
 	char *key;
 	struct work_queue_worker *w;
+	int iteration;
 
 	// Allocate a small table, if it hasn't been done yet.
 	if(!q->poll_table) {
@@ -3264,8 +3269,7 @@ static int build_poll_table(struct work_queue *q, struct link *manager)
 	}
 
 	// For every worker in the hash table, add an item to the poll table
-	hash_table_firstkey(q->worker_table);
-	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
+	HASH_TABLE_ITERATE(q->worker_table, iteration, key, w) {
 		// If poll table is not large enough, reallocate it
 		if(n >= q->poll_table_size) {
 			q->poll_table_size *= 2;
@@ -3496,7 +3500,9 @@ static work_queue_result_code_t send_item_if_not_cached( struct work_queue *q, s
 
 		if(result == WQ_SUCCESS && tf->flags & WORK_QUEUE_CACHE) {
 			remote_info = remote_file_info_create(tf->type,local_info.st_size,local_info.st_mtime);
-			hash_table_insert(w->current_files, tf->cached_name, remote_info);
+			if(!hash_table_insert(w->current_files, tf->cached_name, remote_info)) {
+				free(remote_info);
+			}
 		}
 
 		return result;
@@ -3598,7 +3604,9 @@ static work_queue_result_code_t send_special_if_not_cached( struct work_queue *q
 
 	if(tf->flags & WORK_QUEUE_CACHE) {
 		struct remote_file_info *remote_info = remote_file_info_create(tf->type,tf->length,time(0));
-		hash_table_insert(w->current_files,tf->cached_name,remote_info);
+		if(!hash_table_insert(w->current_files,tf->cached_name,remote_info)) {
+			free(remote_info);
+		}
 	}
 
 	return WQ_SUCCESS;
@@ -3705,8 +3713,7 @@ static work_queue_result_code_t send_input_files( struct work_queue *q, struct w
 	// Check for existence of each input file first.
 	// If any one fails to exist, set the failure condition and return failure.
 	if(t->input_files) {
-		list_first_item(t->input_files);
-		while((f = list_next_item(t->input_files))) {
+		LIST_ITERATE(t->input_files,f) {
 			if(f->type == WORK_QUEUE_FILE || f->type == WORK_QUEUE_FILE_PIECE) {
 				char * expanded_payload = expand_envnames(w, f->payload);
 				if(!expanded_payload) {
@@ -3727,8 +3734,7 @@ static work_queue_result_code_t send_input_files( struct work_queue *q, struct w
 	// Send each of the input files.
 	// If any one fails to be sent, return failure.
 	if(t->input_files) {
-		list_first_item(t->input_files);
-		while((f = list_next_item(t->input_files))) {
+		LIST_ITERATE(t->input_files,f) {
 			work_queue_result_code_t result = send_input_file(q,w,t,f);
 			if(result != WQ_SUCCESS) {
 				return result;
@@ -3934,15 +3940,13 @@ static work_queue_result_code_t start_one_task(struct work_queue *q, struct work
 	 * CORES, MEMORY, etc. will be set at the worker to the values of
 	 * specify_*, if used. */
 	char *var;
-	list_first_item(t->env_list);
-	while((var=list_next_item(t->env_list))) {
+	LIST_ITERATE(t->env_list,var) {
 		send_worker_msg(q, w,"env %zu\n%s\n", strlen(var), var);
 	}
 
 	if(t->input_files) {
 		struct work_queue_file *tf;
-		list_first_item(t->input_files);
-		while((tf = list_next_item(t->input_files))) {
+		LIST_ITERATE(t->input_files,tf) {
 			if(tf->type == WORK_QUEUE_DIRECTORY) {
 				send_worker_msg(q,w, "dir %s\n", tf->remote_name);
 			} else {
@@ -3955,8 +3959,7 @@ static work_queue_result_code_t start_one_task(struct work_queue *q, struct work
 
 	if(t->output_files) {
 		struct work_queue_file *tf;
-		list_first_item(t->output_files);
-		while((tf = list_next_item(t->output_files))) {
+		LIST_ITERATE(t->output_files,tf) {
 			char remote_name_encoded[PATH_MAX];
 			url_encode(tf->remote_name, remote_name_encoded, PATH_MAX);
 			send_worker_msg(q,w, "outfile %s %s %d\n", tf->cached_name, remote_name_encoded, tf->flags);
@@ -4032,7 +4035,6 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 	struct work_queue_task_report *capacity = calloc(1, sizeof(*capacity));
 	capacity->resources = rmsummary_create(0);
 
-	struct work_queue_task_report *tr;
 	double alpha = 0.05;
 	int count = list_size(q->task_reports);
 	int capacity_instantaneous = 0;
@@ -4053,8 +4055,8 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 		count = 1;
 	} else {
 		// Sum up the task reports available.
-		list_first_item(q->task_reports);
-		while((tr = list_next_item(q->task_reports))) {
+		struct work_queue_task_report *tr;
+		LIST_ITERATE(q->task_reports,tr) {
 			capacity->transfer_time += tr->transfer_time;
 			capacity->exec_time     += tr->exec_time;
 			capacity->manager_time   += tr->manager_time;
@@ -4187,8 +4189,7 @@ static int check_hand_against_task(struct work_queue *q, struct work_queue_worke
 			return 0;
 
 		char *feature;
-		list_first_item(t->features);
-		while((feature = list_next_item(t->features))) {
+		LIST_ITERATE(t->features,feature) {
 			if(!hash_table_lookup(w->features, feature))
 				return 0;
 		}
@@ -4233,6 +4234,7 @@ static int candidate_has_worse_fit(struct work_queue_worker *current_best, struc
 
 static struct work_queue_worker *find_worker_by_files(struct work_queue *q, struct work_queue_task *t)
 {
+	int iteration;
 	char *key;
 	struct work_queue_worker *w;
 	struct work_queue_worker *best_worker = 0;
@@ -4241,12 +4243,10 @@ static struct work_queue_worker *find_worker_by_files(struct work_queue *q, stru
 	struct remote_file_info *remote_info;
 	struct work_queue_file *tf;
 
-	hash_table_firstkey(q->worker_table);
-	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
+	HASH_TABLE_ITERATE(q->worker_table, iteration, key, w) {
 		if( check_hand_against_task(q, w, t) ) {
 			task_cached_bytes = 0;
-			list_first_item(t->input_files);
-			while((tf = list_next_item(t->input_files))) {
+			LIST_ITERATE(t->input_files,tf) {
 				if((tf->type == WORK_QUEUE_FILE || tf->type == WORK_QUEUE_FILE_PIECE) && (tf->flags & WORK_QUEUE_CACHE)) {
 					remote_info = hash_table_lookup(w->current_files, tf->cached_name);
 					if(remote_info)
@@ -4269,8 +4269,8 @@ static struct work_queue_worker *find_worker_by_fcfs(struct work_queue *q, struc
 {
 	char *key;
 	struct work_queue_worker *w;
-	hash_table_firstkey(q->worker_table);
-	while(hash_table_nextkey(q->worker_table, &key, (void**)&w)) {
+	int iteration;
+	HASH_TABLE_ITERATE(q->worker_table, iteration, key, w) {
 		if( check_hand_against_task(q, w, t) ) {
 			return w;
 		}
@@ -4282,11 +4282,11 @@ static struct work_queue_worker *find_worker_by_random(struct work_queue *q, str
 {
 	char *key;
 	struct work_queue_worker *w = NULL;
+	int iteration;
 	int random_worker;
 	struct list *valid_workers = list_create();
 
-	hash_table_firstkey(q->worker_table);
-	while(hash_table_nextkey(q->worker_table, &key, (void**)&w)) {
+	HASH_TABLE_ITERATE(q->worker_table, iteration, key, w) {
 		if(check_hand_against_task(q, w, t)) {
 			list_push_tail(valid_workers, w);
 		}
@@ -4310,10 +4310,10 @@ static struct work_queue_worker *find_worker_by_worst_fit(struct work_queue *q, 
 {
 	char *key;
 	struct work_queue_worker *w;
+	int iteration;
 	struct work_queue_worker *best_worker = NULL;
 
-	hash_table_firstkey(q->worker_table);
-	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
+	HASH_TABLE_ITERATE(q->worker_table, iteration, key, w) {
 		if( check_hand_against_task(q, w, t) ) {
 			if(!best_worker || candidate_has_worse_fit(best_worker, w))
 			{
@@ -4329,11 +4329,11 @@ static struct work_queue_worker *find_worker_by_time(struct work_queue *q, struc
 {
 	char *key;
 	struct work_queue_worker *w;
+	int iteration;
 	struct work_queue_worker *best_worker = 0;
 	double best_time = HUGE_VAL;
 
-	hash_table_firstkey(q->worker_table);
-	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
+	HASH_TABLE_ITERATE(q->worker_table, iteration, key, w) {
 		if(check_hand_against_task(q, w, t)) {
 			if(w->total_tasks_complete > 0) {
 				double t = (w->total_task_time + w->total_transfer_time) / w->total_tasks_complete;
@@ -4397,11 +4397,10 @@ static int is_task_larger_than_connected_workers(struct work_queue *q, struct wo
 {
 	char *key;
 	struct work_queue_worker *w;
-	hash_table_firstkey(q->worker_table);
-
+	int iteration;
 	int bit_set = 0;
-	while(hash_table_nextkey(q->worker_table, &key, (void**)&w))
-	{
+
+	HASH_TABLE_ITERATE(q->worker_table, iteration, key, w) {
 		int new_set = is_task_larger_than_worker(q, t, w);
 		if (new_set == 0){
 			// Task could run on a currently connected worker, immediately
@@ -4444,6 +4443,7 @@ static void count_worker_resources(struct work_queue *q, struct work_queue_worke
 {
 	struct rmsummary *box;
 	uint64_t taskid;
+	int iteration;
 
 	w->resources->cores.inuse  = 0;
 	w->resources->memory.inuse = 0;
@@ -4462,8 +4462,7 @@ static void count_worker_resources(struct work_queue *q, struct work_queue_worke
 		return;
 	}
 
-	itable_firstkey(w->current_tasks_boxes);
-	while(itable_nextkey(w->current_tasks_boxes, &taskid, (void **)& box)) {
+	ITABLE_ITERATE(w->current_tasks_boxes, iteration, taskid, box) {
 		struct work_queue_task *t = itable_lookup(w->current_tasks, taskid);
 		if (t->coprocess) {
 			w->coprocess_resources->cores.inuse     += box->cores;
@@ -4515,8 +4514,8 @@ static void find_max_worker(struct work_queue *q) {
 
 	char *key;
 	struct work_queue_worker *w;
-	hash_table_firstkey(q->worker_table);
-	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
+	int iteration;
+	HASH_TABLE_ITERATE(q->worker_table, iteration, key, w) {
 		if(w->resources->workers.total > 0)
 		{
 			update_max_worker(q, w);
@@ -4580,7 +4579,7 @@ static int send_one_task_with_cr( struct work_queue *q , struct skip_list_cursor
 
 	int iter_count = 0;
 
-	SKIP_LIST_ITERATE(cr, t) {
+	SKIP_LIST_ITERATE_CURSOR(cr,t) {
 		if(iter_count >= iter_depth) {
 			break;
 		}
@@ -4655,9 +4654,7 @@ static void print_large_tasks_warning(struct work_queue *q)
 
 	struct rmsummary *largest_unfit_task = rmsummary_create(-1);
 
-	struct skip_list_cursor *cur = skip_list_cursor_create(q->ready_list);
-	skip_list_seek(cur, 0);
-	SKIP_LIST_ITERATE(cur, t){
+	SKIP_LIST_ITERATE(q->ready_list, t) {
 		// check each task against the queue of connected workers
 		int bit_set = is_task_larger_than_connected_workers(q, t);
 		if(bit_set) {
@@ -4677,7 +4674,6 @@ static void print_large_tasks_warning(struct work_queue *q)
 			unfit_gpu++;
 		}
 	}
-	skip_list_cursor_delete(cur);
 
 	if(unfit_core || unfit_mem || unfit_disk || unfit_gpu){
 		notice(D_WQ,"There are tasks that cannot fit any currently connected worker:\n");
@@ -4715,12 +4711,13 @@ static void trim_factory( struct work_queue *q, struct work_queue_worker *w )
 
 static int receive_one_task( struct work_queue *q )
 {
+	int iteration;
 	struct work_queue_task *t;
 	struct work_queue_worker *w;
 	uint64_t taskid;
 
 	int found = 0;
-	ITABLE_ITERATE(q->tasks, taskid, t) {
+	ITABLE_ITERATE(q->tasks, iteration, taskid, t) {
 		if( task_state_is(q, taskid, WORK_QUEUE_TASK_WAITING_RETRIEVAL) ) {
 			found = 1;
 			break;
@@ -4740,12 +4737,12 @@ static int receive_one_task( struct work_queue *q )
 
 //Sends keepalives to check if connected workers are responsive, and ask for updates If not, removes those workers.
 static void ask_for_workers_updates(struct work_queue *q) {
+	int iteration;
 	struct work_queue_worker *w;
 	char *key;
 	timestamp_t current_time = timestamp_get();
 
-	hash_table_firstkey(q->worker_table);
-	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
+	HASH_TABLE_ITERATE(q->worker_table, iteration, key, w) {
 		if(q->keepalive_interval > 0) {
 
 			/* we have not received workqueue message from worker yet, so we
@@ -4788,6 +4785,7 @@ static void ask_for_workers_updates(struct work_queue *q) {
 
 static int abort_slow_workers(struct work_queue *q)
 {
+	int iteration;
 	struct category *c;
 	char *category_name;
 
@@ -4800,8 +4798,7 @@ static int abort_slow_workers(struct work_queue *q)
 	/* optimization. If no category has a fast abort multiplier, simply return. */
 	int fast_abort_flag = 0;
 
-	hash_table_firstkey(q->categories);
-	while(hash_table_nextkey(q->categories, &category_name, (void **) &c)) {
+	HASH_TABLE_ITERATE(q->categories, iteration, category_name, c) {
 		struct work_queue_stats *stats = c->wq_stats;
 		if(!stats) {
 			/* no stats have been computed yet */
@@ -4826,8 +4823,7 @@ static int abort_slow_workers(struct work_queue *q)
 
 	timestamp_t current = timestamp_get();
 
-	itable_firstkey(q->tasks);
-	while(itable_nextkey(q->tasks, &taskid, (void **) &t)) {
+	ITABLE_ITERATE(q->tasks, iteration, taskid, t) {
 		c = work_queue_category_lookup_or_create(q, t->category);
 		/* Fast abort deactivated for this category */
 		if(c->fast_abort == 0)
@@ -4877,9 +4873,10 @@ static int abort_slow_workers(struct work_queue *q)
 
 					q->stats->workers_fast_aborted++;
 					removed++;
+					/* w was just freed by remove_worker(); do not touch it again */
+				} else {
+					w->fast_abort_alarm = 1;
 				}
-
-				w->fast_abort_alarm = 1;
 			}
 		}
 	}
@@ -4899,13 +4896,13 @@ static int shut_down_worker(struct work_queue *q, struct work_queue_worker *w)
 }
 
 static int abort_drained_workers(struct work_queue *q) {
+	int iteration;
 	char *worker_hashkey = NULL;
 	struct work_queue_worker *w = NULL;
 
 	int removed = 0;
 
-	hash_table_firstkey(q->worker_table);
-	while(hash_table_nextkey(q->worker_table, &worker_hashkey, (void **) &w)) {
+	HASH_TABLE_ITERATE(q->worker_table, iteration, worker_hashkey, w) {
 		if(w->draining && itable_size(w->current_tasks) == 0) {
 			removed++;
 			shut_down_worker(q, w);
@@ -4960,11 +4957,11 @@ static int cancel_task_on_worker(struct work_queue *q, struct work_queue_task *t
 }
 
 static struct work_queue_task *find_task_by_tag(struct work_queue *q, const char *tasktag) {
+	int iteration;
 	struct work_queue_task *t;
 	uint64_t taskid;
 
-	itable_firstkey(q->tasks);
-	while(itable_nextkey(q->tasks, &taskid, (void**)&t)) {
+	ITABLE_ITERATE(q->tasks, iteration, taskid, t) {
 		if( tasktag_comparator(t, tasktag) ) {
 			return t;
 		}
@@ -4995,8 +4992,7 @@ static struct list *work_queue_task_file_list_clone(struct list *list) {
   struct list *new = list_create();
   struct work_queue_file *old_file, *new_file;
 
-  list_first_item(list);
-  while ((old_file = list_next_item(list))) {
+  LIST_ITERATE(list,old_file) {
 	new_file = work_queue_file_clone(old_file);
 	list_push_tail(new, new_file);
   }
@@ -5006,8 +5002,7 @@ static struct list *work_queue_task_file_list_clone(struct list *list) {
 static struct list *work_queue_task_env_list_clone(struct list *env_list) {
 	struct list *new = list_create();
 	char *var;
-	list_first_item(env_list);
-	while((var=list_next_item(env_list))) {
+	LIST_ITERATE(env_list,var) {
 		list_push_tail(new, xxstrdup(var));
 	}
 
@@ -5088,8 +5083,7 @@ struct work_queue_task *work_queue_task_clone(const struct work_queue_task *task
 	if(task->features) {
 		new->features = list_create();
 		char *req;
-		list_first_item(task->features);
-		while((req = list_next_item(task->features))) {
+		LIST_ITERATE(task->features,req) {
 			list_push_tail(new->features, xxstrdup(req));
 		}
 	}
@@ -5304,7 +5298,7 @@ static void delete_feature(struct work_queue_task *t, const char *name)
 		}
 	}
 
-	list_cursor_destroy(c);
+	list_cursor_delete(c);
 }
 
 struct work_queue_file *work_queue_file_create(const char *payload, const char *remote_name, work_queue_file_t type, work_queue_file_flags_t flags)
@@ -5355,16 +5349,14 @@ int work_queue_task_specify_url(struct work_queue_task *t, const char *file_url,
 		files = t->input_files;
 
 		//check if two different urls map to the same remote name for inputs.
-		list_first_item(t->input_files);
-		while((tf = (struct work_queue_file*)list_next_item(files))) {
+		LIST_ITERATE(t->input_files,tf) {
 			if(!strcmp(remote_name, tf->remote_name) && strcmp(file_url, tf->payload)) {
 				fprintf(stderr, "Error: input url %s conflicts with another input pointing to same remote name (%s).\n", file_url, remote_name);
 				return 0;
 			}
 		}
 		//check if there is an output file with the same remote name.
-		list_first_item(t->output_files);
-		while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
+		LIST_ITERATE(t->output_files,tf) {
 			if(!strcmp(remote_name, tf->remote_name)){
 				fprintf(stderr, "Error: input url %s conflicts with an output pointing to same remote name (%s).\n", file_url, remote_name);
 				return 0;
@@ -5410,8 +5402,7 @@ int work_queue_task_specify_file(struct work_queue_task *t, const char *local_na
 		files = t->input_files;
 
 		//check if two different local names map to the same remote name for inputs.
-		list_first_item(t->input_files);
-		while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
+		LIST_ITERATE(t->input_files,tf) {
 			if(!strcmp(remote_name, tf->remote_name) && strcmp(local_name, tf->payload)){
 				fprintf(stderr, "Error: input file %s conflicts with another input pointing to same remote name (%s).\n", local_name, remote_name);
 				return 0;
@@ -5419,8 +5410,7 @@ int work_queue_task_specify_file(struct work_queue_task *t, const char *local_na
 		}
 
 		//check if there is an output file with the same remote name.
-		list_first_item(t->output_files);
-		while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
+		LIST_ITERATE(t->output_files,tf) {
 			if(!strcmp(remote_name, tf->remote_name)){
 				fprintf(stderr, "Error: input file %s conflicts with an output pointing to same remote name (%s).\n", local_name, remote_name);
 				return 0;
@@ -5430,8 +5420,7 @@ int work_queue_task_specify_file(struct work_queue_task *t, const char *local_na
 		files = t->output_files;
 
 		//check if two different different remote names map to the same local name for outputs.
-		list_first_item(files);
-		while((tf = (struct work_queue_file*)list_next_item(files))) {
+		LIST_ITERATE(t->output_files,tf) {
 			if(!strcmp(local_name, tf->payload) && strcmp(remote_name, tf->remote_name)) {
 				fprintf(stderr, "Error: output file %s conflicts with another output pointing to same remote name (%s).\n", local_name, remote_name);
 				return 0;
@@ -5439,8 +5428,7 @@ int work_queue_task_specify_file(struct work_queue_task *t, const char *local_na
 		}
 
 		//check if there is an input file with the same remote name.
-		list_first_item(t->input_files);
-		while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
+		LIST_ITERATE(t->input_files,tf) {
 			if(!strcmp(remote_name, tf->remote_name)){
 				fprintf(stderr, "Error: output file %s conflicts with an input pointing to same remote name (%s).\n", local_name, remote_name);
 				return 0;
@@ -5479,10 +5467,10 @@ int work_queue_task_specify_directory(struct work_queue_task *t, const char *loc
 
 	files = t->input_files;
 
-	list_first_item(files);
-	while((tf = (struct work_queue_file*)list_next_item(files))) {
-		if(!strcmp(remote_name, tf->remote_name))
-		{	return 0;	}
+	LIST_ITERATE(files,tf) {
+		if(!strcmp(remote_name, tf->remote_name)) {
+			return 0;
+		}
 	}
 
 	//KNOWN HACK: Every file passes through make_cached_name() which expects the
@@ -5522,8 +5510,7 @@ int work_queue_task_specify_file_piece(struct work_queue_task *t, const char *lo
 		files = t->input_files;
 
 		//check if two different local names map to the same remote name for inputs.
-		list_first_item(t->input_files);
-		while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
+		LIST_ITERATE(t->input_files,tf) {
 			if(!strcmp(remote_name, tf->remote_name) && strcmp(local_name, tf->payload)){
 				fprintf(stderr, "Error: piece of input file %s conflicts with another input pointing to same remote name (%s).\n", local_name, remote_name);
 				return 0;
@@ -5531,8 +5518,7 @@ int work_queue_task_specify_file_piece(struct work_queue_task *t, const char *lo
 		}
 
 		//check if there is an output file with the same remote name.
-		list_first_item(t->output_files);
-		while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
+		LIST_ITERATE(t->output_files,tf) {
 			if(!strcmp(remote_name, tf->remote_name)){
 				fprintf(stderr, "Error: piece of input file %s conflicts with an output pointing to same remote name (%s).\n", local_name, remote_name);
 				return 0;
@@ -5542,8 +5528,7 @@ int work_queue_task_specify_file_piece(struct work_queue_task *t, const char *lo
 		files = t->output_files;
 
 		//check if two different different remote names map to the same local name for outputs.
-		list_first_item(files);
-		while((tf = (struct work_queue_file*)list_next_item(files))) {
+		LIST_ITERATE(t->output_files,tf) {
 			if(!strcmp(local_name, tf->payload) && strcmp(remote_name, tf->remote_name)) {
 				fprintf(stderr, "Error: piece of output file %s conflicts with another output pointing to same remote name (%s).\n", local_name, remote_name);
 				return 0;
@@ -5551,8 +5536,7 @@ int work_queue_task_specify_file_piece(struct work_queue_task *t, const char *lo
 		}
 
 		//check if there is an input file with the same remote name.
-		list_first_item(t->input_files);
-		while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
+		LIST_ITERATE(t->input_files,tf) {
 			if(!strcmp(remote_name, tf->remote_name)){
 				fprintf(stderr, "Error: piece of output file %s conflicts with an input pointing to same remote name (%s).\n", local_name, remote_name);
 				return 0;
@@ -5584,16 +5568,14 @@ int work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, 
 		fatal("Error: Remote name %s is an absolute path.\n", remote_name);
 	}
 
-	list_first_item(t->input_files);
-	while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
+	LIST_ITERATE(t->input_files,tf) {
 		if(!strcmp(remote_name, tf->remote_name)) {
 			fprintf(stderr, "Error: buffer conflicts with another input pointing to same remote name (%s).\n", remote_name);
 			return 0;
 		}
 	}
 
-	list_first_item(t->output_files);
-	while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
+	LIST_ITERATE(t->output_files,tf) {
 		if(!strcmp(remote_name, tf->remote_name)) {
 			fprintf(stderr, "Error: buffer conflicts with an output pointing to same remote name (%s).\n", remote_name);
 			return 0;
@@ -5606,6 +5588,7 @@ int work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, 
 	tf->payload = malloc(length);
 	if(!tf->payload) {
 		fprintf(stderr, "Error: failed to allocate memory for buffer with remote name %s and length %d bytes.\n", remote_name, length);
+		work_queue_file_delete(tf);
 		return 0;
 	}
 
@@ -5636,8 +5619,7 @@ int work_queue_task_specify_file_command(struct work_queue_task *t, const char *
 		files = t->input_files;
 
 		//check if two different local names map to the same remote name for inputs.
-		list_first_item(t->input_files);
-		while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
+		LIST_ITERATE(t->input_files,tf) {
 			if(!strcmp(remote_name, tf->remote_name) && strcmp(cmd, tf->payload)){
 				fprintf(stderr, "Error: input file command %s conflicts with another input pointing to same remote name (%s).\n", cmd, remote_name);
 				return 0;
@@ -5645,8 +5627,7 @@ int work_queue_task_specify_file_command(struct work_queue_task *t, const char *
 		}
 
 		//check if there is an output file with the same remote name.
-		list_first_item(t->output_files);
-		while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
+		LIST_ITERATE(t->output_files,tf) {
 			if(!strcmp(remote_name, tf->remote_name)) {
 				fprintf(stderr, "Error: input file command %s conflicts with an output pointing to same remote name (%s).\n", cmd, remote_name);
 				return 0;
@@ -5724,10 +5705,10 @@ void work_queue_invalidate_cached_file(struct work_queue *q, const char *local_n
 }
 
 void work_queue_invalidate_cached_file_internal(struct work_queue *q, const char *filename) {
+	int iteration;
 	char *key;
 	struct work_queue_worker *w;
-	hash_table_firstkey(q->worker_table);
-	while(hash_table_nextkey(q->worker_table, &key, (void**)&w)) {
+	HASH_TABLE_ITERATE(q->worker_table, iteration, key, w) {
 		if(!hash_table_lookup(w->current_files, filename))
 			continue;
 
@@ -5737,20 +5718,19 @@ void work_queue_invalidate_cached_file_internal(struct work_queue *q, const char
 
 		struct work_queue_task *t;
 		uint64_t taskid;
+ 		int iteration_tasks;
 
-		itable_firstkey(w->current_tasks);
-		while(itable_nextkey(w->current_tasks, &taskid, (void**)&t)) {
+		ITABLE_ITERATE(w->current_tasks, iteration_tasks, taskid, t) {
 			struct work_queue_file *tf;
-			list_first_item(t->input_files);
 
-			while((tf = list_next_item(t->input_files))) {
+			LIST_ITERATE(t->input_files,tf) {
 				if(strcmp(filename, tf->cached_name) == 0) {
 					cancel_task_on_worker(q, t, WORK_QUEUE_TASK_READY);
 					continue;
 				}
 			}
 
-			while((tf = list_next_item(t->output_files))) {
+			LIST_ITERATE(t->output_files,tf) {
 				if(strcmp(filename, tf->cached_name) == 0) {
 					cancel_task_on_worker(q, t, WORK_QUEUE_TASK_READY);
 					continue;
@@ -5829,6 +5809,7 @@ int work_queue_task_specify_output_file_do_not_cache(struct work_queue_task *t, 
 int work_queue_task_specify_input_buf(struct work_queue_task *t, const char *buf, int length, const char *rname)
 {
 	return work_queue_task_specify_buffer(t, buf, length, rname, WORK_QUEUE_NOCACHE);
+
 }
 
 int work_queue_task_specify_input_file(struct work_queue_task *t, const char *fname, const char *rname)
@@ -5872,10 +5853,8 @@ struct work_queue *work_queue_ssl_create(int port, const char *key, const char *
 	}
 
 	/* compatibility code */
-	if (getenv("WORK_QUEUE_LOW_PORT"))
-		setenv("TCP_LOW_PORT", getenv("WORK_QUEUE_LOW_PORT"), 0);
-	if (getenv("WORK_QUEUE_HIGH_PORT"))
-		setenv("TCP_HIGH_PORT", getenv("WORK_QUEUE_HIGH_PORT"), 0);
+	setenv_compat("TCP_LOW_PORT", "WORK_QUEUE_LOW_PORT", 0);
+	setenv_compat("TCP_HIGH_PORT", "WORK_QUEUE_HIGH_PORT", 0);
 
 	q->manager_link = link_serve(port);
 	if(!q->manager_link) {
@@ -5950,7 +5929,7 @@ struct work_queue *work_queue_ssl_create(int port, const char *key, const char *
 	q->attempt_schedule_depth = 100;
 
 	q->proportional_resources = 1;
-	q->proportional_whole_tasks = 1;
+        q->proportional_whole_tasks = 1;
 
 	q->allocation_default_mode = WORK_QUEUE_ALLOCATION_MODE_FIXED;
 	q->categories = hash_table_create(0, 0);
@@ -6194,20 +6173,21 @@ int work_queue_specify_password_file( struct work_queue *q, const char *file )
 void work_queue_delete(struct work_queue *q)
 {
 	if(q) {
-		struct work_queue_worker *w;
-		char *key;
+		release_all_workers(q);
 
-		hash_table_firstkey(q->worker_table);
-		while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
-			release_worker(q, w);
-			hash_table_firstkey(q->worker_table);
+		char *key;
+		struct work_queue_factory_info *f;
+		int iteration;
+		HASH_TABLE_ITERATE(q->factory_table, iteration, key, f) {
+			remove_factory_info(q, key);
 		}
 
-		struct work_queue_factory_info *f;
-		hash_table_firstkey(q->factory_table);
-		while(hash_table_nextkey(q->factory_table, &key, (void **) &f)) {
-			remove_factory_info(q, key);
-			hash_table_firstkey(q->factory_table);
+		{
+			char *blocked_hostname;
+			struct blocklist_host_info *binfo;
+			HASH_TABLE_ITERATE(q->worker_blocklist, iteration, blocked_hostname, binfo) {
+				free(binfo);
+			}
 		}
 
 		log_queue_stats(q, 1);
@@ -6243,11 +6223,7 @@ void work_queue_delete(struct work_queue *q)
 
 		hash_table_delete(q->workers_with_available_results);
 
-		struct work_queue_task_report *tr;
-		list_first_item(q->task_reports);
-		while((tr = list_next_item(q->task_reports))) {
-			task_report_delete(tr);
-		}
+		list_clear(q->task_reports,(void*)task_report_delete);
 		list_delete(q->task_reports);
 
 		free(q->stats);
@@ -6399,7 +6375,7 @@ char *work_queue_monitor_wrap(struct work_queue *q, struct work_queue_worker *w,
 	if(!(q->monitor_mode & MON_WATCHDOG)) {
 		buffer_printf(&b, " --measure-only");
 	}
-
+	
 	if (q->monitor_interval > 0) {
 		buffer_printf(&b, " --interval %d", q->monitor_interval);
 	}
@@ -6641,11 +6617,11 @@ static int task_state_is( struct work_queue *q, uint64_t taskid, work_queue_task
 }
 
 static struct work_queue_task *task_state_any(struct work_queue *q, work_queue_task_state_t state) {
+	int iteration;
 	struct work_queue_task *t;
 	uint64_t taskid;
 
-	itable_firstkey(q->tasks);
-	while( itable_nextkey(q->tasks, &taskid, (void **) &t) ) {
+	ITABLE_ITERATE(q->tasks, iteration, taskid, t) {
 		if( task_state_is(q, taskid, state) ) {
 			return t;
 		}
@@ -6655,11 +6631,11 @@ static struct work_queue_task *task_state_any(struct work_queue *q, work_queue_t
 }
 
 static struct work_queue_task *task_state_any_with_tag(struct work_queue *q, work_queue_task_state_t state, const char *tag) {
+	int iteration;
 	struct work_queue_task *t;
 	uint64_t taskid;
 
-	itable_firstkey(q->tasks);
-	while( itable_nextkey(q->tasks, &taskid, (void **) &t) ) {
+	ITABLE_ITERATE(q->tasks, iteration, taskid, t) {
 		if( task_state_is(q, taskid, state) && tasktag_comparator((void *) t, (void *) tag)) {
 			return t;
 		}
@@ -6669,13 +6645,13 @@ static struct work_queue_task *task_state_any_with_tag(struct work_queue *q, wor
 }
 
 static int task_request_count( struct work_queue *q, const char *category, category_allocation_t request) {
+	int iteration;
 	struct work_queue_task *t;
 	uint64_t taskid;
 
 	int count = 0;
 
-	itable_firstkey(q->tasks);
-	while( itable_nextkey(q->tasks, &taskid, (void **) &t) ) {
+	ITABLE_ITERATE(q->tasks, iteration, taskid, t) {
 		if(t->resource_request == request) {
 			if(!category || strcmp(category, t->category) == 0) {
 				count++;
@@ -6729,6 +6705,7 @@ int work_queue_submit(struct work_queue *q, struct work_queue_task *t)
 void work_queue_block_host_with_timeout(struct work_queue *q, const char *hostname, time_t timeout)
 {
 	struct blocklist_host_info *info = hash_table_lookup(q->worker_blocklist, hostname);
+	int is_new = !info;
 
 	if(!info) {
 		info = malloc(sizeof(struct blocklist_host_info));
@@ -6752,7 +6729,9 @@ void work_queue_block_host_with_timeout(struct work_queue *q, const char *hostna
 		info->release_at = -1;
 	}
 
-	hash_table_insert(q->worker_blocklist, hostname, (void *) info);
+	if(is_new) {
+		hash_table_insert(q->worker_blocklist, hostname, (void *) info);
+	}
 }
 
 void work_queue_block_host(struct work_queue *q, const char *hostname)
@@ -6764,19 +6743,18 @@ void work_queue_unblock_host(struct work_queue *q, const char *hostname)
 {
 	struct blocklist_host_info *info = hash_table_remove(q->worker_blocklist, hostname);
 	if(info) {
-		info->blocked = 0;
-		info->release_at  = 0;
+		free(info);
 	}
 }
 
 /* deadline < 1 means release all, regardless of release_at time. */
 static void work_queue_unblock_all_by_time(struct work_queue *q, time_t deadline)
 {
+	int iteration;
 	char *hostname;
 	struct blocklist_host_info *info;
 
-	hash_table_firstkey(q->worker_blocklist);
-	while(hash_table_nextkey(q->worker_blocklist, &hostname, (void *) &info)) {
+	HASH_TABLE_ITERATE(q->worker_blocklist, iteration, hostname, info) {
 		if(!info->blocked)
 			continue;
 
@@ -6907,13 +6885,12 @@ static int poll_active_workers(struct work_queue *q, int stoptime, struct link *
 	}
 
 	if(hash_table_size(q->workers_with_available_results) > 0) {
+		int iteration;
 		char *key;
 		struct work_queue_worker *w;
-		hash_table_firstkey(q->workers_with_available_results);
-		while(hash_table_nextkey(q->workers_with_available_results,&key,(void**)&w)) {
+		HASH_TABLE_ITERATE(q->workers_with_available_results, iteration, key, w) {
 			get_available_results(q, w);
 			hash_table_remove(q->workers_with_available_results, key);
-			hash_table_firstkey(q->workers_with_available_results);
 		}
 	}
 
@@ -7177,15 +7154,12 @@ int work_queue_hungry(struct work_queue *q)
 	int64_t ready_task_gpus		= 0;
 
 	struct work_queue_task *t;
-	struct skip_list_cursor *cursor = skip_list_cursor_create(q->ready_list);
-	skip_list_seek(cursor, 0);
-	SKIP_LIST_ITERATE(cursor, t) {
+	SKIP_LIST_ITERATE(q->ready_list, t) {
 		ready_task_cores  += MAX(1,t->resources_requested->cores);
 		ready_task_memory += t->resources_requested->memory;
 		ready_task_disk   += t->resources_requested->disk;
 		ready_task_gpus   += t->resources_requested->gpus;
 	}
-	skip_list_cursor_delete(cursor);
 
 	//check possible limiting factors
 	//return false if required resources exceed available resources
@@ -7207,6 +7181,7 @@ int work_queue_hungry(struct work_queue *q)
 
 int work_queue_shut_down_workers(struct work_queue *q, int n)
 {
+	int iteration;
 	struct work_queue_worker *w;
 	char *key;
 	int i = 0;
@@ -7219,13 +7194,11 @@ int work_queue_shut_down_workers(struct work_queue *q, int n)
 		return -1;
 
 	// send worker the "exit" msg
-	hash_table_firstkey(q->worker_table);
-	while(i < n && hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
+	HASH_TABLE_ITERATE(q->worker_table, iteration, key, w) {
+		if(i >= n)
+			break;
 		if(itable_size(w->current_tasks) == 0) {
 			shut_down_worker(q, w);
-
-			/* shut_down_worker alters the table, so we reset it here. */
-			hash_table_firstkey(q->worker_table);
 			i++;
 		}
 	}
@@ -7235,6 +7208,7 @@ int work_queue_shut_down_workers(struct work_queue *q, int n)
 
 int work_queue_specify_draining_by_hostname(struct work_queue *q, const char *hostname, int drain_flag)
 {
+	int iteration;
 	char *worker_hashkey = NULL;
 	struct work_queue_worker *w = NULL;
 
@@ -7242,8 +7216,7 @@ int work_queue_specify_draining_by_hostname(struct work_queue *q, const char *ho
 
 	int workers_updated = 0;
 
-	hash_table_firstkey(q->worker_table);
-	while(hash_table_nextkey(q->worker_table, &worker_hashkey, (void *) w)) {
+	HASH_TABLE_ITERATE(q->worker_table, iteration, worker_hashkey, w) {
 		if (!strcmp(w->hostname, hostname)) {
 			w->draining = drain_flag;
 			workers_updated++;
@@ -7297,31 +7270,28 @@ struct work_queue_task *work_queue_cancel_by_tasktag(struct work_queue *q, const
 }
 
 struct list * work_queue_cancel_all_tasks(struct work_queue *q) {
+	int iteration;
 	struct list *l = list_create();
 	struct work_queue_task *t;
 	struct work_queue_worker *w;
 	uint64_t taskid;
 	char *key;
 
-	itable_firstkey(q->tasks);
-	while(itable_nextkey(q->tasks, &taskid, (void**)&t)) {
-		list_push_tail(l, t);
+	ITABLE_ITERATE(q->tasks, iteration, taskid, t) {
 		work_queue_cancel_by_taskid(q, taskid);
+		list_push_tail(l, t);
 	}
 
-	hash_table_firstkey(q->workers_with_available_results);
-	while(hash_table_nextkey(q->workers_with_available_results, &key, (void **) &w)) {
+	HASH_TABLE_ITERATE(q->workers_with_available_results, iteration, key, w) {
 		hash_table_remove(q->workers_with_available_results, key);
-		hash_table_firstkey(q->workers_with_available_results);
 	}
 
-	hash_table_firstkey(q->worker_table);
-	while(hash_table_nextkey(q->worker_table, &key, (void**)&w)) {
+	HASH_TABLE_ITERATE(q->worker_table, iteration, key, w) {
 
 		send_worker_msg(q,w,"kill -1\n");
 
-		itable_firstkey(w->current_tasks);
-		while(itable_nextkey(w->current_tasks, &taskid, (void**)&t)) {
+		int iteration_tasks;
+		ITABLE_ITERATE(w->current_tasks, iteration_tasks, taskid, t) {
 			//Delete any input files that are not to be cached.
 			delete_worker_files(q, w, t->input_files, WORK_QUEUE_CACHE | WORK_QUEUE_PREEXIST);
 
@@ -7331,7 +7301,6 @@ struct list * work_queue_cancel_all_tasks(struct work_queue *q) {
 
 			list_push_tail(l, t);
 			q->stats->tasks_cancelled++;
-			itable_firstkey(w->current_tasks);
 		}
 	}
 	return l;
@@ -7339,24 +7308,19 @@ struct list * work_queue_cancel_all_tasks(struct work_queue *q) {
 
 void release_all_workers(struct work_queue *q) {
 	struct work_queue_worker *w;
-	char *key;
 
-	if(!q) return;
-
-	hash_table_firstkey(q->worker_table);
-	while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
-		release_worker(q, w);
-		hash_table_firstkey(q->worker_table);
+	while ((w = hash_table_pop(q->worker_table))) {
+	    release_worker(q, w);
 	}
 }
 
 int work_queue_empty(struct work_queue *q)
 {
+	int iteration;
 	struct work_queue_task *t;
 	uint64_t taskid;
 
-	itable_firstkey(q->tasks);
-	while( itable_nextkey(q->tasks, &taskid, (void **) &t) ) {
+	ITABLE_ITERATE(q->tasks, iteration, taskid, t) {
 		int state = work_queue_task_state(q, taskid);
 
 		if( state == WORK_QUEUE_TASK_READY   )           return 0;
@@ -7543,13 +7507,13 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	//info about tasks
 	struct work_queue_task *t;
 	uint64_t taskid;
+	int iteration;
 
 	int ready_tasks = 0;
 	int waiting_tasks = 0;
 	int running_tasks = 0;
 
-	itable_firstkey(q->tasks);
-	while( itable_nextkey(q->tasks, &taskid, (void **) &t) ) {
+	ITABLE_ITERATE(q->tasks, iteration, taskid, t) {
 		int state = (long)itable_lookup(q->task_state_map, taskid);
 		switch (state)
 		{
@@ -7576,8 +7540,8 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 		char *key;
 		struct work_queue_worker *w;
 		s->tasks_running = 0;
-		hash_table_firstkey(q->worker_table);
-		while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
+		int iteration;
+		HASH_TABLE_ITERATE(q->worker_table, iteration, key, w) {
 			accumulate_stat(s, w->stats, tasks_running);
 		}
 		/* (see work_queue_get_stats_hierarchy for an explanation on the
@@ -7620,6 +7584,7 @@ void work_queue_get_stats_hierarchy(struct work_queue *q, struct work_queue_stat
 {
 	work_queue_get_stats(q, s);
 
+	int iteration;
 	char *key;
 	struct work_queue_worker *w;
 
@@ -7627,8 +7592,7 @@ void work_queue_get_stats_hierarchy(struct work_queue *q, struct work_queue_stat
 	s->tasks_running = 0;
 	s->workers_connected = 0;
 
-	hash_table_firstkey(q->worker_table);
-	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
+	HASH_TABLE_ITERATE(q->worker_table, iteration, key, w) {
 		if(w->type == WORKER_TYPE_FOREMAN)
 		{
 			accumulate_stat(s, w->stats, workers_joined);
@@ -7709,6 +7673,7 @@ char *work_queue_status(struct work_queue *q, const char *request) {
 
 void aggregate_workers_resources( struct work_queue *q, struct work_queue_resources *total, struct hash_table *features)
 {
+	int iteration;
 	struct work_queue_worker *w;
 	char *key;
 
@@ -7722,8 +7687,7 @@ void aggregate_workers_resources( struct work_queue *q, struct work_queue_resour
 		hash_table_clear(features,0);
 	}
 
-	hash_table_firstkey(q->worker_table);
-	while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
+	HASH_TABLE_ITERATE(q->worker_table, iteration, key, w) {
 		if(w->resources->tag < 0)
 			continue;
 
@@ -7731,10 +7695,10 @@ void aggregate_workers_resources( struct work_queue *q, struct work_queue_resour
 
 		if(features) {
 			if(w->features) {
+				int iteration_features;
 				char *key;
 				void *dummy;
-				hash_table_firstkey(w->features);
-				while(hash_table_nextkey(w->features, &key, &dummy)) {
+								HASH_TABLE_ITERATE(w->features, iteration_features, key, dummy) {
 					hash_table_insert(features, key, (void **) 1);
 				}
 			}
@@ -7902,6 +7866,16 @@ static void write_transaction_category(struct work_queue *q, struct category *c)
 		case CATEGORY_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING:
 			mode = "EXHAUSTIVE_BUCKETING";
 			break;
+		case CATEGORY_ALLOCATION_MODE_DET_GREEDY_BUCKETING:
+			mode = "DET_GREEDY_BUCKETING";
+			break;
+		case CATEGORY_ALLOCATION_MODE_DET_EXHAUSTIVE_BUCKETING:
+			mode = "DET_EXHAUSTIVE_BUCKETING";
+			break;
+		case CATEGORY_ALLOCATION_MODE_QUANTIZED_BUCKETING:
+			mode = "QUANTIZED_BUCKETING";
+			break;
+
 	}
 
 	buffer_printf(&B, "CATEGORY %s FIRST %s ", c->name, mode);
@@ -8131,6 +8105,9 @@ int work_queue_specify_category_mode(struct work_queue *q, const char *category,
 		case WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT:
 		case WORK_QUEUE_ALLOCATION_MODE_GREEDY_BUCKETING:
 		case WORK_QUEUE_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING:
+		case WORK_QUEUE_ALLOCATION_MODE_DET_GREEDY_BUCKETING:
+		case WORK_QUEUE_ALLOCATION_MODE_DET_EXHAUSTIVE_BUCKETING:
+		case WORK_QUEUE_ALLOCATION_MODE_QUANTIZED_BUCKETING:
 			break;
 		default:
 			notice(D_WQ, "Unknown category mode specified.");
@@ -8288,6 +8265,7 @@ static double round_to_nice_power_of_2(double value, int n) {
 
 
 struct rmsummary **work_queue_workers_summary(struct work_queue *q) {
+	int iteration;
 	struct work_queue_worker *w;
 	struct rmsummary *s;
 	char *id;
@@ -8296,8 +8274,7 @@ struct rmsummary **work_queue_workers_summary(struct work_queue *q) {
 
 	struct hash_table *workers_count = hash_table_create(0, 0);
 
-	hash_table_firstkey(q->worker_table);
-	while(hash_table_nextkey(q->worker_table, &id, (void**) &w)) {
+	HASH_TABLE_ITERATE(q->worker_table, iteration, id, w) {
 		if (w->resources->tag < 0) {
 			// worker has not yet declared resources
 			continue;
@@ -8329,8 +8306,7 @@ struct rmsummary **work_queue_workers_summary(struct work_queue *q) {
 	int count = 0;
 	struct rmsummary **worker_data = (struct rmsummary **) malloc((hash_table_size(workers_count) + 1) * sizeof(struct rmsummary *));
 
-	hash_table_firstkey(workers_count);
-	while(hash_table_nextkey(workers_count, &resources_key, (void**) &s)) {
+	HASH_TABLE_ITERATE(workers_count, iteration, resources_key, s) {
 		worker_data[count] = s;
 		count++;
 	}

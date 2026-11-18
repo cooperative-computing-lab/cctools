@@ -205,9 +205,10 @@ double *histogram_buckets(struct histogram *h)
 	int i = 0;
 	uint64_t key;
 	struct box_count *box;
+	int iteration;
 
-	itable_firstkey(h->buckets);
-	while (itable_nextkey(h->buckets, &key, (void **)&box)) {
+	ITABLE_ITERATE(h->buckets, iteration, key, box)
+	{
 		values[i] = end_of(h, key);
 		i++;
 	}

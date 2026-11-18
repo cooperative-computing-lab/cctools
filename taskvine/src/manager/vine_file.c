@@ -119,10 +119,10 @@ struct vine_file *vine_file_create(const char *source, const char *cached_name, 
 				f->cached_name = vine_meta_name(f, &totalsize);
 				/* if this is a pending file give it a random name */
 				if (!f->cached_name) {
-					f->cached_name = vine_random_name(f, &totalsize);
+					f->cached_name = vine_random_name(f);
 				}
 			} else {
-				f->cached_name = vine_random_name(f, &totalsize);
+				f->cached_name = vine_random_name(f);
 			}
 		}
 		if (size == 0) {
@@ -256,8 +256,9 @@ struct vine_file *vine_file_temp_no_peers(const char *staging_dir)
 	cctools_uuid_create(&uuid);
 
 	char *name = string_format("%s/temp-local-%s", staging_dir, uuid.str);
-	return vine_file_create(name, 0, 0, 0, VINE_FILE, 0, cache, VINE_UNLINK_WHEN_DONE);
+	struct vine_file *f = vine_file_create(name, 0, 0, 0, VINE_FILE, 0, cache, VINE_UNLINK_WHEN_DONE);
 	free(name);
+	return f;
 }
 
 struct vine_file *vine_file_buffer(const char *data, size_t size, vine_cache_level_t cache, vine_file_flags_t flags)

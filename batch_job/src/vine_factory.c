@@ -7,6 +7,7 @@ See the file COPYING for details.
 #include "vine_catalog.h"
 #include "vine_protocol.h"
 
+#include "address.h"
 #include "cctools.h"
 #include "batch_queue.h"
 #include "hash_table.h"
@@ -93,6 +94,7 @@ static char *foremen_regex = 0;
 
 char *manager_host = 0;
 int manager_port = 0;
+static char manager_host_storage[DOMAIN_NAME_MAX];
 int using_catalog = 0;
 
 static char *extra_worker_args=0;
@@ -108,11 +110,17 @@ static char *batch_submit_options = NULL;
 static const char *password_file = 0;
 char *password;
 
+/* A wrapper command applied to the worker itself. */
 static char *wrapper_command = 0;
 
+/* Additional files required by the worker wrapper. */
 struct list *wrapper_inputs = 0;
 
+/* The executable name of the worker itself. */
 static char *worker_command = 0;
+
+/* A wrapper command to be applied to every task executed. */
+static char *task_wrapper = 0;
 
 /* Unique number assigned to each worker instance for troubleshooting. */
 static int worker_instance = 0;
@@ -384,8 +392,7 @@ static int count_workers_connected( struct list *managers_list )
 		return connected_workers;
 	}
 
-	list_first_item(managers_list);
-	while((j=list_next_item(managers_list))) {
+	LIST_ITERATE(managers_list,j) {
 		const int workers = jx_lookup_integer(j,"workers");
 		connected_workers += workers;
 	}
@@ -407,9 +414,7 @@ static int count_workers_needed( struct list *managers_list, int only_not_runnin
 		return needed_workers;
 	}
 
-	list_first_item(managers_list);
-	while((j=list_next_item(managers_list))) {
-
+	LIST_ITERATE(managers_list,j) {
 		const char *project =jx_lookup_string(j,"project");
 		const char *host =   jx_lookup_string(j,"name");
 		const int  port =    jx_lookup_integer(j,"port");
@@ -418,6 +423,7 @@ static int count_workers_needed( struct list *managers_list, int only_not_runnin
 		const int tw =       jx_lookup_integer(j,"tasks_waiting");
 		const int tl =       jx_lookup_integer(j,"tasks_left");
 		const int protocol = jx_lookup_integer(j,"protocol");
+		const int able =     jx_lookup_integer(j,"workers_able");
 
 		if(protocol!=VINE_PROTOCOL_VERSION) {
 			printf("WARNING: skipping manager %s (%s:%d) with protocol version %d\n",project, host, port, protocol);
@@ -446,6 +452,18 @@ static int count_workers_needed( struct list *managers_list, int only_not_runnin
 
 		if(consider_capacity && capacity > 0) {
 			need = MIN(need, capacity);
+		}
+
+		// If the manager is holding dispatch until a number of workers connect
+		// (tune "wait-for-workers"), ask for at least that many. Not capped by
+		// capacity, since capacity is meaningless before workers connect.
+		// Older managers do not send this field and look up as 0.
+		const int wfw = jx_lookup_integer(j,"wait_for_workers");
+		if(wfw > need) {
+			if (wfw > able) {
+				debug(D_VINE,"%s %s:%d is waiting for %d more worker(s) before dispatching tasks",project,host,port,wfw-able);
+			}
+			need = wfw;
 		}
 
 		debug(D_VINE,"%s %s:%d %s tasks: %d capacity: %d workers needed: %d tasks running: %d",project,host,port,owner,tw+tl+tr,capacity,need,tr);
@@ -499,11 +517,12 @@ to pass to the worker.  The returned string must be freed.
 
 static char * make_features_string( struct hash_table *features_table )
 {
+	int iteration;
 	char *str = strdup("");
 
 	char *key;
 	void *value;
-	HASH_TABLE_ITERATE(features_table,key,value) {
+	HASH_TABLE_ITERATE(features_table, iteration, key, value) {
 		char * newstr = string_format("%s --feature \"%s\"",str,key);
 		free(str);
 		str = newstr;
@@ -525,54 +544,38 @@ static int submit_worker( struct batch_queue *queue )
 		debug_worker_options = string_format("-d all -o %s",worker_log_file);
 	}
 
-	char *features_string = make_features_string(features_table);
-	char *transfer_port_arg = transfer_port_range ? string_format("--transfer-port %s", transfer_port_range) : "";
-
+	/* The basic command differs whether using a project name or simple host:port. */
+	
 	if(using_catalog) {
-		static char *submission_regex_escaped = NULL;
-		submission_regex_escaped = submission_regex ? string_escape_shell(submission_regex) : NULL;
-
-		cmd = string_format(
-		"./%s --parent-death -M %s -t %d -C '%s' %s %s %s %s %s %s %s %s %s",
-		worker_command,
-		submission_regex_escaped,
-		worker_timeout,
-		catalog_host,
-		debug_workers ? debug_worker_options : "",
-		factory_name ? string_format("--from-factory \"%s\"", factory_name) : "",
-		password_file ? "-P pwfile" : "",
-		resource_args ? resource_args : "",
-		manual_ssl_option ? "--ssl" : "",
-		features_string,
-		single_shot ? "--single-shot" : "",
-		transfer_port_arg,
-		extra_worker_args ? extra_worker_args : ""
-		);
-
-		free(submission_regex_escaped);
+		cmd = string_format("./%s -M %s", worker_command, submission_regex);
 	} else {
-		cmd = string_format(
-		"./%s --parent-death %s %d -t %d -C '%s' %s %s %s %s %s %s %s %s",
-		worker_command,
-		manager_host,
-		manager_port,
-		worker_timeout,
-		catalog_host,
-		debug_workers ? debug_worker_options : "",
-		password_file ? "-P pwfile" : "",
-		resource_args ? resource_args : "",
-		manual_ssl_option ? "--ssl" : "",
-		features_string,
-		single_shot ? "--single-shot" : "",
-		transfer_port_arg,
-		extra_worker_args ? extra_worker_args : ""
-		);
+		cmd = string_format("./%s %s %d", worker_command, manager_host, manager_port);
 	}
 
+	/* Add a formatted argument to a string s, reallocating and returning s. */
+#define ADD_ARG2(s,format,value) s = string_combine(s,string_format(format,value))
+#define ADD_ARG1(s,format)       s = string_combine(s,string_format(format))
+
+	/* Add each of the fixed options. */
+	/* Be careful that each format string begins with a space. */
+	ADD_ARG2(cmd," -t %d",worker_timeout);
+	ADD_ARG2(cmd," -C '%s'",catalog_host);
+	ADD_ARG1(cmd," --parent-death");
+
+	/* Add each of the optional features. */
+	if(debug_workers)	ADD_ARG2(cmd," %s",debug_worker_options);
+	if(factory_name)	ADD_ARG2(cmd," --from-factory \"%s\"",factory_name);
+	if(password_file)	ADD_ARG1(cmd," -P pwfile");
+	if(resource_args)	ADD_ARG2(cmd," %s",resource_args);
+	if(manual_ssl_option)	ADD_ARG1(cmd," --ssl");
+	if(single_shot)		ADD_ARG1(cmd," --single-shot");
+	if(task_wrapper)        ADD_ARG2(cmd," --task-wrapper \"%s\"",task_wrapper);
+	if(transfer_port_range) ADD_ARG2(cmd," --transfer-port %s",transfer_port_range);
+	if(extra_worker_args)	ADD_ARG2(cmd," %s",extra_worker_args);
+
+	char *features_string = make_features_string(features_table);
+	ADD_ARG2(cmd," %s",features_string);
 	free(features_string);
-	if(transfer_port_range) {
-		free(transfer_port_arg);
-	}
 	
 	if(wrapper_command) {
 		// Note that we don't use string_wrap_command here,
@@ -636,8 +639,7 @@ static void update_blocked_hosts( struct batch_queue *queue, struct list *manage
 
 	if(managers_list) {
 		struct jx *j;
-		list_first_item(managers_list);
-		while((j=list_next_item(managers_list))) {
+		LIST_ITERATE(managers_list,j) {
 
 			/* Skip if no workers_blocked property */
 			struct jx *blocked = jx_lookup(j,"workers_blocked");
@@ -712,13 +714,13 @@ void wait_all_workers( struct batch_queue *queue, struct itable *job_table, time
 
 void remove_all_workers( struct batch_queue *queue, struct itable *job_table, batch_queue_remove_mode_t mode )
 {
+	int iteration;
 	uint64_t jobid;
 	void *value;
 
 	debug(D_VINE,"removing all workers...");
 
-	itable_firstkey(job_table);
-	while(itable_nextkey(job_table,&jobid,&value)) {
+		ITABLE_ITERATE(job_table, iteration, jobid, value) {
 		debug(D_VINE,"removing worker job %"PRId64,jobid);
 		batch_queue_remove(queue,jobid,mode);
 	}
@@ -844,9 +846,7 @@ struct jx *factory_to_jx(struct list *managers, struct list *foremen, int submit
 	if(managers && list_size(managers) > 0)
 	{
 		struct jx *m;
-		list_first_item(managers);
-		while((m = list_next_item(managers)))
-		{
+		LIST_ITERATE(managers,m) {
 			jx_array_append(ms, manager_to_jx(m));
 		}
 	}
@@ -857,11 +857,8 @@ struct jx *factory_to_jx(struct list *managers, struct list *foremen, int submit
 	if(foremen && list_size(foremen) > 0)
 	{
 		struct jx *f;
-		list_first_item(foremen);
-		while((f = list_next_item(foremen)))
-		{
+		LIST_ITERATE(foremen,f) {
 			jx_array_append(fs, manager_to_jx(f));
-
 		}
 	}
 	jx_insert(j, jx_string("foremen"), fs);
@@ -1331,6 +1328,7 @@ void add_wrapper_input( const char *filename )
 static void show_help(const char *cmd)
 {
 	printf("Use: vine_factory [options] <managerhost> <port>\n");
+	printf("Or:  vine_factory [options] <managerhost:port>\n");
 	printf("Or:  vine_factory [options] -M projectname\n");
 	printf("\n");
 	/*------------------------------------------------------------*/
@@ -1379,8 +1377,9 @@ static void show_help(const char *cmd)
 	printf(" %-30s Extra options to give to worker.\n", "-E,--extra-options=<options>");
 	printf(" %-30s Port range for worker-worker transfers (e.g. 10000:11000). Passed as --transfer-port.\n", "--transfer-port=<port|min:max>");
 	printf(" %-30s Alternate binary instead of vine_worker.\n", "--worker-binary=<file>");
-	printf(" %-30s Wrap factory with this command prefix.\n","--wrapper");
-	printf(" %-30s Add this input file needed by the wrapper.\n","--wrapper-input");
+	printf(" %-30s Wrap worker with this command prefix.\n","--wrapper");
+	printf(" %-30s Wrap tasks with this command prefix.\n","--task-wrapper");
+	printf(" %-30s Add this input file needed by a task or worker wrapper.\n","--wrapper-input");
 	printf(" %-30s Run each worker inside this poncho environment.\n","--poncho-env=<file.tar.gz>");
 
 	printf("\nOptions specific to batch systems:\n");
@@ -1409,6 +1408,7 @@ enum{   LONG_OPT_CORES = 255,
 		LONG_OPT_WRAPPER, 
 		LONG_OPT_WRAPPER_INPUT,
 		LONG_OPT_WORKER_BINARY,
+		LONG_OPT_TASK_WRAPPER,
 		LONG_OPT_K8S_IMAGE,
 		LONG_OPT_K8S_WORKER_IMAGE,
 		LONG_OPT_CATALOG,
@@ -1472,6 +1472,7 @@ static const struct option long_options[] = {
 	{"wrapper",required_argument, 0, LONG_OPT_WRAPPER},
 	{"wrapper-input",required_argument, 0, LONG_OPT_WRAPPER_INPUT},
 	{"ssl",no_argument, 0, LONG_OPT_USE_SSL},
+	{"task-wrapper",required_argument, 0, LONG_OPT_TASK_WRAPPER},
 	{"tls-sni", required_argument, 0, LONG_OPT_TLS_SNI},
 	{"factory-name",required_argument, 0, LONG_OPT_FACTORY_NAME},
 	{"single-shot", no_argument, 0, LONG_OPT_SINGLE_SHOT},
@@ -1621,6 +1622,9 @@ int main(int argc, char *argv[])
 			case LONG_OPT_WORKER_BINARY:
 				worker_command = xxstrdup(optarg);
 				break;
+			case LONG_OPT_TASK_WRAPPER:
+				task_wrapper = xxstrdup(optarg);
+				break;
 			case 'P':
 				password_file = optarg;
 				if(copy_file_to_buffer(optarg, &password, NULL) < 0) {
@@ -1710,9 +1714,15 @@ int main(int argc, char *argv[])
 		config_file = xxstrdup(abs_path_name);
 	}
 
-	if((argc - optind) == 2) {
+	if ((argc - optind) == 1) {
+		if (!address_parse_hostport(argv[optind], manager_host_storage, &manager_port, 0) || manager_port < 1) {
+			fprintf(stderr, "vine_factory: invalid manager address '%s'\n", argv[optind]);
+			exit(1);
+		}
+		manager_host = manager_host_storage;
+	} else if ((argc - optind) == 2) {
 		manager_host = argv[optind];
-		manager_port = atoi(argv[optind+1]);
+		manager_port = atoi(argv[optind + 1]);
 	}
 
 	if(config_file) {
@@ -1723,7 +1733,7 @@ int main(int argc, char *argv[])
 	}
 
 	if(!(manager_host || config_file || project_regex)) {
-		fprintf(stderr,"vine_factory: You must either give a project name with the -M option or manager-name option with a configuration file, or give the manager's host and port.\n");
+		fprintf(stderr,"vine_factory: You must either give a project name with the -M option or manager-name option with a configuration file, or give the manager's host and port (as <host> <port> or <host:port>).\n");
 		exit(1);
 	}
 
@@ -1808,8 +1818,7 @@ int main(int argc, char *argv[])
 	}
 		
 	const char *item = NULL;
-	list_first_item(wrapper_inputs);
-	while((item = list_next_item(wrapper_inputs))) {
+	LIST_ITERATE(wrapper_inputs,item) {
 		char *file_at_scratch_dir = string_format("%s/%s", scratch_dir, path_basename(item));
 		int64_t result = copy_file_to_file(item, file_at_scratch_dir);
 		if(result < 0) {

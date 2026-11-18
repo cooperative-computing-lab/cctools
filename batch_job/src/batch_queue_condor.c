@@ -326,7 +326,9 @@ static batch_queue_id_t batch_queue_condor_wait(struct batch_queue *q, struct ba
 					debug(D_BATCH, "job %" PRIbjid " was removed", jobid);
 
 					memcpy(info_out, info, sizeof(*info));
-					free(info);
+					/* ownership of info->schedd transferred to info_out via the memcpy above */
+					info->schedd = NULL;
+					batch_job_info_delete(info);
 					return jobid;
 				} else if (type == 5) {
 					itable_remove(q->job_table, jobid);
@@ -349,7 +351,9 @@ static batch_queue_id_t batch_queue_condor_wait(struct batch_queue *q, struct ba
 					}
 
 					memcpy(info_out, info, sizeof(*info));
-					free(info);
+					/* ownership of info->schedd transferred to info_out via the memcpy above */
+					info->schedd = NULL;
+					batch_job_info_delete(info);
 					return jobid;
 				}
 			}

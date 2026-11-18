@@ -73,7 +73,7 @@ void makeflow_parse_input_outputs( struct dag *d )
 	struct dag_file *f;
 	char *filename;
 
-	int i, argc;
+	int i, argc, iteration;
 	char **argv;
 
 	char *input_list  = dag_variable_lookup_global_string("MAKEFLOW_INPUTS" , d);
@@ -97,13 +97,13 @@ void makeflow_parse_input_outputs( struct dag *d )
 		debug(D_MAKEFLOW_RUN, "MAKEFLOW_INPUTS is not specified");
 	}
 	/* add all source files */
-	hash_table_firstkey(d->files);
-	while((hash_table_nextkey(d->files, &filename, (void **) &f)))
+	HASH_TABLE_ITERATE(d->files, iteration, filename, f) {
 		if(dag_file_is_source(f)) {
 			set_insert(d->inputs, f);
 			f->type = DAG_FILE_TYPE_INPUT;
 			debug(D_MAKEFLOW_RUN, "Added %s to input list", f->filename);
 		}
+	}
 
 	if(output_list) {
 		/* remove files from preserve_list */
@@ -120,13 +120,13 @@ void makeflow_parse_input_outputs( struct dag *d )
 	} else {
 		debug(D_MAKEFLOW_RUN, "MAKEFLOW_OUTPUTS is not specified");
 		/* add all sink if OUTPUTS not specified */
-		hash_table_firstkey(d->files);
-		while((hash_table_nextkey(d->files, &filename, (void **) &f)))
+		HASH_TABLE_ITERATE(d->files, iteration, filename, f) {
 			if(dag_file_is_sink(f)) {
 				set_insert(d->outputs, f);
 				f->type = DAG_FILE_TYPE_OUTPUT;
 				debug(D_MAKEFLOW_RUN, "Added %s to output list", f->filename);
 			}
+		}
 	}
 }
 
@@ -217,6 +217,7 @@ void makeflow_clean_node(struct dag *d, struct batch_queue *queue, struct dag_no
 
 int makeflow_clean(struct dag *d, struct batch_queue *queue, makeflow_clean_depth clean_depth)
 {
+	int iteration;
 	struct dag_file *f;
 	char *name;
 
@@ -231,8 +232,7 @@ int makeflow_clean(struct dag *d, struct batch_queue *queue, makeflow_clean_dept
 	}
 
 
-	hash_table_firstkey(d->files);
-	while(hash_table_nextkey(d->files, &name, (void **) &f)) {
+	HASH_TABLE_ITERATE(d->files, iteration, name, f) {
 
 		/* We have a record of the file, but it is no longer created or used so delete */
 		if(dag_file_is_source(f) && dag_file_is_sink(f) && !set_lookup(d->inputs, f))
@@ -275,6 +275,7 @@ int makeflow_clean(struct dag *d, struct batch_queue *queue, makeflow_clean_dept
 
 static void makeflow_gc_all( struct dag *d, struct batch_queue *queue, int maxfiles)
 {
+	int iteration;
 	int collected = 0;
 	struct dag_file *f;
 	char *name;
@@ -284,8 +285,9 @@ static void makeflow_gc_all( struct dag *d, struct batch_queue *queue, int maxfi
 	/* This will walk the table of files to collect and will remove any
 	 * that are below or equal to the threshold. */
 	start_time = timestamp_get();
-	hash_table_firstkey(d->files);
-	while(hash_table_nextkey(d->files, &name, (void **) &f) && collected < maxfiles) {
+	HASH_TABLE_ITERATE(d->files, iteration, name, f) {
+		if(collected >= maxfiles)
+			break;
 		if(f->state == DAG_FILE_STATE_COMPLETE
 			&& !dag_file_is_source(f)
 			&& !set_lookup(d->outputs, f)

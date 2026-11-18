@@ -21,6 +21,7 @@
 #include "copy_stream.h"
 #include "debug.h"
 #include "stringtools.h"
+#include "xxmalloc.h"
 
 const char *namelist;
 const char *packagepath;
@@ -111,7 +112,8 @@ void relative_path(char *newpath, const char *oldpath, const char *path)
 {
 	char *s;
 	strcpy(newpath, "");
-	s = strchr(path, '/');
+	char *pathb = xxstrdup(path);
+	s = strchr(pathb, '/');
 	while(s != NULL) {
 		s++;
 		strcat(newpath, "../");
@@ -119,6 +121,7 @@ void relative_path(char *newpath, const char *oldpath, const char *path)
 	}
 	newpath[strlen(newpath) - 4] = '\0';
 	strcat(newpath, oldpath);
+	free(pathb);
 }
 
 void remove_final_slashes(char *path)

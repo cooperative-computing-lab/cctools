@@ -112,17 +112,17 @@ void *hash_cache_lookup(struct hash_cache *cache, const char *key)
 	return result;
 }
 
-void hash_cache_firstkey(struct hash_cache *cache)
+int hash_cache_firstkey(struct hash_cache *cache)
 {
-	hash_table_firstkey(cache->table);
+	return hash_table_firstkey(cache->table);
 }
 
-int hash_cache_nextkey(struct hash_cache *cache, char **key, void **item)
+int hash_cache_nextkey(struct hash_cache *cache, int iteration, char **key, void **item)
 {
 	struct entry *e;
 	time_t current = time(0);
 
-	while (hash_table_nextkey(cache->table, key, (void **)&e)) {
+	while (hash_table_nextkey(cache->table, iteration, key, (void **)&e)) {
 		if (e->expires < current) {
 			hash_cache_remove(cache, *key);
 			continue;

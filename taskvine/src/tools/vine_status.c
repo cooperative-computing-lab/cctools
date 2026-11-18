@@ -100,7 +100,7 @@ static struct jx_table workers_able_headers[] = {
 {"category",      "CATEGORY",     JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT,  -12},
 {"tasks_on_workers", "DISPATCHED",      JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 10},
 {"tasks_waiting", "WAITING",      JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 10},
-{"tasks_done",     "COMPLETE",    JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 10},
+{"tasks_successful", "SUCCESSFUL",    JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 10},
 {"workers_able",  "FIT-WORKERS",  JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 12},
 {"max_cores",     "MAX-CORES",    JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 10},
 {"max_memory",    "MAX-MEMORY",   JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 10},
@@ -391,7 +391,10 @@ int find_child_relations(int spaces, const char *host, int port, struct jx_table
 	}
 
 	char *port_str = string_format(":%d", port);
-	strcat(full_address, port_str);
+	/* strncat, not strcat: full_address is already populated by
+	 * domain_name_cache_lookup above, so bound the append to what's left
+	 * in the buffer rather than trusting it to fit. */
+	strncat(full_address, port_str, sizeof(full_address) - strlen(full_address) - 1);
 	free(port_str);
 
 	while(global_catalog[i] != NULL)

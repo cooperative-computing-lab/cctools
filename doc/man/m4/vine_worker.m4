@@ -25,11 +25,13 @@ computed tasks and maintains it on disk to accelerate future applications.
 PARA
 
 The BOLD(managerhost) and BOLD(port) arguments specify the hostname and port
-number of the manager application for vine_worker to connect. Several
-managerhosts and ports may be specified, separated with a semicolon (;), with the
-worker connecting to any of the managers specified (When specifying multiple
-managers, remember to escape the ; from shell interpretation, for example, using
-quotes.)
+number of the manager application for vine_worker to connect. The manager may
+be given as separate BOLD(managerhost) and BOLD(port) arguments, or as a single
+BOLD(managerhost:port) argument; the two forms are equivalent. For IPv6 addresses,
+use the bracket form BOLD([addr]:port). Several managerhosts and ports may be
+specified, separated with a semicolon (;), with the worker connecting to any of
+the managers specified (When specifying multiple managers, remember to escape the
+; from shell interpretation, for example, using quotes.)
 
 Alternatevely, the manager may be specified by name, using the BOLD(-M) option.
 
@@ -82,6 +84,11 @@ SECTION(EXAMPLES)
 To run BOLD(vine_worker) to join a specific manager process running on host CODE(manager.somewhere.edu) port 9123:
 LONGCODE_BEGIN
 % vine_worker manager.somewhere.edu 9123
+LONGCODE_END
+
+The same manager may be specified with a single BOLD(host:port) argument:
+LONGCODE_BEGIN
+% vine_worker manager.somewhere.edu:9123
 LONGCODE_END
 
 To run BOLD(vine_worker) in auto mode with debugging turned on for all subsystems and

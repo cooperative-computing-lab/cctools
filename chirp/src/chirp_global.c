@@ -354,12 +354,12 @@ INT64_T chirp_global_getlongdir(const char *host, const char *path, chirp_longdi
 		return chirp_reli_getlongdir(host, "/", callback, arg, stoptime);
 	} else {
 		if(server_table_load(stoptime)) {
+			int iteration;
 			char *key;
 			void *item;
 			struct chirp_stat info;
 
-			hash_table_firstkey(server_table);
-			while(hash_table_nextkey(server_table, &key, &item)) {
+						HASH_TABLE_ITERATE(server_table, iteration, key, item) {
 				chirp_jx_to_stat(item, &info);
 				callback(key, &info, arg);
 			}
@@ -386,10 +386,10 @@ INT64_T chirp_global_getdir(const char *host, const char *path, chirp_dir_t call
 		return chirp_reli_getdir(host, "/", callback, arg, stoptime);
 	} else {
 		if(server_table_load(stoptime)) {
+			int iteration;
 			char *key;
 			void *item;
-			hash_table_firstkey(server_table);
-			while(hash_table_nextkey(server_table, &key, &item)) {
+						HASH_TABLE_ITERATE(server_table, iteration, key, item) {
 				callback(key, arg);
 			}
 			callback("multi", arg);

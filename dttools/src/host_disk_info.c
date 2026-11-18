@@ -36,7 +36,15 @@ int check_disk_space_for_filesize(char *path, int64_t file_size, uint64_t disk_a
 	uint64_t disk_avail, disk_total;
 
 	if (disk_avail_threshold > 0) {
-		host_disk_info_get(path, &disk_avail, &disk_total);
+		if (host_disk_info_get(path, &disk_avail, &disk_total) < 0) {
+			/* Can't determine disk usage for path (e.g. it doesn't exist,
+			or statfs() otherwise failed) -- disk_avail/disk_total were
+			never written, so don't compare against them. Fail open, the
+			same way a disabled threshold does, rather than block on
+			uninitialized data or on a stat failure that may be benign. */
+			debug(D_DEBUG, "could not determine disk usage for %s, skipping disk space check.\n", path);
+			return 1;
+		}
 		if (file_size > 0) {
 			if ((uint64_t)file_size > disk_avail || (disk_avail - file_size) < disk_avail_threshold) {
 				debug(D_DEBUG,

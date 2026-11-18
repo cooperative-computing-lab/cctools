@@ -1464,6 +1464,9 @@ to make a progress bar or other user-visible information:
     printf("%d\n", stats->workers_connected);
     ```
 
+In Python, you can also expose these statistics to a Prometheus server for
+external monitoring. See [Prometheus Metrics](#prometheus-metrics).
+
 ## Python Programming Models
 
 When writing a manager in Python, you have access to several types of tasks
@@ -1796,7 +1799,7 @@ can be tailored as any other task:
     print(f.result())
     ```
 
-Additionally, the executor the Vine Factory to submit TaskVine workers.
+Additionally, the executor can use the VineFactory to submit TaskVine workers.
 Specifications for the workers can be provided via the `opts` keyword argument when creating to executor.
 
 === "Python"
@@ -1815,6 +1818,7 @@ Specifications for the workers can be provided via the `opts` keyword argument w
     f = m.submit(t)
 
     print(f.result())
+    ```
 
 Instead of tasks, the futures may also executed using [function calls](#serverless-computing) with the `future_funcall` method:
 
@@ -2568,6 +2572,48 @@ produces the following graphs:
 ![](images/plot-perf-montage.png)
 
 - [Performance Log File Format Details](log-file-formats.md#performance-log-format)
+
+### Prometheus Metrics
+
+When writing a manager in Python, you can expose live manager statistics as
+[Prometheus](https://prometheus.io/) metrics. Pass `prometheus_port` to serve
+metrics on that port:
+
+```python
+import ndcctools.taskvine as vine
+
+with vine.Manager(port=0, prometheus_port=9090) as m:
+    print(f"metrics at http://127.0.0.1:{m.prometheus_port}/metrics")
+    ...
+```
+
+This feature requires the optional `prometheus_client` package. This package
+is installed by default if cctools is installed from conda. If it is missing,
+it can be installled with
+
+
+```sh
+conda install -c conda-forge prometheus_client
+```
+
+If `prometheus_client` is not installed, manager creation fails with an
+`ImportError` when metrics are enabled.
+
+Each scrape returns gauge metrics derived from manager statistics. Statistics
+are exported as `vine_<field>` (for example, `vine_tasks_waiting` and
+`vine_workers_connected`).
+
+The metrics server starts when the manager is created and stops automatically
+when the manager is destroyed.
+
+To scrape these metrics with a Prometheus server, add a job like this:
+
+```yaml
+scrape_configs:
+  - job_name: taskvine
+    static_configs:
+      - targets: ["MACHINENAME:9090"]
+```
 
 ### Taskgraph Log
 

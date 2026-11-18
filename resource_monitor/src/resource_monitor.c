@@ -188,9 +188,10 @@ int rmonitor_queue_fd = -1; /* File descriptor of a datagram socket to which (gr
 			      grandchildren processes report to the monitor. */
 static int rmonitor_inotify_fd = -1;
 
-pid_t first_process_pid;	      /* pid of the process given at the command line. */
-int first_process_sigchild_status;    /* exit status flags of the process given at the command line */
-int first_process_already_waited = 0; /* exit status flags of the process given at the command line */
+pid_t first_process_pid;				     /* pid of the process given at the command line. */
+volatile sig_atomic_t first_process_sigchild_status;	     /* exit status flags of the process given at the command line */
+volatile sig_atomic_t first_process_already_waited = 0;	     /* whether the process given at the command line was waited for. */
+static volatile sig_atomic_t first_process_exit_pending = 0; /* set by the SIGCHLD handler, cleared by rmonitor_handle_first_process_exit */
 int first_process_exit_status = 0;
 int first_pid_manually_set = 0; /* whether --pid was used */
 
@@ -834,8 +835,8 @@ int64_t average_bandwidth(int use_min_len)
 	if (tail->end + 60 * ONE_SECOND < timestamp_get())
 		return 0;
 
-	list_first_item(tx_rx_sizes);
-	while ((head = list_next_item(tx_rx_sizes))) {
+	LIST_ITERATE(tx_rx_sizes, head)
+	{
 		sum += head->bit_count;
 	}
 
@@ -1137,12 +1138,13 @@ void decode_zombie_status(struct rmsummary *summary, int wait_status)
 
 void rmonitor_find_files_final_sizes()
 {
+	int iteration;
 	char *fname;
 	struct stat buf;
 	struct rmonitor_file_info *finfo;
 
-	hash_table_firstkey(files);
-	while (hash_table_nextkey(files, &fname, (void **)&finfo)) {
+	HASH_TABLE_ITERATE(files, iteration, fname, finfo)
+	{
 		/* If size_on_close is unknwon, perform a stat on the file. */
 
 		if (finfo->size_on_close < 0 && stat(fname, &buf) == 0) {
@@ -1153,6 +1155,7 @@ void rmonitor_find_files_final_sizes()
 
 void rmonitor_add_files_to_summary(char *field, int outputs)
 {
+	int iteration;
 	char *fname;
 	struct rmonitor_file_info *finfo;
 
@@ -1163,8 +1166,8 @@ void rmonitor_add_files_to_summary(char *field, int outputs)
 
 	char *delimeter = "";
 
-	hash_table_firstkey(files);
-	while (hash_table_nextkey(files, &fname, (void **)&finfo)) {
+	HASH_TABLE_ITERATE(files, iteration, fname, finfo)
+	{
 		if (finfo->is_output != outputs)
 			continue;
 
@@ -1190,6 +1193,7 @@ int rmonitor_file_io_summaries()
 {
 #if defined(RESOURCE_MONITOR_USE_INOTIFY)
 	if (rmonitor_inotify_fd >= 0) {
+		int iteration;
 		char *fname;
 		struct rmonitor_file_info *finfo;
 
@@ -1205,8 +1209,8 @@ int rmonitor_file_io_summaries()
 				"reads",
 				"writes");
 
-		hash_table_firstkey(files);
-		while (hash_table_nextkey(files, &fname, (void **)&finfo)) {
+		HASH_TABLE_ITERATE(files, iteration, fname, finfo)
+		{
 			fprintf(log_inotify, "%-15s\n%-15s ", fname, "");
 			fprintf(log_inotify, "%6" PRId64 " %20lld %20lld", finfo->device, (long long int)finfo->size_on_open, (long long int)finfo->size_on_close);
 			fprintf(log_inotify, " %6" PRId64 " %6" PRId64, finfo->n_opens, finfo->n_closes);
@@ -1360,32 +1364,42 @@ void rmonitor_untrack_process(uint64_t pid)
 
 void rmonitor_add_children_by_polling()
 {
+	int iteration;
 
 	uint64_t pid;
 	struct rmonitor_process_info *p;
-	uint64_t *children = NULL;
 
-	itable_firstkey(processes);
-	while (itable_nextkey(processes, &pid, (void **)&p)) {
+	/* rmonitor_track_process inserts into processes, which cannot be done
+	 * while iterating over processes. Collect the children first. */
+	uint64_t *found = NULL;
+	int found_count = 0;
+
+	ITABLE_ITERATE(processes, iteration, pid, p)
+	{
 		if (!p->running) {
 			continue;
 		}
 
+		uint64_t *children = NULL;
 		int n = rmonitor_get_children(pid, &children);
 
-		if (n < 1) {
-			continue;
-		}
-
-		int i;
-		for (i = 0; i < n; i++) {
-			if (rmonitor_track_process(children[i])) {
-				debug(D_RMON, "added by polling pid %" PRIu64, children[i]);
-			}
+		if (n > 0) {
+			found = xxrealloc(found, (found_count + n) * sizeof(*found));
+			memcpy(found + found_count, children, n * sizeof(*found));
+			found_count += n;
 		}
 
 		free(children);
 	}
+
+	int i;
+	for (i = 0; i < found_count; i++) {
+		if (rmonitor_track_process(found[i])) {
+			debug(D_RMON, "added by polling pid %" PRIu64, found[i]);
+		}
+	}
+
+	free(found);
 }
 
 void cleanup_zombie(struct rmonitor_process_info *p)
@@ -1401,13 +1415,15 @@ void cleanup_zombie(struct rmonitor_process_info *p)
 
 void cleanup_zombies(void)
 {
+	int iteration;
 	uint64_t pid;
 	struct rmonitor_process_info *p;
 
-	itable_firstkey(processes);
-	while (itable_nextkey(processes, &pid, (void **)&p))
+	ITABLE_ITERATE(processes, iteration, pid, p)
+	{
 		if (!p->running)
 			cleanup_zombie(p);
+	}
 }
 
 void release_waiting_process(uint64_t pid)
@@ -1418,31 +1434,34 @@ void release_waiting_process(uint64_t pid)
 
 void release_waiting_processes(void)
 {
+	int iteration;
 	uint64_t pid;
 	struct rmonitor_process_info *p;
 
-	itable_firstkey(processes);
-	while (itable_nextkey(processes, &pid, (void **)&p))
+	ITABLE_ITERATE(processes, iteration, pid, p)
+	{
 		if (p->waiting)
 			release_waiting_process(pid);
+	}
 }
 
 void ping_processes(void)
 {
+	int iteration;
 	uint64_t pid;
 	struct rmonitor_process_info *p;
 
-	itable_firstkey(processes);
-	while (itable_nextkey(processes, &pid, (void **)&p))
+	ITABLE_ITERATE(processes, iteration, pid, p)
+	{
 		if (!ping_process(pid)) {
 			debug(D_RMON, "cannot find %" PRId64 " process.\n", pid);
 			rmonitor_untrack_process(pid);
 		}
+	}
 }
 
-void set_snapshot_watch_events()
+void set_snapshot_watch_events(void)
 {
-
 	if (!snapshot_watch_events_file) {
 		return;
 	}
@@ -1474,11 +1493,12 @@ void set_snapshot_watch_events()
 
 void terminate_snapshot_watch_events()
 {
+	int iteration;
 	uint64_t pid;
 	void *dummy;
 
-	itable_firstkey(snapshot_watch_pids);
-	while (itable_nextkey(snapshot_watch_pids, &pid, &dummy)) {
+	ITABLE_ITERATE(snapshot_watch_pids, iteration, pid, dummy)
+	{
 		kill(pid, SIGKILL);
 	}
 }
@@ -1547,46 +1567,72 @@ void rmonitor_forward_signal(const int signal, siginfo_t *info, void *data)
 	}
 }
 
-/* sigchild signal handler */
+/* sigchild signal handler.
+ *
+ * This handler may interrupt the main loop while it is iterating over
+ * processes (or any other table), so it must not touch the tables:
+ * ITABLE_ITERATE here would invalidate the iteration of the main loop.
+ * It only reaps the first process and sets a flag. The rest is done by
+ * rmonitor_handle_first_process_exit, called from the main loop. */
 void rmonitor_check_child(const int signal)
 {
-	uint64_t pid = waitpid(first_process_pid, &first_process_sigchild_status, WNOHANG | WCONTINUED | WUNTRACED);
+	int status;
+	pid_t pid = waitpid(first_process_pid, &status, WNOHANG | WCONTINUED | WUNTRACED);
 
-	if (pid != (uint64_t)first_process_pid)
+	if (pid != first_process_pid)
 		return;
+
+	if (WIFCONTINUED(status)) {
+		return;
+	}
+
+	if (WIFSTOPPED(status) && WSTOPSIG(status) != SIGTTIN && WSTOPSIG(status) != SIGTTOU) {
+		return;
+	}
+
+	first_process_sigchild_status = status;
+	first_process_already_waited = 1;
+	first_process_exit_pending = 1;
+}
+
+/* Finish handling the exit of the first process detected by rmonitor_check_child. */
+void rmonitor_handle_first_process_exit(void)
+{
+	if (!first_process_exit_pending) {
+		return;
+	}
+	first_process_exit_pending = 0;
+
+	int status = first_process_sigchild_status;
 
 	debug(D_RMON, "got SIGCHLD from %d", first_process_pid);
 
-	if (WIFEXITED(first_process_sigchild_status)) {
+	if (WIFEXITED(status)) {
 		debug(D_RMON, "exit\n");
-	} else if (WIFSIGNALED(first_process_sigchild_status)) {
+	} else if (WIFSIGNALED(status)) {
 		debug(D_RMON, "signal\n");
-	} else if (WIFSTOPPED(first_process_sigchild_status)) {
+	} else if (WIFSTOPPED(status)) {
 		debug(D_RMON, "stop\n");
 
-		switch (WSTOPSIG(first_process_sigchild_status)) {
+		switch (WSTOPSIG(status)) {
 		case SIGTTIN:
 			debug(D_NOTICE, "Process asked for input from the terminal, try the -f option to bring the child process in foreground.\n");
 			break;
 		case SIGTTOU:
 			debug(D_NOTICE, "Process wants to write to the standard output, but the current terminal settings do not allow this. Please try the -f option to bring the child process in foreground.\n");
 			break;
-		default:
-			return;
-			break;
 		}
-	} else if (WIFCONTINUED(first_process_sigchild_status)) {
-		debug(D_RMON, "continue\n");
-		return;
 	}
 
-	first_process_already_waited = 1;
-
+	uint64_t pid;
 	struct rmonitor_process_info *p;
+	int iteration;
+
 	debug(D_RMON, "adding all processes to cleanup list.\n");
-	itable_firstkey(processes);
-	while (itable_nextkey(processes, &pid, (void **)&p))
+	ITABLE_ITERATE(processes, iteration, pid, p)
+	{
 		rmonitor_untrack_process(pid);
+	}
 
 	/* get the peak values from getrusage, and others. */
 	struct rmsummary *tr_usg = rmonitor_final_usage_tree();
@@ -1610,8 +1656,9 @@ void rmonitor_final_cleanup()
 	sigprocmask(SIG_BLOCK, &block, NULL);
 
 	if (!first_pid_manually_set) {
-		itable_firstkey(processes);
-		while (itable_nextkey(processes, &pid, (void **)&p)) {
+		int iteration;
+		ITABLE_ITERATE(processes, iteration, pid, p)
+		{
 			notice(D_RMON, "sending kill signal to process %" PRId64 ".%d\n", pid);
 			kill(pid, SIGKILL);
 		}
@@ -1625,6 +1672,8 @@ void rmonitor_final_cleanup()
 			rmonitor_check_child(0);
 		}
 	}
+
+	rmonitor_handle_first_process_exit();
 
 	if (lib_helper_extracted) {
 		cleanup_library();
@@ -1685,10 +1734,13 @@ int rmonitor_dispatch_msg(void)
 	int recv_status = recv_monitor_msg(rmonitor_queue_fd, &msg);
 
 	if (recv_status < 0) {
+		/* Nothing was read into msg, so it must not be touched below.
+		EAGAIN just means no message is available right now (not an
+		error); anything else is logged. */
 		if (errno != EAGAIN) {
 			debug(D_RMON, "Error receiving message: %s", strerror(errno));
-			return 1;
 		}
+		return 1;
 	}
 
 	if (((unsigned int)recv_status) < sizeof(msg)) {
@@ -2078,6 +2130,7 @@ int rmonitor_resources(long int interval /*in seconds */)
 
 		release_waiting_processes();
 
+		rmonitor_handle_first_process_exit();
 		cleanup_zombies();
 
 		if (record_snapshot(snapshot)) {
@@ -2104,6 +2157,7 @@ int rmonitor_resources(long int interval /*in seconds */)
 
 		// cleanup processes which by terminating may have awaken
 		// select.
+		rmonitor_handle_first_process_exit();
 		cleanup_zombies();
 
 		round++;

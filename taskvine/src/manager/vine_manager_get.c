@@ -318,7 +318,7 @@ Get a single output file from a worker, independently of any task.
 
 vine_result_code_t vine_manager_get_single_file(struct vine_manager *q, struct vine_worker_info *w, struct vine_file *f)
 {
-	int64_t total_bytes;
+	int64_t total_bytes = 0;
 	vine_manager_send(q, w, "getfile %s\n", f->cached_name);
 	return vine_manager_get_buffer(q, w, 0, f, &total_bytes);
 }

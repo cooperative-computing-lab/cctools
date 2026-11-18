@@ -9,6 +9,7 @@
 #include "vine_mount.h"
 
 #include "priority_queue.h"
+#include "skip_list.h"
 #include "macros.h"
 #include "stringtools.h"
 #include "debug.h"
@@ -33,7 +34,7 @@ static int worker_can_peer_transfer(struct vine_worker_info *w)
 	if (!w->transfer_port_active) {
 		return 0;
 	}
-	if (w->draining) {
+	if (w->draining || w->pending_removal) {
 		return 0;
 	}
 	if (!w->resources) {
@@ -86,7 +87,8 @@ static struct vine_worker_info *get_best_source_worker(struct vine_manager *q, s
 	struct vine_worker_info *best_source_worker = NULL;
 
 	struct vine_worker_info *w = NULL;
-	SET_ITERATE(sources, w)
+	int iteration;
+	SET_ITERATE(sources, iteration, w)
 	{
 		/* skip if the worker cannot participate in peer transfers */
 		if (!worker_can_peer_transfer(w)) {
@@ -130,7 +132,8 @@ static struct vine_worker_info *get_best_dest_worker(struct vine_manager *q, str
 
 	char *key;
 	struct vine_worker_info *w;
-	HASH_TABLE_ITERATE(q->worker_table, key, w)
+	int iteration;
+	HASH_TABLE_ITERATE(q->worker_table, iteration, key, w)
 	{
 		/* skip if the worker cannot participate in peer transfers */
 		if (!worker_can_peer_transfer(w)) {
@@ -229,7 +232,8 @@ int vine_temp_exists_somewhere(struct vine_manager *q, struct vine_file *f)
 	}
 
 	struct vine_worker_info *w;
-	SET_ITERATE(workers, w)
+	int iteration;
+	SET_ITERATE(workers, iteration, w)
 	{
 		struct vine_file_replica *replica = vine_file_replica_table_lookup(w, f->cached_name);
 		if (replica && (replica->state == VINE_FILE_REPLICA_STATE_CREATING || replica->state == VINE_FILE_REPLICA_STATE_READY)) {
@@ -360,17 +364,21 @@ void vine_temp_clean_redundant_replicas(struct vine_manager *q, struct vine_file
 		return;
 	}
 
-	struct priority_queue *clean_replicas_from_workers = priority_queue_create(0);
+	/* Candidates ordered by (pending_removal, inuse_cache), highest first: workers about to be removed anyway,
+	 * then the workers using the most cache space. */
+	struct skip_list *clean_replicas_from_workers = skip_list_create(2, 0.5);
 
 	struct vine_worker_info *source_worker = NULL;
-	SET_ITERATE(source_workers, source_worker)
+	int iteration;
+	SET_ITERATE(source_workers, iteration, source_worker)
 	{
 		/* if the file is actively in use by a task (the input to that task), we don't remove the replica on this worker */
 		int file_inuse = 0;
 
 		uint64_t task_id;
 		struct vine_task *task;
-		ITABLE_ITERATE(source_worker->current_tasks, task_id, task)
+		int iteration;
+		ITABLE_ITERATE(source_worker->current_tasks, iteration, task_id, task)
 		{
 			struct vine_mount *input_mount;
 			LIST_ITERATE(task->input_mounts, input_mount)
@@ -389,11 +397,12 @@ void vine_temp_clean_redundant_replicas(struct vine_manager *q, struct vine_file
 			continue;
 		}
 
-		priority_queue_push(clean_replicas_from_workers, source_worker, source_worker->inuse_cache);
+		// given the priorities, replicas from workers pending removal are counted first
+		skip_list_insert(clean_replicas_from_workers, source_worker, source_worker->pending_removal ? 1.0 : 0.0, (double)source_worker->inuse_cache);
 	}
 
 	while (excess_replicas > 0) {
-		source_worker = priority_queue_pop(clean_replicas_from_workers);
+		source_worker = skip_list_pop_head(clean_replicas_from_workers);
 		if (!source_worker) {
 			break;
 		}
@@ -401,7 +410,9 @@ void vine_temp_clean_redundant_replicas(struct vine_manager *q, struct vine_file
 		excess_replicas--;
 	}
 
-	priority_queue_delete(clean_replicas_from_workers);
+	/* the workers are owned by the manager, so only remove them from the list. */
+	skip_list_clear(clean_replicas_from_workers, NULL);
+	skip_list_delete(clean_replicas_from_workers);
 
 	return;
 }
@@ -421,7 +432,8 @@ void vine_temp_shift_disk_load(struct vine_manager *q, struct vine_worker_info *
 
 	char *key;
 	struct vine_worker_info *w = NULL;
-	HASH_TABLE_ITERATE(q->worker_table, key, w)
+	int iteration;
+	HASH_TABLE_ITERATE(q->worker_table, iteration, key, w)
 	{
 		/* skip if the worker cannot participate in peer transfers */
 		if (!worker_can_peer_transfer(w)) {

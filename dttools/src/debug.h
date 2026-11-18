@@ -42,6 +42,25 @@ unless it has the flags D_NOTICE or D_FATAL.  For example, a main program might 
 #include <stdarg.h>
 #include <stdio.h>
 
+/*
+Tells the clang static analyzer (scan-build) specifically that a function
+never returns, on top of (and independently of) the standard noreturn
+attribute below. The analyzer's path-sensitive checkers do not always
+trust a custom noreturn function to end a path, which otherwise produces
+a false-positive null-deref/uninitialized-value/etc finding at every call
+site guarded by fatal() -- one that would need a fresh suppression-file
+entry each time someone adds another fatal() call. See CCTOOLS_ANALYZER_NORETURN
+below on fatal() itself.
+*/
+#if defined(__has_attribute)
+#if __has_attribute(analyzer_noreturn)
+#define CCTOOLS_ANALYZER_NORETURN __attribute__((analyzer_noreturn))
+#endif
+#endif
+#ifndef CCTOOLS_ANALYZER_NORETURN
+#define CCTOOLS_ANALYZER_NORETURN
+#endif
+
 /* priority */
 #define D_INFO     (0LL)     /**< Indicates a message that is of general interest to the user. (the default) */
 #define D_FATAL    (1LL<<0)  /**< Indicates a message that is fatal. */
@@ -169,7 +188,12 @@ Displays a printf-style message, and then forcibly exits the program.
 @param fmt A printf-style formatting string, followed by the necessary arguments.
 */
 
-void fatal(const char *fmt, ...);
+void fatal(const char *fmt, ...)
+#ifndef SWIG
+__attribute__ ((noreturn))
+CCTOOLS_ANALYZER_NORETURN
+#endif
+;
 
 
 /** Emit a notice message.
@@ -263,14 +287,14 @@ void debug_close(void);
 /* LDEBUG likes debug, but also print the code location.
  * NOTE: the caller of this macro must supply at least one argument after the format string.
  */
-#define LDEBUG(fmt, ...) debug(D_DEBUG, "%s:%s:%d[%s]: " fmt, __func__, __FILE__, __LINE__, CCTOOLS_SOURCE, __VA_ARGS__)
-
+#define LDEBUG(fmt, ...) debug(D_DEBUG, "%s:%d[%s]: " fmt, __FILE__, __LINE__, CCTOOLS_SOURCE, __VA_ARGS__)
 
 #define DEBUG_BT_SIZE 100
 
 /* Use offset info (+0x...) with addr2line -f -e [exe or .so] */
 #define debug_backtrace \
-	{ debug(D_ERROR, "%s:%s:%d[%s]", __func__, __FILE__, __LINE__, CCTOOLS_SOURCE); \
+	{ \
+		debug(D_ERROR, "%s:%d", __FILE__, __LINE__); \
 		void *buffer[DEBUG_BT_SIZE]; \
 		size_t nptrs = backtrace(buffer, DEBUG_BT_SIZE); \
 		char **strings = backtrace_symbols(buffer, nptrs); \
@@ -284,11 +308,11 @@ void debug_close(void);
 		free(strings); \
 	} // generate a core if possible
 
-
-#define debug_assert(cond)\
-  if (!(cond)) {\
-    debug(D_ERROR, "Assertion failed: %s", #cond);\
-    debug_backtrace;\
-    abort(); }
+#define debug_assert(cond) \
+	if (!(cond)) { \
+		debug(D_ERROR, "Assertion failed: %s:%d", __FILE__, __LINE__); \
+		debug_backtrace; \
+		abort(); \
+	}
 
 #endif

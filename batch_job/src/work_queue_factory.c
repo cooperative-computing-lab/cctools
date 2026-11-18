@@ -50,7 +50,7 @@ See the file COPYING for details.
 #include <unistd.h>
 #include <signal.h>
 
-#define CCTOOLS_RUNOS_PATH "/afs/crc.nd.edu/group/ccl/software/runos/runos"
+#define CCTOOLS_RUNOS_PATH "/groups/dthain/software/runos/runos"
 
 typedef enum {
 	FORMAT_TABLE,
@@ -103,11 +103,17 @@ static char *batch_submit_options = NULL;
 static const char *password_file = 0;
 char *password;
 
+/* A wrapper command applied to the worker itself. */
 static char *wrapper_command = 0;
 
+/* Additional files required by the worker wrapper. */
 struct list *wrapper_inputs = 0;
 
+/* The executable name of the worker itself. */
 static char *worker_command = 0;
+
+/* A wrapper command to be applied to every task executed. */
+static char *task_wrapper = 0;
 
 static char *runos_os = 0;
 
@@ -307,8 +313,7 @@ static int count_workers_connected( struct list *managers_list )
 		return connected_workers;
 	}
 
-	list_first_item(managers_list);
-	while((j=list_next_item(managers_list))) {
+	LIST_ITERATE(managers_list,j) {
 		const int workers = jx_lookup_integer(j,"workers");
 		connected_workers += workers;
 	}
@@ -330,9 +335,7 @@ static int count_workers_needed( struct list *managers_list, int only_not_runnin
 		return needed_workers;
 	}
 
-	list_first_item(managers_list);
-	while((j=list_next_item(managers_list))) {
-
+	LIST_ITERATE(managers_list,j) {
 		const char *project =jx_lookup_string(j,"project");
 		const char *host =   jx_lookup_string(j,"name");
 		const int  port =    jx_lookup_integer(j,"port");
@@ -341,6 +344,7 @@ static int count_workers_needed( struct list *managers_list, int only_not_runnin
 		const int tw =       jx_lookup_integer(j,"tasks_waiting");
 		const int tl =       jx_lookup_integer(j,"tasks_left");
 		const int protocol = jx_lookup_integer(j,"protocol");
+		const int able =     jx_lookup_integer(j,"workers_able");
 
 		if(protocol!=WORK_QUEUE_PROTOCOL_VERSION) {
 			printf("WARNING: skipping manager %s (%s:%d) with protocol version %d\n",project, host, port, protocol);
@@ -369,6 +373,18 @@ static int count_workers_needed( struct list *managers_list, int only_not_runnin
 
 		if(consider_capacity && capacity > 0) {
 			need = MIN(need, capacity);
+		}
+
+		// If the manager is holding dispatch until a number of workers connect
+		// (tune "wait-for-workers"), ask for at least that many. Not capped by
+		// capacity, since capacity is meaningless before workers connect.
+		// Older managers do not send this field and look up as 0.
+		const int wfw = jx_lookup_integer(j,"wait_for_workers");
+		if(wfw > need) {
+			if (wfw > able) {
+				debug(D_WQ,"%s %s:%d is waiting for %d more worker(s) before dispatching tasks",project,host,port,wfw-able);
+			}
+			need = wfw;
 		}
 
 		debug(D_WQ,"%s %s:%d %s tasks: %d capacity: %d workers needed: %d tasks running: %d",project,host,port,owner,tw+tl+tr,capacity,need,tr);
@@ -422,11 +438,12 @@ to pass to the worker.  The returned string must be freed.
 
 static char * make_features_string( struct hash_table *features_table )
 {
+	int iteration;
 	char *str = strdup("");
 
 	char *key;
 	void *value;
-	HASH_TABLE_ITERATE(features_table,key,value) {
+	HASH_TABLE_ITERATE(features_table, iteration, key, value) {
 		char * newstr = string_format("%s --feature \"%s\"",str,key);
 		free(str);
 		str = newstr;
@@ -446,39 +463,33 @@ static int submit_worker( struct batch_queue *queue )
 		worker = string_format("./%s", worker_command);
 	}
 
-	char *features_string = make_features_string(features_table);
+	/* The basic command differs whether using a project name or simple host:port. */
 	
 	if(using_catalog) {
-		cmd = string_format(
-		"%s -M %s -t %d -C '%s' -d all -o worker.log %s %s %s %s %s %s",
-		worker,
-		submission_regex,
-		worker_timeout,
-		catalog_host,
-		factory_name ? string_format("--from-factory \"%s\"", factory_name) : "",
-		password_file ? "-P pwfile" : "",
-		resource_args ? resource_args : "",
-		manual_ssl_option ? "--ssl" : "",
-		features_string,
-		extra_worker_args ? extra_worker_args : ""
-		);
-	}
-	else {
-		cmd = string_format(
-		"%s %s %d -t %d -C '%s' -d all -o worker.log %s %s %s %s %s",
-		worker,
-		manager_host,
-		manager_port,
-		worker_timeout,
-		catalog_host,
-		password_file ? "-P pwfile" : "",
-		resource_args ? resource_args : "",
-		manual_ssl_option ? "--ssl" : "",
-		features_string,
-		extra_worker_args ? extra_worker_args : ""
-		);
+		cmd = string_format("./%s -M %s", worker, submission_regex);
+	} else {
+		cmd = string_format("./%s %s %d", worker, manager_host, manager_port);
 	}
 
+	/* Add a formatted argument to a string s, reallocating and returning s. */
+#define ADD_ARG2(s,format,value) s = string_combine(s,string_format(format,value))
+#define ADD_ARG1(s,format)       s = string_combine(s,string_format(format))
+
+	/* Add each of the fixed options. */
+	/* Be careful that each format string begins with a space. */
+	ADD_ARG2(cmd," -t %d",worker_timeout);
+	ADD_ARG2(cmd," -C '%s'",catalog_host);
+
+	/* Add each of the optional features. */
+	if(factory_name)	ADD_ARG2(cmd," --from-factory \"%s\"",factory_name);
+	if(password_file)	ADD_ARG1(cmd," -P pwfile");
+	if(resource_args)	ADD_ARG2(cmd," %s",resource_args);
+	if(manual_ssl_option)	ADD_ARG1(cmd," --ssl");
+	if(task_wrapper)        ADD_ARG2(cmd," --task-wrapper \"%s\"",task_wrapper);
+	if(extra_worker_args)	ADD_ARG2(cmd," %s",extra_worker_args);
+
+	char *features_string = make_features_string(features_table);
+	ADD_ARG2(cmd," %s",features_string);
 	free(features_string);
 	
 	if(wrapper_command) {
@@ -519,6 +530,8 @@ static int submit_worker( struct batch_queue *queue )
 	}
 
 	batch_job_add_output_file(task,"output.log",0);
+
+	batch_job_set_envlist(task, batch_env);
 	
 	debug(D_WQ,"submitting worker: %s",cmd);
 
@@ -543,8 +556,7 @@ static void update_blocked_hosts( struct batch_queue *queue, struct list *manage
 	buffer_init(&b);
 
 	const char *sep = "";
-	list_first_item(managers_list);
-	while((j=list_next_item(managers_list))) {
+	LIST_ITERATE(managers_list,j) {
 		struct jx *blocked = jx_lookup(j,"workers_blocked");
 
 		if(!blocked) {
@@ -609,13 +621,13 @@ void wait_all_workers( struct batch_queue *queue, struct itable *job_table, time
 
 void remove_all_workers( struct batch_queue *queue, struct itable *job_table, batch_queue_remove_mode_t mode )
 {
+	int iteration;
 	uint64_t jobid;
 	void *value;
 
 	debug(D_WQ,"removing all workers...");
 
-	itable_firstkey(job_table);
-	while(itable_nextkey(job_table,&jobid,&value)) {
+		ITABLE_ITERATE(job_table, iteration, jobid, value) {
 		debug(D_WQ,"removing worker job %"PRId64,jobid);
 		batch_queue_remove(queue,jobid,mode);
 	}
@@ -740,9 +752,7 @@ struct jx *factory_to_jx(struct list *managers, struct list *foremen, int submit
 	if(managers && list_size(managers) > 0)
 	{
 		struct jx *m;
-		list_first_item(managers);
-		while((m = list_next_item(managers)))
-		{
+		LIST_ITERATE(managers,m) {
 			jx_array_append(ms, manager_to_jx(m));
 		}
 	}
@@ -753,11 +763,8 @@ struct jx *factory_to_jx(struct list *managers, struct list *foremen, int submit
 	if(foremen && list_size(foremen) > 0)
 	{
 		struct jx *f;
-		list_first_item(foremen);
-		while((f = list_next_item(foremen)))
-		{
+		LIST_ITERATE(foremen,f) {
 			jx_array_append(fs, manager_to_jx(f));
-
 		}
 	}
 	jx_insert(j, jx_string("foremen"), fs);
@@ -1236,8 +1243,9 @@ static void show_help(const char *cmd)
 	printf(" %-30s Environment variable to add to worker.\n", "--env=<variable=value>");
 	printf(" %-30s Extra options to give to worker.\n", "-E,--extra-options=<options>");
 	printf(" %-30s Alternate binary instead of work_queue_worker.\n", "--worker-binary=<file>");
-	printf(" %-30s Wrap factory with this command prefix.\n","--wrapper");
-	printf(" %-30s Add this input file needed by the wrapper.\n","--wrapper-input");
+	printf(" %-30s Wrap worker with this command prefix.\n","--wrapper");
+	printf(" %-30s Wrap tasks with this command prefix.\n","--task-wrapper");
+	printf(" %-30s Add this input file needed by a task or worker wrapper.\n","--wrapper-input");
 	printf(" %-30s Use runos tool to create environment (ND only).\n","--runos=<img>");
 	printf(" %-30s Run each worker inside this poncho environment.\n","--poncho-env=<file.tar.gz>");
 
@@ -1266,6 +1274,7 @@ enum{   LONG_OPT_CORES = 255,
 		LONG_OPT_WRAPPER, 
 		LONG_OPT_WRAPPER_INPUT,
 		LONG_OPT_WORKER_BINARY,
+		LONG_OPT_TASK_WRAPPER,
 		LONG_OPT_K8S_IMAGE,
 		LONG_OPT_K8S_WORKER_IMAGE,
 		LONG_OPT_CATALOG,
@@ -1317,6 +1326,7 @@ static const struct option long_options[] = {
 	{"runos", required_argument, 0, LONG_OPT_RUN_OS},
 	{"scratch-dir", required_argument, 0, 'S' },
 	{"tasks-per-worker", required_argument, 0, LONG_OPT_TASKS_PER_WORKER},
+	{"task-wrapper", required_argument, 0, LONG_OPT_TASK_WRAPPER},
 	{"timeout", required_argument, 0, 't'},
 	{"version", no_argument, 0, 'v'},
 	{"worker-binary", required_argument, 0, LONG_OPT_WORKER_BINARY},
@@ -1468,6 +1478,9 @@ int main(int argc, char *argv[])
 				break;
 			case LONG_OPT_WORKER_BINARY:
 				worker_command = xxstrdup(optarg);
+				break;
+			case LONG_OPT_TASK_WRAPPER:
+				task_wrapper = xxstrdup(optarg);
 				break;
 			case 'P':
 				password_file = optarg;
@@ -1656,8 +1669,7 @@ int main(int argc, char *argv[])
 	}
 		
 	const char *item = NULL;
-	list_first_item(wrapper_inputs);
-	while((item = list_next_item(wrapper_inputs))) {
+	LIST_ITERATE(wrapper_inputs,item) {
 		char *file_at_scratch_dir = string_format("%s/%s", scratch_dir, path_basename(item));
 		int64_t result = copy_file_to_file(item, file_at_scratch_dir);
 		if(result < 0) {

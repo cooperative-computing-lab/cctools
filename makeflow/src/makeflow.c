@@ -403,18 +403,17 @@ Abort the dag by removing all batch jobs from all queues.
 
 static void makeflow_abort_all(struct dag *d)
 {
+	int iteration;
 	uint64_t jobid;
 	struct dag_node *n;
 
 	printf("got abort signal...\n");
 
-	itable_firstkey(d->local_job_table);
-	while(itable_nextkey(d->local_job_table, &jobid, (void **) &n)) {
+	ITABLE_ITERATE(d->local_job_table, iteration, jobid, n) {
 		makeflow_abort_job(d,n,local_queue,jobid,"local");
 	}
 
-	itable_firstkey(d->remote_job_table);
-	while(itable_nextkey(d->remote_job_table, &jobid, (void **) &n)) {
+	ITABLE_ITERATE(d->remote_job_table, iteration, jobid, n) {
 		makeflow_abort_job(d,n,remote_queue,jobid,"remote");
 	}
 }
@@ -941,6 +940,7 @@ a prior run that was logged.
 
 static int makeflow_check_files(struct dag *d)
 {
+	int iteration;
 	struct stat buf;
 	struct dag_file *f;
 	char *name;
@@ -949,8 +949,7 @@ static int makeflow_check_files(struct dag *d)
 
 	printf("checking files for unexpected changes...  (use --skip-file-check to skip this step)\n");
 
-	hash_table_firstkey(d->files);
-	while(hash_table_nextkey(d->files, &name, (void **) &f)) {
+	HASH_TABLE_ITERATE(d->files, iteration, name, f) {
 
 		/* Skip special files that are not connected to the DAG nodes. */
 		if(!f->created_by && !list_size(f->needed_by)) continue;
@@ -1241,6 +1240,7 @@ static void show_help_run(const char *cmd)
 	printf(" -N,--project-name=<project>    Set the Work Queue project name.\n");
 	printf("    --cache-mode=never|workflow|forever   Change caching control.\n");
 	printf(" -F,--fast-abort=<#>            Set the Work Queue fast abort multiplier.\n");
+	printf("    --wait-for-workers=<#>      Do not dispatch tasks until <#> workers connect.\n");
 	printf(" -t,--keepalive-timeout=<#>     Work Queue keepalive timeout. (default: 30s)\n");
 	printf(" -u,--keepalive-interval=<#>    Work Queue keepalive interval. (default: 120s)\n");
 	printf(" -W,--schedule=<mode>           Work Queue scheduling algor. (time|files|fcfs)\n");
@@ -1570,6 +1570,7 @@ int main(int argc, char *argv[])
 		{"keepalive-timeout", required_argument, 0, 't'},
 		{"schedule", required_argument, 0, 'W'},
 		{"wait-queue-size", required_argument, 0, LONG_OPT_WAIT_FOR_WORKERS}, // Not advertised
+		{"wait-for-workers", required_argument, 0, LONG_OPT_WAIT_FOR_WORKERS},
 		{"wrapper", required_argument, 0, LONG_OPT_WRAPPER},
 		{"wrapper-input", required_argument, 0, LONG_OPT_WRAPPER_INPUT},
 		{"wrapper-output", required_argument, 0, LONG_OPT_WRAPPER_OUTPUT},
@@ -2325,6 +2326,7 @@ int main(int argc, char *argv[])
 	batch_queue_set_option(remote_queue, "keepalive-timeout", option_keepalive_timeout);
 	batch_queue_set_option(remote_queue, "caching", cache_mode);
 	batch_queue_set_option(remote_queue, "wait-queue-size", option_wait_queue_size);
+	batch_queue_set_option(remote_queue, "wait-for-workers", option_wait_queue_size);
 	batch_queue_set_option(remote_queue, "amazon-config", amazon_config);
 	batch_queue_set_option(remote_queue, "working-dir", working_dir);
 	batch_queue_set_option(remote_queue, "manager-preferred-connection", option_preferred_connection);
@@ -2538,11 +2540,16 @@ EXIT_WITH_FAILURE:
 	}
 
 	/* delete all files. We do this here are some of these files may be created in clean mode. */
-	{
+	/* d can be NULL here: EXIT_WITH_FAILURE is reachable before the dag is
+	created (e.g. a hook registration conflict like combining --umbrella-spec
+	with --enforcement). Every other d-using call in this cleanup path
+	(makeflow_log_aborted_event/makeflow_log_failed_event, etc.) already
+	guards against that; this block didn't. */
+	if(d) {
+		int iteration;
 		struct dag_node *n;
 		uint64_t key;
-		itable_firstkey(d->node_table);
-		while(itable_nextkey(d->node_table, &key, (void **) &n)) {
+		ITABLE_ITERATE(d->node_table, iteration, key, n) {
 			if(n->workflow_args) {
 				debug(D_MAKEFLOW_RUN, "deleting tmp file: %s\n", dag_node_nested_workflow_filename(n, "args"));
 				unlink(dag_node_nested_workflow_filename(n, "args"));

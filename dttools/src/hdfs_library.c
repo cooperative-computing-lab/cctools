@@ -155,7 +155,11 @@ struct hdfs_library *hdfs_library_open()
 {
 	struct hdfs_library *hs;
 
-	hs = malloc(sizeof(*hs));
+	/* Zero-initialized: if load_lib() below fails before ever setting
+	libjvm_handle/libhdfs_handle (e.g. JAVA_HOME or HADOOP_HOME unset), the
+	failure cleanup path in hdfs_library_close() reads those two fields as
+	dlclose() branch conditions -- they must not be left uninitialized. */
+	hs = calloc(1, sizeof(*hs));
 	if (hs == NULL)
 		return 0;
 

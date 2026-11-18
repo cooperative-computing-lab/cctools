@@ -91,7 +91,7 @@ Add a file to the cache manager (already created in the proper place) and note i
 int work_queue_cache_addfile( struct work_queue_cache *c, int64_t size, const char *cachename )
 {
 	struct cache_file *f = cache_file_create(WORK_QUEUE_CACHE_FILE,"manager",size,size,0777,1);
-	hash_table_insert(c->table,cachename,f);
+	if(!hash_table_insert(c->table,cachename,f)) cache_file_delete(f);
 	return 1;
 }
 
@@ -103,7 +103,7 @@ This entry will be materialized later in work_queue_cache_ensure.
 int work_queue_cache_queue( struct work_queue_cache *c, work_queue_cache_type_t type, const char *source, const char *cachename, int64_t size, int mode )
 {
 	struct cache_file *f = cache_file_create(type,source,size,0,mode,0);
-	hash_table_insert(c->table,cachename,f);
+	if(!hash_table_insert(c->table,cachename,f)) cache_file_delete(f);
 	return 1;
 }
 

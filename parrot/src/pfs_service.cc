@@ -362,8 +362,9 @@ pfs_service * pfs_service_lookup( const char *name )
 	extern struct hash_table *available_services;
 	char *key;
 	void *value;
-	hash_table_firstkey(available_services);
-	while(hash_table_nextkey(available_services, &key, &value)) {
+	int iteration;
+
+	HASH_TABLE_ITERATE(available_services, iteration, key, value) {
 		if(!strcmp(name, key)) {
 			return (pfs_service *) value;
 		}

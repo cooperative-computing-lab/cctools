@@ -48,8 +48,8 @@ int main(int argc, char **argv) {
 			return 1;
 		}
 
-		hash_table_fromkey(h, key_start);
-		if(!hash_table_nextkey(h, (char **)&name, (void **)&box)) {
+		int iteration = hash_table_fromkey(h, key_start);
+		if(!hash_table_nextkey(h, iteration, (char **)&name, (void **)&box)) {
 			return 1;
 		}
 
@@ -64,7 +64,7 @@ int main(int argc, char **argv) {
 		int current_sum = 0;
 		int iter_control, iter_count_var;
 
-		HASH_TABLE_ITERATE_FROM_KEY( h, iter_control, iter_count_var, key_start, name, box ) {
+		HASH_TABLE_ITERATE_FROM_KEY( h, iteration, iter_control, iter_count_var, key_start, name, box ) {
 			current_sum += box->value;
 			fprintf(stdout, "partial sum from %s: %d, added %s %d\n", key_start, current_sum, name, box->value);
 		}

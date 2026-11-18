@@ -63,7 +63,7 @@ vine_cache_status_t vine_cache_ensure( struct vine_cache *c, const char *cachena
 int vine_cache_remove( struct vine_cache *c, const char *cachename, struct link *manager );
 int vine_cache_contains( struct vine_cache *c, const char *cachename );
 
-int vine_cache_check_files( struct vine_cache *c, struct link *manager );
+int vine_cache_check_xfer_files( struct vine_cache *c, struct link *manager );
 int vine_cache_start_transfers(struct vine_cache *c);
 
 #endif

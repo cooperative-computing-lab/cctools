@@ -263,7 +263,7 @@ void work_queue_coprocess_measure_resources(struct work_queue_coprocess *coproce
 
 		debug(D_WQ, "Measuring resources of coprocess with pid %d\n", curr_coprocess->pid);
 		debug(D_WQ, "cores: %lf, memory: %lf, disk: %lf, gpus: %lf\n", resources->cores, resources->memory + resources->swap_memory, resources->disk, resources->gpus);
-		debug(D_WQ, "Max resources available to coprocess:\ncores: %"PRId64 " memory: %"PRId64 " disk: %"PRId64 " gpus: %"PRId64 "\n", curr_coprocess->coprocess_resources->cores.total, curr_coprocess->coprocess_resources->memory.total, curr_coprocess->coprocess_resources->disk.total, curr_coprocess->coprocess_resources->gpus.total);
+		debug(D_WQ, "Max resources available to coprocess:\ncores: %lf memory: %lf disk: %lf gpus: %lf\n", curr_coprocess->coprocess_resources->cores.total, curr_coprocess->coprocess_resources->memory.total, curr_coprocess->coprocess_resources->disk.total, curr_coprocess->coprocess_resources->gpus.total);
 		curr_coprocess->coprocess_resources->cores.inuse = resources->cores;
 		curr_coprocess->coprocess_resources->memory.inuse = resources->memory + resources->swap_memory;
 		curr_coprocess->coprocess_resources->disk.inuse = resources->disk;

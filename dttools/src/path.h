@@ -35,7 +35,23 @@ void path_split_multi (const char *input, char *first, char *rest);
 
 int path_find (buffer_t *B, const char *dir, const char *pattern, int recursive);
 
+/** Check whether path resolves within the tree below dir.
+ * path is collapsed first, so "." and ".." cannot walk out of dir.
+ * Symlinks are resolved in every component except the last one.
+ * dir is assumed to be collapsed already.
+ * @param path The path to check. It need not exist.
+ * @param dir The directory that should contain path.
+ * @return 1 if path is strictly below dir, 0 otherwise.
+ */
 int path_within_dir( const char *path, const char *dir );
+
+/** Check whether dir is a leading component of path, without resolving anything.
+ * @param path The path to check.
+ * @param dir The directory prefix. A trailing slash is ignored.
+ * @param allow_equal If non-zero, path equal to dir also counts.
+ * @return 1 if path is dir (when allow_equal is set) or below it, 0 otherwise.
+ */
+int path_has_dir_prefix(const char *path, const char *dir, int allow_equal);
 
 
 /*

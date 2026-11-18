@@ -146,6 +146,9 @@ static char *cluster_set_resource_string(struct batch_queue *q, const struct rms
 			// expected in minutes, not seconds
 			buffer_printf(&cluster_resources, " --time=%.0f", DIV_INT_ROUND_UP(resources->wall_time, 60));
 		}
+		if (resources->gpus > 0) {
+			buffer_printf(&cluster_resources, " --gpus=%.0f", DIV_INT_ROUND_UP(resources->gpus, 1));
+		}
 
 		/* The value of max_concurrent_processes is set by the .MAKEFLOW MPI_PROCESSES.
 		 * If set, the number of cores should be divisible by max_concurrent_processes. */
@@ -326,9 +329,10 @@ static batch_queue_id_t batch_queue_cluster_wait(struct batch_queue *q, struct b
 	int t, c;
 
 	while (1) {
+		int iteration;
 		UINT64_T ujobid;
-		itable_firstkey(q->job_table);
-		while (itable_nextkey(q->job_table, &ujobid, (void **)&info)) {
+		ITABLE_ITERATE(q->job_table, iteration, ujobid, info)
+		{
 			jobid = ujobid;
 			char *statusfile = string_format("%s.status.%" PRIbjid, cluster_name, jobid);
 			FILE *file = fopen(statusfile, "r");

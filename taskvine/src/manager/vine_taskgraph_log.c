@@ -15,6 +15,10 @@ void vine_taskgraph_log_write_header(struct vine_manager *q)
 
 void vine_taskgraph_log_write_task(struct vine_manager *q, struct vine_task *t)
 {
+	if (!q->graph_logfile) {
+		return;
+	}
+
 	if (!t)
 		return;
 
@@ -48,6 +52,10 @@ void vine_taskgraph_log_write_task(struct vine_manager *q, struct vine_task *t)
 
 void vine_taskgraph_log_write_mini_task(struct vine_manager *q, struct vine_task *t, const char *task_name, const char *output_name)
 {
+	if (!q->graph_logfile) {
+		return;
+	}
+
 	if (!t)
 		return;
 
@@ -78,6 +86,10 @@ void vine_taskgraph_log_write_mini_task(struct vine_manager *q, struct vine_task
 
 void vine_taskgraph_log_write_file(struct vine_manager *q, struct vine_file *f)
 {
+	if (!q->graph_logfile) {
+		return;
+	}
+
 	if (!f)
 		return;
 
@@ -89,5 +101,9 @@ void vine_taskgraph_log_write_file(struct vine_manager *q, struct vine_file *f)
 
 void vine_taskgraph_log_write_footer(struct vine_manager *q)
 {
+	if (!q->graph_logfile) {
+		return;
+	}
+
 	fprintf(q->graph_logfile, "# end\n");
 }

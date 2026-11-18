@@ -130,7 +130,10 @@ static vine_url_cache_t get_url_properties(const char *url, char *tag)
 		ssize_t totalsize;
 		char *hash = vine_checksum_any(&url[7], &totalsize);
 		if (hash) {
-			strcpy(tag, hash);
+			/* snprintf, not strcpy: tag is a bare char* here with no size
+			 * of its own; bound the copy to what the sole caller of
+			 * get_url_properties actually allocated for it. */
+			snprintf(tag, VINE_LINE_MAX, "%s", hash);
 			free(hash);
 			return VINE_FOUND_MD5;
 		} else {
@@ -289,6 +292,7 @@ char *vine_meta_name(const struct vine_file *f, ssize_t *totalsize)
 	char *meta = string_format("%s-%" PRIu64 "-%s", f->source, info.st_size, mtime);
 	char *metahash = md5_of_string(meta);
 	char *name = string_format("file-meta-%s", metahash);
+	*totalsize = info.st_size;
 
 	free(metahash);
 	free(meta);
@@ -300,7 +304,7 @@ Generates a random cached name of a file object.
 Returns a string that must be freed with free().
 */
 
-char *vine_random_name(const struct vine_file *f, ssize_t *totalsize)
+char *vine_random_name(const struct vine_file *f)
 {
 	char *name;
 	char random[17];
@@ -349,7 +353,7 @@ char *vine_cached_name(const struct vine_file *f, ssize_t *totalsize)
 			free(hash);
 		} else {
 			/* A pending file gets a random name. */
-			name = vine_random_name(f, totalsize);
+			name = vine_random_name(f);
 		}
 		break;
 	case VINE_MINI_TASK:
@@ -367,7 +371,7 @@ char *vine_cached_name(const struct vine_file *f, ssize_t *totalsize)
 	case VINE_TEMP:
 		/* An empty temporary file gets a random name. */
 		/* Until we later have a better name for it.*/
-		name = vine_random_name(f, totalsize);
+		name = vine_random_name(f);
 		break;
 	case VINE_BUFFER:
 		if (f->data) {
@@ -378,7 +382,7 @@ char *vine_cached_name(const struct vine_file *f, ssize_t *totalsize)
 		} else {
 			/* If the buffer doesn't exist yet, then give a random name. */
 			/* Until we later have a better name for it.*/
-			name = vine_random_name(f, totalsize);
+			name = vine_random_name(f);
 		}
 		break;
 	default:
