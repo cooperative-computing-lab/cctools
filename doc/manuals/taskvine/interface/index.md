@@ -1,0 +1,741 @@
+## Python Programming Models
+
+When writing a manager in Python, you have access to several types of tasks
+that wrap around the standard task abstraction:
+
+### Python Tasks
+
+A `PythonTask` is an extension of a standard task.
+It is not defined with a command line to execute,
+but with a Python function and its arguments, like this:
+
+=== "Python"
+    ```python
+    def my_sum(x, y):
+        return x+y
+
+    # task to execute x = my_sum(1, 2)
+    t = vine.PythonTask(my_sum, 1, 2)
+    ```
+
+A PythonTask is handled in the same way as a standard task,
+except that its output `t.output` is simply the Python return
+value of the function.  If the function should throw an exception,
+then the output will be the exception object.
+
+You can examine the result of a PythonTask like this:
+
+=== "Python"
+    ```
+    while not m.empty():
+        t = m.wait(5)
+        if t:
+            x = t.output
+            if isinstance(x, Exception):
+                print("Exception: {}".format(x))
+            else:
+                print("Result: {}".format(x))
+    ```
+
+A `PythonTask` is derived from `Task` and so all other methods for
+controlling scheduling, managing resources, and setting performance options
+all apply to `PythonTask` as well.
+
+When running a Python function remotely, it is assumed that the Python interpreter
+and libraries available at the worker correspond to the appropriate python environment for the task.
+If this is not the case, an environment file can be provided with t.set_environment:
+
+=== "Python"
+    ```python
+    t = vine.PythonTask(my_sum, 1, 2)
+    t.set_environment("my-env.tar.gz")
+    ```
+
+The file `my-env.tar.gz` is a
+[conda](https://docs.conda.io/projects/conda/en/latest/user-guide/install/linux.html)
+environment created with [conda-pack](https://conda.github.io/conda-pack/).  A
+minimal environment can be created a follows:
+
+```sh
+conda create -y -p my-env python=3.8 cloudpickle conda
+conda install -y -p my-env -c conda-forge conda-pack
+# conda install -y -p my-env pip and conda install other modules, etc.
+conda run -p my-env conda-pack
+```
+
+#### Using SciUnit to Discover Python Dependencies
+
+If you're unsure which libraries your python tasks require, you can use
+**[SciUnit](https://github.com/depaul-dice/sciunit/wiki)** to detect them
+automatically:
+
+**Example: Generating a `requirements.txt` with SciUnit**
+
+To generate the `requirements.txt` file, use SciUnit to capture dependencies:
+```sh
+sciunit exec python <python_script>
+# SciUnit returns an EID (Execution ID)
+sciunit export <eid>
+# SciUnit creates requirements.txt in the current directory
+```
+
+### Serverless Computing
+
+TaskVine offers a serverless computing model which is
+especially appropriate for invoking functions that have
+a relatively short execution time (10s or less) and have
+substantial startup time due to large numbers of libraries
+or dependent data.
+
+In this model, you first define and install a `LibraryTask`
+that defines a function, and then invoke `FunctionCall` tasks
+that invoke the library by name.
+
+Suppose your main program has two functions `my_sum` and `my_mul`.
+Invoke `create_library_from_functions` to package up these
+function definitions into a library task `libtask`
+
+=== "Python"
+    ```python
+    def my_sum(x, y):
+        return x+y
+
+    def my_mul(x, y):
+        return x*y
+
+    libtask = m.create_library_from_functions("my_library", my_sum, my_mul)
+    ```
+
+We strongly recommend to specify the modules the function needs inside the function itself. This ensures that the correct modules and their aliases will be available when the functions are executed in isolation at the worker:
+
+You can certainly embed `import` statements within the function and install any necessary packages:
+
+=== "Python"
+    ```python
+    def divide(dividend, divisor):
+        import math
+        return dividend / math.sqrt(divisor)
+
+    libtask = m.create_library_from_functions("my_library", divide)
+    ```
+
+If the overhead of importing modules per function is noticeable, modules can be optionally imported as a common preamble to the function executions. Common modules can be specified with the `hoisting_modules` argument to `create_library_from_functions`. This reduces the overhead by eliminating redundant imports:
+
+
+=== "Python"
+    ```python
+    import numpy
+    import math
+
+    hoisting_modules = [numpy, math]
+    ```
+
+`hoisting_modules` only accepts modules as arguments (e.g. it can't be used to import functions, or select particular names with `from ... import ...` statements. Such statements should be made inside functions after specifying the modules with `hoisting_modules`.
+
+=== "Python"
+    ```python
+    def cube(x):
+        # whenever using FromImport statments, put them inside of functions
+        from random import uniform
+        from time import sleep as time_sleep
+
+        random_delay = uniform(0.00001, 0.0001)
+        time_sleep(random_delay)
+
+        return math.pow(x, 3)
+    ```
+
+
+After installing the packages and functions, you can optionally specify the number of functions the library can run concurrently by setting the number of function slots.  (If unset, TaskVine will assume the library can run one function per core available.)
+
+=== "Python"
+    ```python
+    libtask.set_function_slots(4)   # maximum 4 concurrent functions
+    ```
+
+Once complete, the library task must be `installed` in the system:
+
+=== "Python"
+    ```python
+    m.install_library(t)
+    ```
+
+This causes the library task to be dispatched and started at
+available workers, where it remains running.  Immediately after
+installing the library, you may submit `FunctionCall` tasks
+that invoke the library and functions by name:
+
+=== "Python"
+    ```python
+    t = vine.FunctionCall("my_library", "my_mul", 20, 30);
+    t.set_cores(1)
+    t.set_memory(100)
+    t.set_disk(100)
+    m.submit(t)
+    ```
+
+The function invocation will be dispatched to available workers,
+and when it is returned, the result is present as `t.output`:
+
+=== "Python"
+    ```python
+    t = m.wait(5)
+    if t:
+        print(t.output)
+    ```
+
+Note that both library tasks and function invocations consume
+resources at the worker, and the number of running tasks will be
+constrained by the available resources in the same way as normal tasks.
+
+### Stateful Serverless Computing
+A function typically sets up its states (e.g., load modules/packages, build internal models or states) before executing its computation. With advanced serverless computing in TaskVine, you can set up a shared state between function invocations so the cost of setting up states doesn't have to be paid for every invocation, but instead is paid once and shared many times. TaskVine supports this technique as demonstrated via the below example.
+
+Assume that you program has two functions `my_sum` and `my_mul`, and they both use `base` to set up a common value in their computations.
+
+=== "Python"
+    ```python
+    def base(x, y=1):
+        return x**y
+
+    A = 2
+    B = 3
+
+    def my_sum(x, y):
+        base_val = base(A, B)
+        return base_val + x+y
+
+    def my_mul(x, y):
+        base_val = base(A, B)
+        return base_val + x*y
+    ```
+
+With this setup, `base(A, B)` has to be called repeatedly for every function invocation of `my_sum` and `my_mul`. What you want instead is to have the value of `base(A, B)` created and computed once and stored in a library. `my_sum` and `my_mul` thus only have to load such value, instead of computing the value, from a library's state, as follows.
+
+=== "Python"
+    ```python
+    from ndcctools.taskvine.utils import load_variable_from_library
+    def base(x, y=1):
+        return {'base_val': x**y}
+
+    A = 2
+    B = 3
+
+    def my_sum(x, y):
+        base_val = load_variable_from_library('base_val')
+        return base_val + x+y
+
+    def my_mul(x, y):
+        base_val = load_variable_from_library('base_val')
+        return base_val + x*y
+
+    libtask = m.create_library_from_functions("my_library", my_sum, my_mul, library_context_info=[base, [A], {'y': B})
+    m.install(libtask)
+    # application continues as usual with submitting FunctionCalls and waiting for results.
+    ...
+    ```
+
+This technique enables maximum sharing between invocations of functions that share some common states, and between invocations of the same function in a library. This is especially helpful in ML/AI workloads where one has to build an ML/AI model on a remote node to best configure it against the remote node's local resources (e.g., GPU). Thus, instead of loading and creating a model for every invocation:
+
+=== "Python"
+    ```python
+    def infer(image):
+        # load model parameters
+        ...
+        # build model
+        model = tf.ResNet50(...)
+        # load model in GPU
+        model.to_gpu(1)
+        # execute an inference
+        return model.infer(image)
+    ```
+
+One can do this to have the model created and loaded in a GPU once and separate the model creation from the actual inference:
+
+=== "Python"
+    ```python
+    from ndcctools.taskvine.utils import load_variable_from_library
+    def model_setup():
+        # load model parameters
+        ...
+        # build model
+        model = tf.ResNet50(...)
+        # load model in GPU
+        model.to_gpu(1)
+        return {'model': model}
+
+    def infer(image):
+        model = load_variable_from_library('model')
+        # execute an inference
+        return model.infer(image)
+
+    libtask = m.create_library_from_functions('infer_library',
+                                              infer,
+                                              library_context_info=[model_setup, [], {})
+    m.install(libtask)
+
+    # application continues as usual with submitting FunctionCalls and waiting for results.
+    ...
+    ```
+
+
+
+### Futures
+
+TaskVine provides a futures executor model which is a subclass
+of Python's concurrent futures executor. A function along with its
+arguments are submitted to the executor to be executed. A future is
+returned whose value will be resolved at some later point.
+
+To create a future, a `FuturesExecutor` object must first be created. Tasks can
+then be submitted through the `submit` function. This will return
+a Future object. The result of the task can retrieved by calling `future.result()`
+
+=== "Python"
+    ```python
+    import ndcctools.taskvine as vine
+
+    def my_sum(x, y):
+        return x + y
+
+    m = vine.FuturesExecutor(manager_name='my_manager')
+
+    a = m.submit(my_sum, 3, 4)
+    b = m.submit(my_sum, 5, 2)
+    c = m.submit(my_sum, a, b)  # note that the futures a and b are
+                                # passed as any other argument.
+
+    print(c.result())
+    ```
+
+If the tasks need to be configured in some way, for example to specify maximum
+resources allowed, the method `future_task` returns a `FuturePythonTask` that
+can be tailored as any other task:
+
+
+=== "Python"
+    ```python
+    import ndcctools.taskvine as vine
+
+    def my_sum(x, y):
+        return x + y
+
+    m = vine.FuturesExecutor(manager_name='my_manager')
+
+    t = m.future_task(my_sum, 3, 4)
+    t.set_cores(1)
+
+    f = m.submit(t)
+
+    print(f.result())
+    ```
+
+Additionally, the executor can use the VineFactory to submit TaskVine workers.
+Specifications for the workers can be provided via the `opts` keyword argument when creating to executor.
+
+=== "Python"
+    ```python
+    import ndcctools.taskvine as vine
+
+    def my_sum(x, y):
+        return x + y
+
+    opts = {"memory": 8000, "disk":8000, "cores":8, "min-workers": 5}
+    m = vine.FuturesExecutor(manager_name='my_manager', batch_type="condor", opts=opts)
+
+    t = m.future_task(my_sum, 3, 4)
+    t.set_cores(1)
+
+    f = m.submit(t)
+
+    print(f.result())
+    ```
+
+Instead of tasks, the futures may also executed using [function calls](#serverless-computing) with the `future_funcall` method:
+
+=== "Python"
+    ```python
+    import ndcctools.taskvine as vine
+
+    def my_sum(x, y):
+        return x + y
+
+    m = vine.FuturesExecutor(manager_name='my_manager')
+
+    libtask = m.create_library_from_functions('test-library', my_sum)
+    m.install_library(libtask)
+
+    t = m.future_funcall('test-library', 'my_sum', 7, 4)
+
+    a = m.submit(t)
+
+    print(a.result())
+    ```
+
+
+
+### Functional Abstractions
+
+The TaskVine **map* abstraction works similar to python map, as it applies a
+a function to every element in a list. This function works by taking in a chunk_size,
+which is the size of an iterable to send to a worker. The worker than maps the given
+function over the iterable and returns it. All the results are then combined from the
+workers and returned. The size of the chunk depends on the cost of the function.
+If the function is very cheap, then sending a larger chunk_size is better. If the
+function is expensive, then smaller is better. If an invalid operation happens,
+the error will appear in the results.
+
+```python
+def fn(a):
+    return a*a
+
+m.map(fn, arry, chunk_size)
+```
+
+The TaskVine **pair** function computes all the pairs of 2 sequences, and then uses
+them as inputs of a given function. The pairs are generated locally using itertools,
+and then based on the given chunk_size, are sent out to a worker as an iterable of pairs.
+The given function must accept an iterable, as the pair will be sent to the function as
+a tuple. The worker will then return the results, and each result from each worker will be
+combined locally. Again, cheaper functions work better with larger chunk_sizes,
+more expensive functions work better with smaller ones. Errors will be placed in results.
+
+```python
+def fn(pair):
+    return pair[0] * pair[1]
+
+m.pair(fn, seq1, seq2, chunk_size)
+```
+
+The **treeReduce** function combines an array using a given function by
+breaking up the array into chunk_sized chunks, computing the results, and returning
+the results to a new array. It then does the same process on the new array until there
+only one element left and then returns it. The given function must accept an iterable,
+and must be an associative function, or else the same result cannot be guaranteed for
+different chunk sizes. Again, cheaper functions work better with larger chunk_sizes,
+more expensive functions work better with smaller ones. Errors will be placed in results.
+Also, the minimum chunk size is 2, as going 1 element at time would not reduce the array
+
+```python
+def fn(seq):
+    return max(seq)
+
+m.treeReduce(fn, arry, chunk_size)
+```
+
+Below is an example of all three abstractions, and their expected output:
+
+```python
+# abstractions.py
+
+import ndcctools.taskvine as vine
+
+def main():
+    # Set up queue
+    q = vine.Manager(port=9123)
+
+    # map - similar to Python's own map function, but uses a taskvine worker
+    # to complete computation. Returns sequence with the results from the given function
+    # [result] = q.map(func, sequence)
+    # Example: (returns [1, 4, 9, 16])
+    results = q.map(lambda x: x*x, [1, 2, 3, 4])
+    print(results)
+
+    # pair - similar to map function, but uses the function for every pair between
+    # the two sequences. Returns sequence of results of each pair.
+    # [result] = q.pair(func, sequence1, sequence2)
+    # Example: (returns [1, 2, 3, 4, 2, 4, 6, 8, 3, 6, 9, 12, 4, 8, 12, 16])
+    results = q.pair(lambda x, y: x*y, [1, 2, 3, 4], [1, 2, 3, 4])
+    print(results)
+
+    # tree_reduce - combines pairs of values using a given function, and then returns
+    # to a single final number after reducing the sequence.
+    # result = q.tree_reduce(func, sequence)
+    # Example (even): (returns 24)
+    results = q.tree_reduce(lambda x, y: x*y, [1, 2, 3, 4])
+    print(results)
+
+    # Example (odd): (returns 120)
+    results = q.tree_reduce(lambda x, y: x*y, [1, 2, 3, 4, 5])
+    print(results)
+
+
+if __name__ == "__main__":
+    main()
+```
+
+Run:
+```
+python abstractions.py
+```
+
+Expected output:
+```
+Map: [2, 4, 6, 8]
+Pair: [2, 4, 6, 8, 4, 8, 12, 16, 6, 12, 18, 24, 8, 18, 24, 32]
+Tree: 8
+```
+
+
+### VineReduce
+
+VineReduce is a Python package, built on TaskVine, for applications that run
+the same function on every entry of a large dataset, and then add the outputs
+together into a single result. A typical case is a high energy physics analysis
+that fills histograms from millions of collision events.
+
+You describe the data as one or more named datasets, where each dataset is a
+list of files along with the number of entries in each file. VineReduce cuts
+each file into chunks of entries, runs a **processor** function on each chunk
+as a TaskVine task, and then runs **reducer** tasks that combine the partial
+results, until there is one final result for each processor and dataset.
+Reductions start as soon as there are partial results to combine, rather than
+after all the chunks are done, and partial results stay at the workers as
+temporary files until they are combined. By default, only final results are
+brought back to the manager.
+
+VineReduce is not part of `ndcctools`. Install it with `pip` in the same
+environment as `ndcctools`:
+
+```sh
+conda install -c conda-forge ndcctools
+pip install vine-reduce
+```
+
+VineReduce needs Python 3.12 or newer. At the moment, `pip install vine-reduce`
+also installs coffea, uproot, and other high energy physics packages, even if
+your application does not use them.
+
+The following example counts the words in four books from Project Gutenberg.
+Each author is a dataset, each book is a file, and each line of a book is an
+entry:
+
+```python
+--8<-- "taskvine/interface/vine_reduce_example.py"
+```
+
+The `input` argument describes the datasets with a dictionary of the form
+`{name: {"metadata": {...}, "files": {path: entries}}}`. VineReduce uses the
+number of entries to cut the files into chunks of `chunksize` entries, without
+opening the files. A chunk is simply the path of a file and a range of
+entries, from `chunk.start` up to (but not including) `chunk.stop`.
+
+The functions `read_lines` and `count_words` are executed at the worker. For
+each chunk, the function given as `chunk_to_args` (here `read_lines`) reads the
+entries of the chunk, and what it returns is passed to the processor (here
+`count_words`). Both functions are serialized and sent along with the tasks, so
+they can be defined in the same file as the rest of the application. The input
+files, however, are not sent. The worker opens them by itself, and so the files
+need to be reachable from the workers, either in a shared filesystem, or as
+URLs that `chunk_to_args` knows how to open, such as `https://` or `root://`.
+In this example the worker runs on the same machine as the manager, and so
+local paths are enough.
+
+When no `reducer` is given, VineReduce combines two results `a` and `b` with
+`a += b`. This works for numbers, numpy arrays, histograms, and, as in this
+example, `collections.Counter`. For other kinds of results, give a function of
+two arguments as `reducer`. The reducer must be commutative and associative,
+since partial results are combined in whatever order they finish.
+
+The final result of each processor and dataset is written to
+`results/<dataset>/<processor>/` as a compressed pickle file, which can be read
+back with `vine_reduce.serialization.load`.
+
+Run the example like this:
+
+```
+python vine_reduce_example.py
+```
+
+While it runs, VineReduce shows a line for each task that finishes, and
+progress bars for the chunks, reductions, and datasets done so far. At the
+end, it should display output like this:
+
+```
+tolstoy {'needle': 4, 'house': 614, 'water': 152}
+austen {'needle': 0, 'house': 205, 'water': 12}
+```
+
+If you run the example a second time, it finishes without running any tasks
+and displays the same counts. VineReduce keeps a record of the results it has
+written in `results/vine_reduce.db`, and only computes what is missing. This
+record is tied to the description of the datasets, not to your code: if you
+modify `count_words`, delete the `results` directory before running again.
+The same record is used to continue an interrupted run, although by default
+only final results are recorded. To also save partial results to disk as the
+run goes, set `checkpoint_time` to the number of seconds of task execution
+between checkpoints.
+
+Processor and reducer tasks are placed in separate
+[categories](../resources/index.md#grouping-tasks-with-similar-resource-needs),
+with the maximum resources given to `TaskVineDistributor` as
+`resources_processor` and `resources_reducer`, for example
+`{"cores": 1, "memory_mb": 2000, "disk_mb": 4000}`. VineReduce turns on
+[resource monitoring](../resources/index.md#monitoring-and-enforcement), so
+a task that goes over its resources is terminated. When this happens to a
+processor task, VineReduce cuts its chunk in half and tries again, and also
+halves `chunksize` for the files it has not started yet. When it happens to a
+reducer task, VineReduce combines fewer results at a time (`reduction_size`,
+10 by default).
+
+The example starts its own worker with a
+[factory](../running/index.md#managing-workers-with-the-taskvine-factory).
+To use workers on a cluster instead, give the manager a
+[project name](../running/index.md#project-names-and-the-catalog-server)
+with `TaskVineDistributor(name="my-words")`, remove the factory from the
+script, and start the workers separately, for example:
+
+```
+vine_submit_workers -T condor -M my-words 10
+```
+
+`TaskVineDistributor` encrypts the connections to its workers by default.
+Workers that find the manager by its project name do this automatically, but
+workers given the host and port of the manager need the `--ssl` option.
+
+Workers on a cluster usually do not have the Python packages that your
+functions need. `vine_reduce.get_environment()` packs the current conda
+environment into a [poncho package](../data/index.md#poncho), which
+`TaskVineDistributor` then sends to the workers along with the tasks. The
+package is built once, and it is built again only when the environment
+changes:
+
+```python
+from vine_reduce import TaskVineDistributor, get_environment
+
+distributor = TaskVineDistributor(
+    name="my-words",
+    resources_processor={"cores": 1},
+    resources_reducer={"cores": 1},
+    environment=get_environment(),
+)
+```
+
+If your application already has a TaskVine manager, give it to VineReduce as
+`TaskVineDistributor(manager=m)`, and the VineReduce tasks will share that
+manager and its workers. Finally, if no `distributor` is given at all,
+VineReduce runs the tasks as local processes without TaskVine, which is
+useful to debug a processor on a small input.
+
+VineReduce was written for high energy physics. The
+[vine-cms-analysis-stack](https://github.com/cooperative-computing-lab/vine-cms-analysis-stack)
+repository has an environment and complete examples for CMS analyses written
+with coffea or with ROOT RDataFrame, running on an HTCondor pool. For coffea,
+it uses `VineReduceCoffea`, a version of VineReduce that reads each chunk as
+NanoEvents and merges coffea accumulators. The
+[vine-cms-analysis-stack-tutorials](https://github.com/cooperative-computing-lab/vine-cms-analysis-stack-tutorials)
+repository has a three-hour, hands-on tutorial based on that stack, which
+covers tuning the chunk size and resources, restarting from checkpoints, and
+dealing with chunks that fail. It was written for a session at Notre Dame, and
+some of its steps assume access to the Notre Dame cluster. The source code of
+VineReduce, and the documentation of all of its options, are in the
+[vine-reduce](https://github.com/cooperative-computing-lab/vine-reduce)
+repository.
+
+### VineGraph
+
+VineGraph is a Python interface to TaskVine for applications that are a graph
+of Python function calls, where the result of one call is an argument of
+others. You describe the calls, and VineGraph runs each one as a task as soon
+as the results it reads are ready. Results stay at the workers and move
+directly from worker to worker, and only the results you ask for are brought
+back to the manager. While the graph runs, results are also copied to the
+manager in the background, so that when a worker is lost, only the few tasks
+whose results were not yet copied run again.
+
+VineGraph is the `vine_graph` module of `ndcctools.taskvine`. At the moment,
+it is only available on the `vine-graph` development branch, and is not yet
+part of a released `ndcctools`.
+
+There are two objects to know. A `Graph` describes tasks and does not run
+anything. An `Executor` runs tasks on TaskVine workers. The following example
+describes nine tasks as a graph, runs them, and then submits three more calls
+one at a time:
+
+```python
+--8<-- "taskvine/interface/vine_graph_example.py"
+```
+
+Each call of `graph.add(function, arguments...)` records one task, and returns
+a `Node` that stands for the result of that task. Passing a `Node` to another
+`add` makes the second task read the result of the first. A `Node` may appear
+anywhere inside the arguments, for example inside a list. A part of a result
+can be selected with `node[key]`, as with `summary["mean"]` above, and then
+only that part is sent to the task that reads it.
+
+`executor.run(graph, targets)` runs the targets and every task that they
+read, and returns a dictionary from each target to its result. Given a single
+target, it returns the result of that target. If no targets are given, it runs
+the tasks that no other task reads.
+
+`executor.submit(function, arguments...)` runs one call right away and returns
+a `Future`. A `Future` given as an argument makes the new task wait for that
+result, so a program can decide what to submit next from the results it has
+seen so far. `future.result()` waits for the task and returns its result. If
+the function of a task raises an exception, `result()` and `run()` raise
+`vg.TaskError`, which carries the original exception.
+
+The functions are executed at the workers, so they must be defined at the top
+level of the program, and the main program should be guarded with
+`if __name__ == "__main__"`, as in the example. Run it like this:
+
+```
+python vine_graph_example.py
+```
+
+It should display output like this:
+
+```
+Listening on port 9123
+overall mean 100.02
+first sample 100000 values, largest 159.48
+a new sample differs from the overall mean by -0.006
+```
+
+A task may also be a command line program. Give a `vg.Command` to `add` or
+`submit` in place of a function. `inputs` lists the files that the command
+reads, and `outputs` lists the files that it writes. An input is a local file,
+or a file written by another task, which is named with `node.file(name)`. The
+result of the task is the standard output of the command. The following
+lines, added to the example above where `executor` is open, sort a file with
+one command and count its lines with another:
+
+```python
+with open("names.txt", "w") as f:
+    f.write("pear\napple\nfig\n")
+
+commands = vg.Graph()
+ordered = commands.add(vg.Command("sort names.txt > sorted.txt", inputs=["names.txt"], outputs=["sorted.txt"]))
+count = commands.add(vg.Command("wc -l < sorted.txt", inputs=[ordered.file("sorted.txt")]))
+print("lines:", executor.run(commands, count).strip())
+```
+
+Each input appears in the working directory of the command under its own file
+name. To give it another name, or to give the result of another task as a
+file, write `inputs` as a dictionary from names to sources, such as
+`inputs={"data.txt": "names.txt"}`. If a command exits with a non-zero status,
+its task fails with `vg.TaskError` like any other, and the message shows the
+error output of the command.
+
+To be told when a task finishes without waiting for it, give the future a
+function with `add_done_callback`, which is called with the future once the
+task completes or fails:
+
+```python
+def report(future):
+    print("shift:", future.result())
+
+future = executor.submit(difference, 3, 1)
+future.add_done_callback(report)
+executor.wait()
+```
+
+The callback runs in a thread of the executor, shortly after the task
+finishes. `executor.wait()` waits for every submitted task, because closing
+the executor cancels the tasks that have not finished.
+
+The example starts its own local worker with a factory. To use workers
+somewhere else, create the executor with a port or a name, such as
+`vg.Executor(port=9123, name="my-graph")`, and start workers for it in the
+usual way. To debug the functions without any workers, create it with
+`vg.Executor(local=True)`, which runs each task in the current process.
