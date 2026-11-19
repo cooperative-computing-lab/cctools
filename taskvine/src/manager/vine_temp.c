@@ -377,8 +377,7 @@ void vine_temp_clean_redundant_replicas(struct vine_manager *q, struct vine_file
 
 		uint64_t task_id;
 		struct vine_task *task;
-		int iteration;
-		ITABLE_ITERATE(source_worker->current_tasks, iteration, task_id, task)
+		ITABLE_ITERATE(source_worker->current_tasks, task_id, task)
 		{
 			struct vine_mount *input_mount;
 			LIST_ITERATE(task->input_mounts, input_mount)

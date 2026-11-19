@@ -1090,14 +1090,13 @@ static void cleanup_worker(struct vine_manager *q, struct vine_worker_info *w)
 {
 	struct vine_task *t;
 	uint64_t task_id;
-	int iteration;
 
 	if (!q || !w)
 		return;
 
 	vine_current_transfers_wipe_worker(q, w);
 
-	ITABLE_ITERATE(w->current_tasks, iteration, task_id, t)
+	ITABLE_ITERATE(w->current_tasks, task_id, t)
 	{
 		t = itable_lookup(w->current_tasks, task_id); // BUG? this lookup looks unecessary and weird
 		if (!t) {
@@ -2516,9 +2515,8 @@ static struct jx *construct_status_message(struct vine_manager *q, const char *r
 	} else if (!strcmp(request, "task_status") || !strcmp(request, "tasks")) {
 		struct vine_task *t;
 		uint64_t task_id;
-		int iteration;
 
-		ITABLE_ITERATE(q->tasks, iteration, task_id, t)
+		ITABLE_ITERATE(q->tasks, task_id, t)
 		{
 			struct jx *j = vine_task_to_jx(q, t);
 			if (j)
@@ -3114,10 +3112,9 @@ static void find_max_worker(struct vine_manager *q)
  * are not counted towards the resources in use and will be killed if needed. */
 static void kill_empty_libraries_on_worker(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
-	int iteration;
 	uint64_t libtask_id;
 	struct vine_task *libtask;
-	ITABLE_ITERATE(w->current_libraries, iteration, libtask_id, libtask)
+	ITABLE_ITERATE(w->current_libraries, libtask_id, libtask)
 	{
 		if (libtask->function_slots_inuse == 0 && (!t->needs_library || strcmp(t->needs_library, libtask->provides_library))) {
 			vine_cancel_by_task_id(q, libtask_id);
@@ -3765,7 +3762,6 @@ static int receive_tasks_from_worker(struct vine_manager *q, struct vine_worker_
 {
 	struct vine_task *t;
 	uint64_t task_id;
-	int iteration;
 
 	int tasks_received = 0;
 
@@ -3778,7 +3774,7 @@ static int receive_tasks_from_worker(struct vine_manager *q, struct vine_worker_
 	}
 
 	/* Now consider all tasks assigned to that worker .*/
-	ITABLE_ITERATE(w->current_tasks, iteration, task_id, t)
+	ITABLE_ITERATE(w->current_tasks, task_id, t)
 	{
 		/* If the task is waiting to be retrieved... */
 		if (t->state == VINE_TASK_WAITING_RETRIEVAL) {
@@ -3910,7 +3906,7 @@ static int disconnect_slow_workers(struct vine_manager *q)
 
 	timestamp_t current = timestamp_get();
 
-	ITABLE_ITERATE(q->tasks, iteration, task_id, t)
+	ITABLE_ITERATE(q->tasks, task_id, t)
 	{
 
 		c = vine_category_lookup_or_create(q, t->category);
@@ -4089,9 +4085,8 @@ static struct vine_task *find_task_by_tag(struct vine_manager *q, const char *ta
 {
 	struct vine_task *t;
 	uint64_t task_id;
-	int iteration;
 
-	ITABLE_ITERATE(q->tasks, iteration, task_id, t)
+	ITABLE_ITERATE(q->tasks, task_id, t)
 	{
 		if (task_tag_comparator(t, task_tag)) {
 			return t;
@@ -4927,11 +4922,10 @@ static int task_request_count(struct vine_manager *q, const char *category, cate
 {
 	struct vine_task *t;
 	uint64_t task_id;
-	int iteration;
 
 	int count = 0;
 
-	ITABLE_ITERATE(q->tasks, iteration, task_id, t)
+	ITABLE_ITERATE(q->tasks, task_id, t)
 	{
 		if (t->resource_request == request) {
 			if (!category || strcmp(category, t->category) == 0) {
@@ -5100,8 +5094,7 @@ void vine_manager_remove_library(struct vine_manager *q, const char *name)
 		/* A worker might contain multiple library instances */
 		uint64_t task_id;
 		struct vine_task *library;
-		int library_iteration;
-		ITABLE_ITERATE(w->current_libraries, library_iteration, task_id, library)
+		ITABLE_ITERATE(w->current_libraries, task_id, library)
 		{
 			if (!strcmp(library->provides_library, name)) {
 				list_push_tail(instances, library);
@@ -5930,9 +5923,8 @@ int vine_cancel_all_by_tag(struct vine_manager *q, const char *tag)
 	int count = 0;
 	struct vine_task *t;
 	uint64_t task_id;
-	int iteration;
 
-	ITABLE_ITERATE(q->tasks, iteration, task_id, t)
+	ITABLE_ITERATE(q->tasks, task_id, t)
 	{
 		switch (t->state) {
 		case VINE_TASK_RETRIEVED:
@@ -5966,9 +5958,8 @@ int vine_cancel_all(struct vine_manager *q)
 
 	struct vine_task *t;
 	uint64_t task_id;
-	int iteration;
 
-	ITABLE_ITERATE(q->tasks, iteration, task_id, t)
+	ITABLE_ITERATE(q->tasks, task_id, t)
 	{
 		vine_cancel_by_task_id(q, task_id);
 		count++;
@@ -6000,9 +5991,8 @@ int vine_empty(struct vine_manager *q)
 {
 	struct vine_task *t;
 	uint64_t task_id;
-	int iteration;
 
-	ITABLE_ITERATE(q->tasks, iteration, task_id, t)
+	ITABLE_ITERATE(q->tasks, task_id, t)
 	{
 		if (t->type == VINE_TASK_TYPE_STANDARD)
 			return 0;

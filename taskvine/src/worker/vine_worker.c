@@ -395,9 +395,8 @@ static int64_t measure_worker_disk()
 
 		struct vine_process *p;
 		uint64_t task_id;
-		int iteration;
 
-		ITABLE_ITERATE(procs_table, iteration, task_id, p)
+		ITABLE_ITERATE(procs_table, task_id, p)
 		{
 			if (p->sandbox_size > 0) {
 				disk_measured += p->sandbox_size;
@@ -749,11 +748,10 @@ static void expire_procs_running()
 {
 	struct vine_process *p;
 	uint64_t task_id;
-	int iteration;
 
 	double current_time = timestamp_get() / USECOND;
 
-	ITABLE_ITERATE(procs_running, iteration, task_id, p)
+	ITABLE_ITERATE(procs_running, task_id, p)
 	{
 		if (p->task->resources_requested->end > 0 && current_time > p->task->resources_requested->end) {
 			p->result = VINE_RESULT_MAX_END_TIME;
@@ -776,9 +774,8 @@ static void finish_running_tasks(vine_result_t result)
 {
 	struct vine_process *p;
 	uint64_t task_id;
-	int iteration;
 
-	ITABLE_ITERATE(procs_running, iteration, task_id, p)
+	ITABLE_ITERATE(procs_running, task_id, p)
 	{
 		finish_running_task(p, result);
 	}
@@ -794,9 +791,8 @@ static void reap_library_functions(struct vine_process *library)
 {
 	struct vine_process *p;
 	uint64_t task_id;
-	int iteration;
 
-	ITABLE_ITERATE(procs_running, iteration, task_id, p)
+	ITABLE_ITERATE(procs_running, task_id, p)
 	{
 		if (p->library_process == library) {
 			debug(D_VINE, "killing function task %d running on library task %d", (int)task_id, library->task->task_id);
@@ -842,13 +838,12 @@ static int handle_completed_tasks(struct link *manager)
 	struct vine_process *p;
 	struct vine_process *fp;
 	uint64_t task_id;
-	int iteration;
 	uint64_t done_task_id;
 	int done_exit_code;
 
 	struct list *failed_libraries = list_create();
 
-	ITABLE_ITERATE(procs_running, iteration, task_id, p)
+	ITABLE_ITERATE(procs_running, task_id, p)
 	{
 		/* Check to see if this process itself is completed. */
 
@@ -1176,9 +1171,8 @@ static void kill_all_tasks()
 {
 	struct vine_process *p;
 	uint64_t task_id;
-	int iteration;
 
-	ITABLE_ITERATE(procs_table, iteration, task_id, p)
+	ITABLE_ITERATE(procs_table, task_id, p)
 	{
 		do_kill(task_id);
 	}
@@ -1224,7 +1218,6 @@ static int enforce_processes_sandbox_limits()
 
 	struct vine_process *p;
 	uint64_t task_id;
-	int iteration;
 
 	int ok = 1;
 
@@ -1232,7 +1225,7 @@ static int enforce_processes_sandbox_limits()
 	if ((time(0) - last_check_time) < options->check_resources_interval)
 		return 1;
 
-	ITABLE_ITERATE(procs_running, iteration, task_id, p)
+	ITABLE_ITERATE(procs_running, task_id, p)
 	{
 		if (!enforce_process_sanbox_limits(p)) {
 			finish_running_task(p, VINE_RESULT_SANDBOX_EXHAUSTION);
@@ -1256,11 +1249,10 @@ static void enforce_processes_max_running_time()
 {
 	struct vine_process *p;
 	uint64_t task_id;
-	int iteration;
 
 	timestamp_t now = timestamp_get();
 
-	ITABLE_ITERATE(procs_running, iteration, task_id, p)
+	ITABLE_ITERATE(procs_running, task_id, p)
 	{
 
 		/* If the task did not set wall_time, return right away. */
@@ -1462,9 +1454,8 @@ static struct vine_process *find_running_library_for_function(const char *librar
 {
 	uint64_t task_id;
 	struct vine_process *p;
-	int iteration;
 
-	ITABLE_ITERATE(procs_running, iteration, task_id, p)
+	ITABLE_ITERATE(procs_running, task_id, p)
 	{
 		if (p->task->provides_library && !strcmp(p->task->provides_library, library_name)) {
 			if (p->library_ready && p->functions_running < p->task->function_slots_total) {
@@ -1507,9 +1498,8 @@ static struct vine_process *find_future_library_for_function(const char *library
 {
 	uint64_t task_id;
 	struct vine_process *p;
-	int iteration;
 
-	ITABLE_ITERATE(procs_table, iteration, task_id, p)
+	ITABLE_ITERATE(procs_table, task_id, p)
 	{
 		if (p->task->provides_library && !strcmp(p->task->provides_library, library_name)) {
 			return p;
@@ -1691,7 +1681,6 @@ static void check_libraries_ready(struct link *manager)
 {
 	uint64_t library_task_id;
 	struct vine_process *library_process;
-	int iteration;
 	struct list *failed_libraries = list_create();
 
 	struct link_info library_link_info;
@@ -1699,7 +1688,7 @@ static void check_libraries_ready(struct link *manager)
 	library_link_info.revents = 0;
 
 	/* Loop through all processes to find libraries and check if they are alive. */
-	ITABLE_ITERATE(procs_running, iteration, library_task_id, library_process)
+	ITABLE_ITERATE(procs_running, library_task_id, library_process)
 	{
 		/* Skip non-library processes or libraries that are already ready */
 		if (library_process->type != VINE_PROCESS_TYPE_LIBRARY || library_process->library_ready)

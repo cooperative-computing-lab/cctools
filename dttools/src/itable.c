@@ -522,10 +522,9 @@ void *itable_remove_random(struct itable *table)
 
 void itable_foreach_ro(struct itable *table, void (*func)(UINT64_T key, void *value, void *arg), void *arg)
 {
-	int iteration;
 	UINT64_T key;
 	void *value;
-	ITABLE_ITERATE(table, iteration, key, value)
+	ITABLE_ITERATE(table, key, value)
 	{
 		func(key, value, arg);
 	}

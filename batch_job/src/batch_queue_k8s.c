@@ -718,10 +718,9 @@ static int batch_queue_k8s_free(struct batch_queue *q)
 	system(cmd_rm_tmp_files);
 
 	if (k8s_job_info_table) {
-		int iteration;
 		uint64_t job_id;
 		k8s_job_info *info;
-		ITABLE_ITERATE(k8s_job_info_table, iteration, job_id, info)
+		ITABLE_ITERATE(k8s_job_info_table, job_id, info)
 		{
 			delete_k8s_job_info(info);
 		}

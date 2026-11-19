@@ -178,8 +178,7 @@ static void verify_all(struct itable *h)
 		struct verify_ctx *ctx = calloc(1, sizeof(*ctx));
 		UINT64_T key;
 		void *value;
-		int iteration = 0;
-		ITABLE_ITERATE(h, iteration, key, value)
+		ITABLE_ITERATE(h, key, value)
 		{
 			int k = key_index(key);
 			CHECK(k >= 0, "iterated over unknown key %llu", (unsigned long long)key);
@@ -361,10 +360,9 @@ static void test_cursor_removal(void)
 	/* Remove every other entry while iterating over the table. */
 	UINT64_T key;
 	void *value;
-	int iteration = 0;
 	int flip = 0;
 	int visited = 0;
-	ITABLE_ITERATE(h, iteration, key, value)
+	ITABLE_ITERATE(h, key, value)
 	{
 		int k = key_index(key);
 		CHECK(k >= 0, "unknown key during iteration");
@@ -379,8 +377,7 @@ static void test_cursor_removal(void)
 	verify_all(h);
 
 	/* Now remove everything during one iteration; the table must end empty and usable. */
-	iteration = 0;
-	ITABLE_ITERATE(h, iteration, key, value)
+	ITABLE_ITERATE(h, key, value)
 	{
 		int k = key_index(key);
 		CHECK(itable_remove(h, key) == model[k], "remove-all during iteration of key %d", k);
@@ -417,10 +414,9 @@ static void test_remove_ahead(void)
 
 	UINT64_T key;
 	void *value;
-	int iteration = 0;
 	int visits = 0;
 	int removed_ahead = 0;
-	ITABLE_ITERATE(h, iteration, key, value)
+	ITABLE_ITERATE(h, key, value)
 	{
 		int k = key_index(key);
 		CHECK(k >= 0, "unknown key during iteration");
@@ -490,13 +486,11 @@ static void test_nested_removal(void)
 
 	UINT64_T key;
 	void *value;
-	int iteration = 0;
-	ITABLE_ITERATE(h, iteration, key, value)
+	ITABLE_ITERATE(h, key, value)
 	{
 		UINT64_T inner_key;
 		void *inner_value;
-		int inner_iteration = 0;
-		ITABLE_ITERATE(h, inner_iteration, inner_key, inner_value)
+		ITABLE_ITERATE(h, inner_key, inner_value)
 		{
 			if (total_count % 9 == 0) {
 				int k = key_index(inner_key);
@@ -530,9 +524,8 @@ static void test_break_releases_cursor(void)
 
 	UINT64_T key;
 	void *value;
-	int iteration = 0;
 	int n = 0;
-	ITABLE_ITERATE(h, iteration, key, value)
+	ITABLE_ITERATE(h, key, value)
 	{
 		if (++n == 3)
 			break;
@@ -546,12 +539,11 @@ static void test_break_releases_cursor(void)
 
 	UINT64_T key2;
 	void *value2;
-	int iteration2 = 0;
 	int outer = 0;
-	ITABLE_ITERATE(h, iteration, key, value)
+	ITABLE_ITERATE(h, key, value)
 	{
 		outer++;
-		ITABLE_ITERATE(h, iteration2, key2, value2)
+		ITABLE_ITERATE(h, key2, value2)
 		{
 			break;
 		}
@@ -579,9 +571,8 @@ static void test_foreach_during_iteration(void)
 
 	UINT64_T key;
 	void *value;
-	int iteration = 0;
 	int outer = 0;
-	ITABLE_ITERATE(h, iteration, key, value)
+	ITABLE_ITERATE(h, key, value)
 	{
 		struct verify_ctx *ctx = calloc(1, sizeof(*ctx));
 		itable_foreach_ro(h, verify_cb, ctx);
