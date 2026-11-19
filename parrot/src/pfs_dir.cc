@@ -32,8 +32,7 @@ pfs_dir::pfs_dir( pfs_name *n ) : pfs_file(n)
 		extern struct hash_table *available_services;
 		char *key;
 		void *value;
-		int iteration;
-		HASH_TABLE_ITERATE(available_services, iteration, key, value) {
+		HASH_TABLE_ITERATE(available_services, key, value) {
 			append(key);
 		}
 	}
