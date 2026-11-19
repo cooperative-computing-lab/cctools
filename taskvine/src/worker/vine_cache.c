@@ -123,8 +123,7 @@ void vine_cache_scan(struct vine_cache *c, struct link *manager)
 {
 	struct vine_cache_file *f;
 	char *cachename;
-	int iteration;
-	HASH_TABLE_ITERATE(c->table, iteration, cachename, f)
+	HASH_TABLE_ITERATE(c->table, cachename, f)
 	{
 		vine_worker_send_cache_update(manager, cachename, f);
 	}
@@ -176,8 +175,7 @@ int vine_cache_start_transfers(struct vine_cache *c)
 	struct list *to_process = list_create();
 	char *cachename;
 	void *dummy;
-	int iteration;
-	HASH_TABLE_ITERATE(c->pending_transfers, iteration, cachename, dummy)
+	HASH_TABLE_ITERATE(c->pending_transfers, cachename, dummy)
 	{
 		list_push_tail(to_process, xxstrdup(cachename));
 		if (list_size(to_process) >= c->max_transfer_procs - hash_table_size(c->processing_transfers)) {
@@ -209,8 +207,7 @@ void vine_cache_delete(struct vine_cache *c)
 	/* Ensure that all child processes are killed off. */
 	char *cachename;
 	struct vine_cache_file *file;
-	int iteration;
-	HASH_TABLE_ITERATE(c->table, iteration, cachename, file)
+	HASH_TABLE_ITERATE(c->table, cachename, file)
 	{
 		vine_cache_kill(c, file, cachename, 0);
 	}
@@ -945,9 +942,8 @@ int vine_cache_check_xfer_files(struct vine_cache *c, struct link *manager)
 {
 	char *key;
 	void *dummy; // processing_transfers is used as a key set; values are unused.
-	int iteration;
 
-	HASH_TABLE_ITERATE(c->processing_transfers, iteration, key, dummy)
+	HASH_TABLE_ITERATE(c->processing_transfers, key, dummy)
 	{
 		/* Duplicate the key, because the item may get removed from the table, freeing the key. */
 		char *cachename = strdup(key);

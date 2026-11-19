@@ -464,9 +464,8 @@ static void send_features(struct link *manager)
 {
 	char *f;
 	void *dummy;
-	int iteration;
 
-	HASH_TABLE_ITERATE(options->features, iteration, f, dummy)
+	HASH_TABLE_ITERATE(options->features, f, dummy)
 	{
 		char feature_encoded[VINE_LINE_MAX];
 		url_encode(f, feature_encoded, VINE_LINE_MAX);

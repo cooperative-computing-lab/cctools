@@ -77,11 +77,10 @@ struct rmsummary **vine_manager_summarize_workers(struct vine_manager *q)
 	struct rmsummary *s;
 	char *id;
 	char *resources_key;
-	int iteration;
 
 	struct hash_table *workers_count = hash_table_create(0, 0);
 
-	HASH_TABLE_ITERATE(q->worker_table, iteration, id, w)
+	HASH_TABLE_ITERATE(q->worker_table, id, w)
 	{
 
 		if (w->resources->tag < 0) {
@@ -115,7 +114,7 @@ struct rmsummary **vine_manager_summarize_workers(struct vine_manager *q)
 	int count = 0;
 	struct rmsummary **worker_data = (struct rmsummary **)malloc((hash_table_size(workers_count) + 1) * sizeof(struct rmsummary *));
 
-	HASH_TABLE_ITERATE(workers_count, iteration, resources_key, s)
+	HASH_TABLE_ITERATE(workers_count, resources_key, s)
 	{
 		worker_data[count] = s;
 		count++;

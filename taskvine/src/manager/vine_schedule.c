@@ -372,8 +372,7 @@ struct vine_worker_info *vine_schedule_task_to_worker(struct vine_manager *q, st
 
 	char *key;
 	struct vine_worker_info *w;
-	int iteration;
-	HASH_TABLE_ITERATE(q->worker_table, iteration, key, w)
+	HASH_TABLE_ITERATE(q->worker_table, key, w)
 	{
 		/* briefly skip uninitialized workers, more detailed checks are performed in @check_worker_against_task */
 		if (!w || !w->resources || w->type != VINE_WORKER_TYPE_WORKER || w->draining) {
@@ -528,10 +527,9 @@ static vine_resource_bitmask_t is_task_larger_than_any_worker(struct vine_manage
 {
 	char *key;
 	struct vine_worker_info *w;
-	int iteration;
 
 	int bit_set = 0;
-	HASH_TABLE_ITERATE(q->worker_table, iteration, key, w)
+	HASH_TABLE_ITERATE(q->worker_table, key, w)
 	{
 		vine_resource_bitmask_t new_set = is_task_larger_than_worker(q, t, w);
 		if (new_set == 0) {
@@ -620,11 +618,10 @@ Determine whether there is a worker that can fit the task and that has all its s
 */
 int vine_schedule_check_fixed_location(struct vine_manager *q, struct vine_task *t)
 {
-	int iteration;
 	char *key;
 	struct vine_worker_info *w;
 
-	HASH_TABLE_ITERATE(q->worker_table, iteration, key, w)
+	HASH_TABLE_ITERATE(q->worker_table, key, w)
 	{
 		if (check_fixed_location_worker(q, w, t)) {
 			return 1;

@@ -230,8 +230,7 @@ struct rmsummary *bucketing_manager_predict(bucketing_manager_t *m, int task_id)
 	double pred_val;
 
 	struct hash_table *ht = m->res_type_to_bucketing_state;
-	int iteration;
-	HASH_TABLE_ITERATE(ht, iteration, res_name, state)
+	HASH_TABLE_ITERATE(ht, res_name, state)
 	{
 		/* if previous resource report doesn't exist, then it's a new task */
 		if (!old_res) {
@@ -353,8 +352,7 @@ void bucketing_manager_add_resource_report(bucketing_manager_t *m, int task_id, 
 		char *res_name;
 		bucketing_state_t *state;
 		double old_val, new_val;
-		int iteration;
-		HASH_TABLE_ITERATE(ht, iteration, res_name, state)
+		HASH_TABLE_ITERATE(ht, res_name, state)
 		{
 			old_val = rmsummary_get(max_seen_r, res_name);
 			new_val = rmsummary_get(r, res_name);
@@ -379,13 +377,12 @@ void bucketing_manager_add_resource_report(bucketing_manager_t *m, int task_id, 
 
 	/* if task successfully finishes then add its resource data and clear out its index in internal table */
 	if (success == 1) {
-		int iteration;
 		struct hash_table *ht = m->res_type_to_bucketing_state;
 		char *res_name;
 		bucketing_state_t *state;
 		double val;
 
-		HASH_TABLE_ITERATE(ht, iteration, res_name, state)
+		HASH_TABLE_ITERATE(ht, res_name, state)
 		{
 			val = rmsummary_get(new_r, res_name);
 			bucketing_add(state, val);

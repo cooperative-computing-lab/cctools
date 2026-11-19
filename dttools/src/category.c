@@ -788,8 +788,7 @@ void categories_initialize(struct hash_table *categories, struct rmsummary *top,
 
 	char *name;
 	struct category *c;
-	int iteration;
-	HASH_TABLE_ITERATE(categories, iteration, name, c)
+	HASH_TABLE_ITERATE(categories, name, c)
 	{
 		category_clear_histograms(c);
 		if (c->first_allocation) {
@@ -808,7 +807,7 @@ void categories_initialize(struct hash_table *categories, struct rmsummary *top,
 		rmsummary_delete(s);
 	}
 
-	HASH_TABLE_ITERATE(categories, iteration, name, c)
+	HASH_TABLE_ITERATE(categories, name, c)
 	{
 		category_update_first_allocation(c, NULL);
 		category_clear_histograms(c);

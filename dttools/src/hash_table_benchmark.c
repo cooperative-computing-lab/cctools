@@ -21,8 +21,7 @@ double measure_iteration_time(struct hash_table *h)
 
 	char *key;
 	void *value;
-	int iteration;
-	HASH_TABLE_ITERATE(h, iteration, key, value);
+	HASH_TABLE_ITERATE(h, key, value);
 
 	clock_gettime(CLOCK_MONOTONIC, &end);
 
