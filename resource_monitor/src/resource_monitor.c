@@ -1137,12 +1137,11 @@ void decode_zombie_status(struct rmsummary *summary, int wait_status)
 
 void rmonitor_find_files_final_sizes()
 {
-	int iteration;
 	char *fname;
 	struct stat buf;
 	struct rmonitor_file_info *finfo;
 
-	HASH_TABLE_ITERATE(files, iteration, fname, finfo)
+	HASH_TABLE_ITERATE(files, fname, finfo)
 	{
 		/* If size_on_close is unknwon, perform a stat on the file. */
 
@@ -1154,7 +1153,6 @@ void rmonitor_find_files_final_sizes()
 
 void rmonitor_add_files_to_summary(char *field, int outputs)
 {
-	int iteration;
 	char *fname;
 	struct rmonitor_file_info *finfo;
 
@@ -1165,7 +1163,7 @@ void rmonitor_add_files_to_summary(char *field, int outputs)
 
 	char *delimeter = "";
 
-	HASH_TABLE_ITERATE(files, iteration, fname, finfo)
+	HASH_TABLE_ITERATE(files, fname, finfo)
 	{
 		if (finfo->is_output != outputs)
 			continue;
@@ -1192,7 +1190,6 @@ int rmonitor_file_io_summaries()
 {
 #if defined(RESOURCE_MONITOR_USE_INOTIFY)
 	if (rmonitor_inotify_fd >= 0) {
-		int iteration;
 		char *fname;
 		struct rmonitor_file_info *finfo;
 
@@ -1208,7 +1205,7 @@ int rmonitor_file_io_summaries()
 				"reads",
 				"writes");
 
-		HASH_TABLE_ITERATE(files, iteration, fname, finfo)
+		HASH_TABLE_ITERATE(files, fname, finfo)
 		{
 			fprintf(log_inotify, "%-15s\n%-15s ", fname, "");
 			fprintf(log_inotify, "%6" PRId64 " %20lld %20lld", finfo->device, (long long int)finfo->size_on_open, (long long int)finfo->size_on_close);

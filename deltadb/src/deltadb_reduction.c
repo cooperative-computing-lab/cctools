@@ -50,10 +50,9 @@ void deltadb_reduction_delete_temporal_table(struct hash_table *temporal_table) 
 
 	char *key;
 	void *value;
-	int iteration;
 	struct deltadb_reduction *r;
 
-		HASH_TABLE_ITERATE(temporal_table, iteration, key, value) {
+		HASH_TABLE_ITERATE(temporal_table, key, value) {
 		r = (struct deltadb_reduction *) value;
 		deltadb_reduction_delete(r);
 	}

@@ -159,7 +159,6 @@ int dag_to_file_category(struct category *c, struct list *nodes, FILE * dag_stre
 
 int dag_to_file_categories(const struct dag *d, FILE * dag_stream, char *(*rename) (struct dag_node * n, const char *filename))
 {
-	int iteration;
 
 	//separate nodes per category
 	struct hash_table *nodes_of_category = hash_table_create(2*hash_table_size(d->categories), 0);
@@ -180,7 +179,7 @@ int dag_to_file_categories(const struct dag *d, FILE * dag_stream, char *(*renam
 		n = n->next;
 	}
 
-	HASH_TABLE_ITERATE(nodes_of_category, iteration, name, ns) {
+	HASH_TABLE_ITERATE(nodes_of_category, name, ns) {
 		c = makeflow_category_lookup_or_create(d, name);
 		dag_to_file_category(c, ns, dag_stream, rename);
 	}
@@ -492,7 +491,6 @@ void write_edge_to_xgmml(FILE *f, char sourceheader, int sourceid, char targethe
 
 void dag_to_cyto(struct dag *d, int condense_display, int change_size)
 {
-	int iteration;
 	struct dag_node *n;
 	struct dag_file *f;
 	struct hash_table *h, *g;
@@ -544,7 +542,7 @@ void dag_to_cyto(struct dag *d, int condense_display, int change_size)
 	fprintf(cytograph, "\t<att name = \"layoutAlgorithm\" value = \"Grid Layout\" type = \"string\" cy:hidden = \"1\"/>\n");
 
 	if(change_size) {
-		HASH_TABLE_ITERATE(d->files, iteration, name, f) {
+		HASH_TABLE_ITERATE(d->files, name, f) {
 			if (!dag_file_should_exist(f)) {
 				break;
 			}
@@ -621,7 +619,7 @@ void dag_to_cyto(struct dag *d, int condense_display, int change_size)
 		}
 	}
 
-	HASH_TABLE_ITERATE(g, iteration, label, e) {
+	HASH_TABLE_ITERATE(g, label, e) {
 		fn = e->name;
 
 		/* compute the size-proportional width (if requested) BEFORE
@@ -672,12 +670,12 @@ void dag_to_cyto(struct dag *d, int condense_display, int change_size)
 		fprintf(stderr, "Unable to create ./style.xml: %s\n", strerror(errno));
 	}
 
-	HASH_TABLE_ITERATE(h, iteration, label, t) {
+	HASH_TABLE_ITERATE(h, label, t) {
 		free(t);
 		hash_table_remove(h, label);
 	}
 
-	HASH_TABLE_ITERATE(g, iteration, label, e) {
+	HASH_TABLE_ITERATE(g, label, e) {
 		free(e);
 		hash_table_remove(g, label);
 	}
@@ -691,7 +689,6 @@ void dag_to_cyto(struct dag *d, int condense_display, int change_size)
 
 void dag_to_dot(struct dag *d, int condense_display, int change_size, int with_labels, int task_id, int with_details, char *graph_attr, char *node_attr, char *edge_attr, char *task_attr, char *file_attr )
 {
-	int iteration;
 	struct dag_node *n;
 	struct dag_file *f;
 	struct hash_table *h, *g;
@@ -715,7 +712,7 @@ void dag_to_dot(struct dag *d, int condense_display, int change_size, int with_l
 	printf( "digraph {\n");
 
 	if(change_size) {
-		HASH_TABLE_ITERATE(d->files, iteration, name, f) {
+		HASH_TABLE_ITERATE(d->files, name, f) {
 			if(stat(name,&st)==0) {
 				average += ((double) st.st_size) / ((double) d->completed_files);
 			}
@@ -861,7 +858,7 @@ void dag_to_dot(struct dag *d, int condense_display, int change_size, int with_l
 		printf( "\nnode [shape=box,color=blue,style=%s,fixedsize=false];\n", with_labels ? "unfilled" : "filled" );
 	}
 
-	HASH_TABLE_ITERATE(g, iteration, label, e) {
+	HASH_TABLE_ITERATE(g, label, e) {
 		fn = e->name;
 		printf( "F%d [label = \"%s", e->id, with_labels ? fn : "" );
 		char cytoid[6];
@@ -1028,7 +1025,6 @@ void dag_to_ppm(struct dag *d, int ppm_mode, char *ppm_option)
 
 	char *name;
 	char *label;
-	int iteration;
 
 	struct hash_table *h;
 
@@ -1058,7 +1054,7 @@ void dag_to_ppm(struct dag *d, int ppm_mode, char *ppm_option)
 		ancestor_count_list[count] = list_create();
 	}
 
-	HASH_TABLE_ITERATE(h, iteration, label, n) {
+	HASH_TABLE_ITERATE(h, label, n) {
 		list_push_tail(ancestor_count_list[n->ancestor_depth], n);
 		if(list_size(ancestor_count_list[n->ancestor_depth]) > max_size)
 			max_size = list_size(ancestor_count_list[n->ancestor_depth]);
@@ -1159,12 +1155,11 @@ void dag_to_ppm(struct dag *d, int ppm_mode, char *ppm_option)
 }
 
 struct jx *variables_to_json(struct hash_table *h) {
-	int iteration;
 	char *key;
 	struct dag_variable *value;
 	struct jx *result = jx_object(NULL);
 
-	HASH_TABLE_ITERATE(h, iteration, key, value) {
+	HASH_TABLE_ITERATE(h, key, value) {
 		jx_insert(result, jx_string(key), jx_string(value->values[value->count - 1]->value));
 	}
 
@@ -1281,13 +1276,12 @@ struct jx *dag_nodes_to_json(struct dag_node *node) {
 }
 
 struct jx *dag_to_json(struct dag *d) {
-	int iteration;
 	char *key;
 	void *value;
 	struct jx *result = jx_object(NULL);
 	struct jx *categories = jx_object(NULL);
 	jx_insert(result, jx_string("rules"), dag_nodes_to_json(d->nodes));
-		HASH_TABLE_ITERATE(d->categories, iteration, key, value) {
+		HASH_TABLE_ITERATE(d->categories, key, value) {
 		jx_insert(categories, jx_string(key), category_to_json((struct category *) value));
 	}
 	jx_insert(result, jx_string("categories"), categories);

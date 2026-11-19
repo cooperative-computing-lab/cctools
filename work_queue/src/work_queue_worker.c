@@ -386,11 +386,10 @@ Send a message to the manager with user defined features.
 
 static void send_features(struct link *manager)
 {
-	int iteration;
 	char *f;
 	void *dummy;
 	char fenc[WORK_QUEUE_LINE_MAX];
-	HASH_TABLE_ITERATE(features, iteration, f, dummy) {
+	HASH_TABLE_ITERATE(features, f, dummy) {
 		url_encode(f, fenc, WORK_QUEUE_LINE_MAX);
 		send_manager_message(manager, "feature %s\n", fenc);
 	}

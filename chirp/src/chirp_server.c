@@ -1486,12 +1486,11 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 
 			table = chirp_audit(path);
 			if (table) {
-				int iteration;
 				char *key;
 				struct chirp_audit *entry;
 
 				link_printf(l, stalltime, "%d\n", hash_table_size(table));
-				HASH_TABLE_ITERATE(table, iteration, key, entry) {
+				HASH_TABLE_ITERATE(table, key, entry) {
 					link_printf(l, stalltime, "%s %" PRId64 " %" PRId64 " %" PRId64 "\n", key, entry->nfiles, entry->ndirs, entry->nbytes);
 				}
 				chirp_audit_delete(table);

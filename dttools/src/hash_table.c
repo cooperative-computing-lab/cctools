@@ -379,8 +379,7 @@ char **hash_table_keys(struct hash_table *table)
 	char *key = 0;
 	void *value = 0;
 	int i = 0;
-	int iteration;
-	HASH_TABLE_ITERATE(table, iteration, key, value)
+	HASH_TABLE_ITERATE(table, key, value)
 	{
 		keys[i++] = strdup(key);
 	}
@@ -579,10 +578,9 @@ void *hash_table_remove_random(struct hash_table *table)
 
 void hash_table_foreach_ro(struct hash_table *table, void (*func)(const char *key, void *value, void *arg), void *arg)
 {
-	int iteration;
 	char *key;
 	void *value;
-	HASH_TABLE_ITERATE(table, iteration, key, value)
+	HASH_TABLE_ITERATE(table, key, value)
 	{
 		func(key, value, arg);
 	}

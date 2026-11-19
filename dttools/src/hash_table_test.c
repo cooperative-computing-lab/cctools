@@ -139,8 +139,7 @@ static void verify_all(struct hash_table *h)
 		struct verify_ctx *ctx = calloc(1, sizeof(*ctx));
 		char *key;
 		void *value;
-		int iteration = 0;
-		HASH_TABLE_ITERATE(h, iteration, key, value)
+		HASH_TABLE_ITERATE(h, key, value)
 		{
 			int k = key_number(key);
 			CHECK(k >= 0, "iterated over unknown key '%s'", key);
@@ -341,9 +340,8 @@ static void test_cursor_removal(void)
 	/* Remove every other entry while iterating over the table. */
 	char *key;
 	void *value;
-	int iteration = 0;
 	int flip = 0;
-	HASH_TABLE_ITERATE(h, iteration, key, value)
+	HASH_TABLE_ITERATE(h, key, value)
 	{
 		int k = key_number(key);
 		CHECK(k >= 0, "unknown key during iteration");
@@ -381,13 +379,11 @@ static void test_nested_removal(void)
 	
 	char *key;
 	void *value;
-	int iteration = 0;
-	HASH_TABLE_ITERATE(h, iteration, key, value)
+	HASH_TABLE_ITERATE(h, key, value)
 	{
 		char *inner_key;
 		void *inner_value;
-		int   inner_iteration;
-		HASH_TABLE_ITERATE(h, inner_iteration, inner_key, inner_value)
+		HASH_TABLE_ITERATE(h, inner_key, inner_value)
 		{
 			if(total_count%9==0) {
 				int k = key_number(inner_key);

@@ -197,10 +197,9 @@ int vine_current_transfers_url_in_use(struct vine_manager *q, const char *source
 {
 	char *id;
 	struct vine_transfer_pair *t;
-	int iteration;
 
 	int c = 0;
-	HASH_TABLE_ITERATE(q->current_transfer_table, iteration, id, t)
+	HASH_TABLE_ITERATE(q->current_transfer_table, id, t)
 	{
 		/* Each transfer owns a copy of its source URL, so compare contents. */
 		if (source && t->source_url && !strcmp(source, t->source_url)) {
@@ -225,9 +224,8 @@ int vine_current_transfers_wipe_worker(struct vine_manager *q, struct vine_worke
 
 	char *id;
 	struct vine_transfer_pair *t;
-	int iteration;
 
-	HASH_TABLE_ITERATE(q->current_transfer_table, iteration, id, t)
+	HASH_TABLE_ITERATE(q->current_transfer_table, id, t)
 	{
 		if (t->dest_worker == w || t->source_worker == w) {
 			list_push_tail(ids_to_remove, xxstrdup(id));
@@ -253,10 +251,9 @@ void vine_current_transfers_print_table(struct vine_manager *q)
 	char *id;
 	struct vine_transfer_pair *t;
 	struct vine_worker_info *w;
-	int iteration;
 
 	debug(D_VINE, "-----------------TRANSFER-TABLE--------------------");
-	HASH_TABLE_ITERATE(q->current_transfer_table, iteration, id, t)
+	HASH_TABLE_ITERATE(q->current_transfer_table, id, t)
 	{
 		w = t->source_worker;
 		if (w) {
