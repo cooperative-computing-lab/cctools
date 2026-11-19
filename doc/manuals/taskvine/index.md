@@ -2936,67 +2936,28 @@ scheduler. The class `DaskVine` implements a TaskVine manager that has a
 === "Python"
     ```python
     import ndcctools.taskvine as vine
-    import argparse
-    import getpass
-    import sys
+    import dask
 
-    try:
-        import dask
-        import awkward as ak
-        import dask_awkward as dak
-        import numpy as np
-    except ImportError:
-        print("You need dask, awkward, and numpy installed")
-        print("(e.g. conda install -c conda-forge dask dask-awkward numpy) to run this example.")
+    def add(x,y):
+        return x + y
 
-    behavior: dict = {}
+    x  = dask.delayed(add)(1, 2)
+    y  = dask.delayed(add)(3, 4)
+    z  = dask.delayed(add)(x, y)
 
-    @ak.mixin_class(behavior)
-    class Point:
-        def distance(self, other):
-	    return np.sqrt((self.x - other.x) ** 2 + (self.y - other.y) ** 2)
+    m = vine.DaskVine(port=9123, ssl=True)
+    m.set_name("test_manager")
+    print(f"Listening for workers at port: {m.port}")
 
+    dask.config.set(scheduler=m.get):
+    result = z.compute(resources={"cores": 1}, resources_mode="max", worker_transfers=True)
+    print(f"result = {result}")
+    print("done!")
 
-    if __name__ == "__main__":
-        # data arrays
-        points1 = ak.Array([
-	    [{"x": 1.0, "y": 1.1}, {"x": 2.0, "y": 2.2}, {"x": 3, "y": 3.3}],
-	    [],
-	    [{"x": 4.0, "y": 4.4}, {"x": 5.0, "y": 5.5}],
-	    [{"x": 6.0, "y": 6.6}],
-	    [{"x": 7.0, "y": 7.7}, {"x": 8.0, "y": 8.8}, {"x": 9, "y": 9.9}],
-        ])
-
-        points2 = ak.Array([
-	    [{"x": 0.9, "y": 1.0}, {"x": 2.0, "y": 2.2}, {"x": 2.9, "y": 3.0}],
-	    [],
-	    [{"x": 3.9, "y": 4.0}, {"x": 5.0, "y": 5.5}],
-	    [{"x": 5.9, "y": 6.0}],
-	    [{"x": 6.9, "y": 7.0}, {"x": 8.0, "y": 8.8}, {"x": 8.9, "y": 9.0}],
-        ])
-        array1 = dak.from_awkward(points1, npartitions=3)
-        array2 = dak.from_awkward(points2, npartitions=3)
-
-        array1 = dak.with_name(array1, name="Point", behavior=behavior)
-        array2 = dak.with_name(array2, name="Point", behavior=behavior)
-
-        distance = array1.distance(array2)
-
-        m = vine.DaskVine(port=9123, ssl=True)
-        m.set_name("test_manager")
-        print(f"Listening for workers at port: {m.port}")
-
-        f = vine.Factory(manager=m)
-        f.cores = 4
-        f.max_workers = 1
-        f.min_workers = 1
-        with f:
-            with dask.config.set(scheduler=m.get):
-                result = distance.compute(resources={"cores": 1}, resources_mode="max", worker_transfers=True)
-                print(f"distance = {result}")
-            print("Terminating workers...", end="")
-        print("done!")
     ```
+for older versions of Dask import `vine.compat.DaskVine`
+
+DaskVine spports other Dask [abstractions](https://docs.dask.org/en/stable/) such as Dask Array, Dask Bag, and Dask DataFrame.  
 
 The `compute` call above may receive the following keyword arguments:
 
@@ -3030,6 +2991,7 @@ The `compute` call above may receive the following keyword arguments:
 | lazy\_transfers | Deprecated alias for `worker_transfers`. |
 | hoisting\_modules | Deprecated alias for `lib_modules`. |
 | import\_modules | Deprecated alias for `lib_modules`. |
+
 
 ## Appendix for Developers
 
