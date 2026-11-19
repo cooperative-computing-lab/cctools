@@ -1,6 +1,5 @@
 /*
-Copyright (C) 2003-2004 Douglas Thain and the University of Wisconsin
-Copyright (C) 2022 The University of Notre Dame
+Copyright (C) 2026 The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
@@ -11,419 +10,515 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 
-#define DEFAULT_SIZE 127
-#define DEFAULT_MAX_LOAD 0.75
-#define DEFAULT_MIN_LOAD 0.125
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
-#define ITERATION_MAX 1000000 /* very conservative overflow protection */
-
-struct entry {
+struct itable_entry {
 	UINT64_T key;
 	void *value;
-	struct entry *next;
-	int deleted;
 };
 
 struct itable {
-	int size;
-	int bucket_count;
-	struct entry **buckets;
-	int ibucket;
-	struct entry *ientry;
-	int iteration_index;
-	int need_compact;
+	struct itable_entry **buckets;
+	unsigned bucket_count;	  /* Length of the buckets array. */
+	unsigned live_count;	  /* Number of valid entries in array. */
+	unsigned dead_count;	  /* Number of tombstone entries in array. */
+	unsigned active_cursors;  /* Number of cursors created on this table. */
 };
 
-struct itable *itable_create(int bucket_count)
+struct itable_cursor {
+	unsigned position;
+	struct itable *table;
+};
+
+#define ITABLE_LOAD_FACTOR_MIN 10
+#define ITABLE_LOAD_FACTOR_MAX 30
+#define ITABLE_SIZE_MIN 127
+
+/* A value indicating a deleted object occupied this bucket. */
+#define ITABLE_TOMBSTONE ((struct itable_entry *)(-1))
+
+/* A value indicating that a cursor does not point to a valid entry. */
+#define ITABLE_CURSOR_INVALID ((unsigned)-1)
+
+static struct itable_entry *itable_entry_create(UINT64_T key, const void *value)
 {
-	struct itable *h;
-
-	h = (struct itable *)malloc(sizeof(struct itable));
-	if (!h)
-		return 0;
-
-	if (bucket_count == 0)
-		bucket_count = DEFAULT_SIZE;
-
-	h->bucket_count = bucket_count;
-	h->buckets = (struct entry **)calloc(bucket_count, sizeof(struct entry *));
-	if (!h->buckets) {
-		free(h);
-		return 0;
-	}
-
-	h->size = 0;
-	h->ientry = 0;
-	h->iteration_index = 0;
-	h->need_compact = 0;
-	return h;
-}
-
-void itable_clear(struct itable *h, void (*delete_func)(void *))
-{
-	struct entry *e, *f;
-	int i;
-
-	for (i = 0; i < h->bucket_count; i++) {
-		e = h->buckets[i];
-		while (e) {
-			if (delete_func && !e->deleted)
-				delete_func(e->value);
-			f = e->next;
-			free(e);
-			e = f;
-		}
-	}
-
-	for (i = 0; i < h->bucket_count; i++) {
-		h->buckets[i] = 0;
-	}
-
-	h->size = 0;
-	h->need_compact = 0;
-	h->iteration_index = (h->iteration_index + 1) % ITERATION_MAX;
-}
-
-static int itable_insert_to_buckets_aux(struct entry **buckets, int bucket_count, struct entry *new_entry)
-{
-	UINT64_T index;
-	struct entry *e;
-
-	index = new_entry->key % bucket_count;
-	e = buckets[index];
-
-	while (e) {
-		/* check that if this key already exist in the table */
-		if (new_entry->key == e->key) {
-			e->value = new_entry->value;
-			e->deleted = 0;
-			free(new_entry);
-			return 1;
-		}
-		e = e->next;
-	}
-
-	new_entry->next = buckets[index];
-	buckets[index] = new_entry;
-
-	return 1;
-}
-
-static int itable_reduce_buckets(struct itable *h)
-{
-	int new_count = ((h->bucket_count + 1) / 2) - 1;
-
-	/* DEFAULT_SIZE is the minimum size */
-	if (new_count < DEFAULT_SIZE) {
-		return 0;
-	}
-
-	/* Table cannot be reduced above DEFAULT_MAX_LOAD */
-	if (((float)h->size / new_count) > DEFAULT_MAX_LOAD) {
-		return 1;
-	}
-
-	struct entry **new_buckets = (struct entry **)calloc(new_count, sizeof(struct entry *));
-	if (!new_buckets) {
-		return 0;
-	}
-
-	struct entry *e, *f;
-	for (int i = 0; i < h->bucket_count; i++) {
-		e = h->buckets[i];
-		while (e) {
-			f = e->next;
-			if (!e->deleted) {
-				e->next = NULL;
-				itable_insert_to_buckets_aux(new_buckets, new_count, e);
-			}
-			e = f;
-		}
-	}
-
-	/* Make the old point to the new */
-	free(h->buckets);
-	h->buckets = new_buckets;
-	h->bucket_count = new_count;
-	h->need_compact = 0;
-
-	h->iteration_index = (h->iteration_index + 1) % ITERATION_MAX;
-
-	return 1;
-}
-
-/* Compact the table by removing deleted entries. This does not change the size of the table, or the number of buckets. */
-void itable_compact(struct itable *h)
-{
-	struct entry *e, *f;
-	int i;
-
-	if (!h->need_compact) {
-		return;
-	}
-
-	for (i = 0; i < h->bucket_count; i++) {
-		e = h->buckets[i];
-
-		/* find the head of the bucket and remove deleted entries*/
-		while (e && e->deleted) {
-			f = e->next;
-			free(e);
-			e = f;
-		}
-		h->buckets[i] = e;
-
-		/* remove deleted entries from the rest of the bucket */
-		while (e) {
-			f = e->next;
-			while (f && f->deleted) {
-				e->next = f->next;
-				free(f);
-				f = e->next;
-			}
-			e = f;
-		}
-	}
-
-	h->need_compact = 0;
-	if (((float)h->size / h->bucket_count) < DEFAULT_MIN_LOAD) {
-		itable_reduce_buckets(h);
-	}
-}
-
-void itable_delete(struct itable *h)
-{
-	itable_clear(h, 0);
-	free(h->buckets);
-	free(h);
-}
-
-int itable_size(struct itable *h)
-{
-	return h->size;
-}
-
-void *itable_lookup(struct itable *h, UINT64_T key)
-{
-	struct entry *e;
-	UINT64_T index;
-
-	index = key % h->bucket_count;
-	e = h->buckets[index];
-
-	while (e) {
-		if (key == e->key) {
-			if (!e->deleted) {
-				return e->value;
-			}
-			return 0;
-		}
-		e = e->next;
-	}
-
-	return 0;
-}
-
-static int itable_double_buckets(struct itable *h)
-{
-	int new_count = (2 * (h->bucket_count + 1)) - 1;
-	struct entry **new_buckets = (struct entry **)calloc(new_count, sizeof(struct entry *));
-	if (!new_buckets) {
-		return 0;
-	}
-
-	struct entry *e, *f;
-	for (int i = 0; i < h->bucket_count; i++) {
-		e = h->buckets[i];
-		while (e) {
-			f = e->next;
-			if (!e->deleted) {
-				e->next = NULL;
-				itable_insert_to_buckets_aux(new_buckets, new_count, e);
-			}
-			e = f;
-		}
-	}
-
-	/* Make the old point to the new */
-	free(h->buckets);
-	h->buckets = new_buckets;
-	h->bucket_count = new_count;
-	h->need_compact = 0;
-
-	h->iteration_index = (h->iteration_index + 1) % ITERATION_MAX;
-
-	return 1;
-}
-
-int itable_insert(struct itable *h, UINT64_T key, const void *value)
-{
-	struct entry *e;
-	UINT64_T index;
-
-	if (((float)h->size / h->bucket_count) > DEFAULT_MAX_LOAD)
-		itable_double_buckets(h);
-
-	index = key % h->bucket_count;
-	e = h->buckets[index];
-
-	while (e) {
-		if (key == e->key) {
-			int was_deleted = e->deleted;
-			e->value = (void *)value;
-			e->deleted = 0;
-			if (was_deleted) {
-				h->size++;
-			}
-			h->iteration_index = (h->iteration_index + 1) % ITERATION_MAX;
-			return 1;
-		}
-		e = e->next;
-	}
-
-	e = (struct entry *)malloc(sizeof(struct entry));
-	if (!e)
-		return 0;
-
+	struct itable_entry *e = malloc(sizeof(*e));
 	e->key = key;
+	/* Note that e->value is neither allocated nor deleted by this module. */
 	e->value = (void *)value;
-	e->deleted = 0;
+	return e;
+}
 
-	int inserted = itable_insert_to_buckets_aux(h->buckets, h->bucket_count, e);
-	if (inserted) {
-		h->size++;
-		h->iteration_index = (h->iteration_index + 1) % ITERATION_MAX;
+static void itable_entry_delete(struct itable_entry *e)
+{
+	/* Note that e->value is neither allocated nor deleted by this module. */
+	free(e);
+}
+
+struct itable *itable_create(unsigned bucket_count)
+{
+	struct itable *table = malloc(sizeof(*table));
+
+	if (bucket_count < 1)
+		bucket_count = ITABLE_SIZE_MIN;
+
+	table->buckets = calloc(bucket_count, sizeof(struct itable_entry *));
+	table->bucket_count = bucket_count;
+	table->live_count = 0;
+	table->dead_count = 0;
+	table->active_cursors = 0;
+
+	return table;
+}
+
+void itable_delete(struct itable *table)
+{
+	itable_clear(table, 0);
+	free(table->buckets);
+	free(table);
+}
+
+int itable_size(struct itable *table)
+{
+	return table->live_count;
+}
+
+double itable_load(struct itable *table)
+{
+	return ((double)table->live_count) / table->bucket_count;
+}
+
+/*
+Remove and dispose of all items in the hash table, applying
+the providing deletefunc to each one.  Note that this routine
+shortcuts the usual delete function, so as to avoid
+(a) a table full of tombstones and (b) a forced rehash,
+since the likely next step is to delete the table.
+*/
+
+void itable_clear(struct itable *table, void (*deletefunc)(void *))
+{
+	for (unsigned i = 0; i < table->bucket_count; i++) {
+		struct itable_entry *e = table->buckets[i];
+		if (e) {
+			if (e != ITABLE_TOMBSTONE) {
+				if (deletefunc)
+					deletefunc(e->value);
+				itable_entry_delete(e);
+			}
+			table->buckets[i] = 0;
+		}
+	}
+	table->live_count = 0;
+	table->dead_count = 0;
+}
+
+/*
+Force a rehash of the table by allocating a table with "new_bucket_count",
+transferring all of the live objects over, and disposing of the old bucket array.
+Note that a rehash may invalidate current cursors into the table.
+*/
+
+static void itable_rehash(struct itable *table, unsigned new_bucket_count)
+{
+	struct itable_entry **new_buckets = calloc(new_bucket_count, sizeof(struct itable_entry *));
+
+	for (unsigned i = 0; i < table->bucket_count; i++) {
+		struct itable_entry *e = table->buckets[i];
+		if (e && e != ITABLE_TOMBSTONE) {
+			unsigned newpos = e->key % new_bucket_count;
+			while (new_buckets[newpos]) {
+				newpos++;
+				if (newpos >= new_bucket_count)
+					newpos = 0;
+			}
+			new_buckets[newpos] = e;
+		}
+	}
+
+	free(table->buckets);
+
+	table->buckets = new_buckets;
+	table->bucket_count = new_bucket_count;
+	table->dead_count = 0;
+}
+
+static void itable_shrink(struct itable *table)
+{
+	unsigned new_bucket_count = ((table->bucket_count + 1) / 2) - 1;
+	itable_rehash(table, new_bucket_count);
+}
+
+static void itable_grow(struct itable *table)
+{
+	unsigned new_bucket_count = ((table->bucket_count + 1) * 2) - 1;
+	itable_rehash(table, new_bucket_count);
+}
+
+/* Consider the current size of the table and grow or shrink as necessary. */
+
+int itable_consider_rehash(struct itable *table)
+{
+	/* Never rehash the table while cursors are actively iterating. */
+	if (table->active_cursors > 0)
+		return 0;
+
+	unsigned live_load = table->live_count * 100 / table->bucket_count;
+	unsigned total_load = (table->live_count + table->dead_count) * 100 / table->bucket_count;
+
+	if (live_load < ITABLE_LOAD_FACTOR_MIN && table->bucket_count > ITABLE_SIZE_MIN) {
+		itable_shrink(table);
+		return table->bucket_count;
+	} else if (total_load > ITABLE_LOAD_FACTOR_MAX) {
+		itable_grow(table);
+		return table->bucket_count;
 	} else {
-		free(e);
+		return 0;
+	}
+}
+
+/*
+Insert an item into the itable and then rehash if necessary.
+Note that *any* insertion is disallowed while a cursor is active,
+because insertion might require a rehash which would confuse cursors.
+
+Why not just optimistically permit insertions as long as there is room?
+Because this would result in a *rare* failure when repeated inserts
+left no room in the table, requiring a (prohibited) rehash.
+
+We prefer to establish a strict, easily testable rule rather than
+leave a rare, difficult to test bug.
+*/
+
+int itable_insert(struct itable *table, UINT64_T key, const void *value)
+{
+	if (!table)
+		return 0;
+
+	if (table->active_cursors) {
+		fatal("itable_insert attempted on a table with active cursors!");
+		/* NOTREACHED */
 		return 0;
 	}
 
-	return 1;
-}
+	unsigned pos = key % table->bucket_count;
+	unsigned found_tombstone = ITABLE_CURSOR_INVALID;
 
-/* keys are not really removed, just marked as deleted. A call to itable_compact will remove them. */
-void *itable_remove(struct itable *h, UINT64_T key)
-{
-	struct entry *e;
-	void *value;
-	UINT64_T index;
-
-	index = key % h->bucket_count;
-	e = h->buckets[index];
-
-	while (e) {
-		if (key == e->key) {
-			if (e->deleted) {
-				return 0;
+	for (;; pos = (pos + 1) % table->bucket_count) {
+		struct itable_entry *e = table->buckets[pos];
+		if (e) {
+			if (e == ITABLE_TOMBSTONE) {
+				/* Use the first tombstone found, but only after ensuring no match. */
+				if (found_tombstone == ITABLE_CURSOR_INVALID) {
+					found_tombstone = pos;
+				}
+				continue;
 			}
-			e->deleted = 1;
-			h->need_compact = 1;
-			value = e->value;
-
-			h->size--;
-			return value;
-		}
-
-		e = e->next;
-	}
-
-	return 0;
-}
-
-void *itable_pop(struct itable *t)
-{
-	UINT64_T key;
-	void *value;
-
-	if (!t) {
-		return NULL;
-	}
-
-	if (itable_nextkey(t, t->iteration_index, &key, (void **)&value)) {
-		t->iteration_index++;
-		return itable_remove(t, key);
-	}
-
-	itable_firstkey(t);
-
-	if (itable_nextkey(t, t->iteration_index, &key, (void **)&value)) {
-		return itable_remove(t, key);
-	}
-
-	return NULL;
-}
-
-int itable_firstkey(struct itable *h)
-{
-	itable_compact(h);
-	h->iteration_index = (h->iteration_index + 1) % ITERATION_MAX;
-
-	h->ientry = 0;
-	for (h->ibucket = 0; h->ibucket < h->bucket_count; h->ibucket++) {
-		h->ientry = h->buckets[h->ibucket];
-		if (h->ientry) {
-			/* we don't need to check for deleted entries here because itable_compact removes them */
+			if (key == e->key ) {
+				if (value == e->value) {
+					/* identical key:value exists */
+					return 1;
+				} else {
+					static int duplicate_key_warnings = 0;
+					duplicate_key_warnings++;
+					if (duplicate_key_warnings < 10) {
+						notice(D_DEBUG, "key %s already exists in itable with different value, ignoring new value.", key);
+					} else if (duplicate_key_warnings == 10) {
+						notice(D_DEBUG, "[additional warnings suppressed]");
+					}
+					return 0;
+				}
+			} else {
+				/* different key: keep looking */
+				continue;
+			}
+		} else {
+			/* empty bucket: insert here */
 			break;
 		}
 	}
 
-	return h->iteration_index;
+	if (found_tombstone != ITABLE_CURSOR_INVALID) {
+		pos = found_tombstone;
+		table->dead_count--;
+	}
+
+	table->live_count++;
+	table->buckets[pos] = itable_entry_create(key, value);
+
+	itable_consider_rehash(table);
+
+	return 1;
 }
 
-int itable_nextkey(struct itable *h, int iteration, UINT64_T *key, void **value)
+void *itable_lookup(struct itable *table, UINT64_T key)
 {
-	if (!h) {
+	if (!table)
 		return 0;
-	}
 
-	if (iteration != h->iteration_index) {
-		fatal("cctools bug: the itable iteration has not been reset since last modification");
-	}
+	struct itable_entry *e = 0;
 
-	if (h->ientry) {
-		*key = h->ientry->key;
-		if (value)
-			*value = h->ientry->value;
+	unsigned pos = key % table->bucket_count;
 
-		h->ientry = h->ientry->next;
-		while (h->ientry && h->ientry->deleted) {
-			h->ientry = h->ientry->next;
-		}
-		if (!h->ientry) {
-			h->ibucket++;
-			for (; h->ibucket < h->bucket_count; h->ibucket++) {
-				h->ientry = h->buckets[h->ibucket];
-				if (h->ientry && !h->ientry->deleted)
-					break;
+	for (;; pos = (pos + 1) % table->bucket_count) {
+		e = table->buckets[pos];
+		if (e) {
+			if (e == ITABLE_TOMBSTONE) {
+				continue;
+			} else if (key == e->key) {
+				break;
+			} else {
+				continue;
 			}
+		} else {
+			return 0;
 		}
+	}
 
-		return 1;
+	return e->value;
+}
+
+/*
+Internal function to remove item at specific position already
+determined to be valid by the caller.  Adjust counts,
+convert the entry to a tombstone, consider rehashing,
+and return the value.
+*/
+
+static void *itable_remove_at_position(struct itable *table, unsigned position)
+{
+	struct itable_entry *e = table->buckets[position];
+	if (!e || e == ITABLE_TOMBSTONE)
+		return 0;
+
+	void *value = e->value;
+
+	itable_entry_delete(e);
+
+	table->buckets[position] = ITABLE_TOMBSTONE;
+	table->live_count--;
+	table->dead_count++;
+
+	itable_consider_rehash(table);
+
+	return value;
+}
+
+/*
+Remove an item from the itable.
+This operation is safe because removals happen in place,
+and rehashes are suppressed while cursors are active.
+*/
+
+void *itable_remove(struct itable *table, UINT64_T key)
+{
+	if (!table)
+		return 0;
+
+	struct itable_entry *e = 0;
+
+	unsigned pos = key % table->bucket_count;
+
+	for (;; pos = (pos + 1) % table->bucket_count) {
+		e = table->buckets[pos];
+		if (e) {
+			if (e == ITABLE_TOMBSTONE) {
+				continue;
+			} else if (key == e->key) {
+				break;
+			} else {
+				continue;
+			}
+		} else {
+			return 0;
+		}
+	}
+
+	return itable_remove_at_position(table, pos);
+}
+
+/*
+Create a new cursor object, which will be initially positioned
+at the first valid entry in the itable, or at the INVALID position,
+if the itable is empty.
+*/
+
+struct itable_cursor *itable_cursor_create(struct itable *table)
+{
+	struct itable_cursor *cursor = malloc(sizeof(*cursor));
+
+	cursor->position = 0;
+	cursor->table = table;
+	cursor->table->active_cursors++;
+
+	itable_cursor_seek(cursor, 0);
+
+	return cursor;
+}
+
+/*
+Move the cursor to the first valid entry in the itable
+at a location equal or greater than the position argument.
+If there is no such entry, go to the INVALID position.
+A position of zero indicates the first valid entry.
+(It's not clear if this function is useful for any position other than zero.)
+*/
+
+void itable_cursor_seek(struct itable_cursor *cursor, unsigned position)
+{
+	if (position >= cursor->table->bucket_count) {
+		cursor->position = ITABLE_CURSOR_INVALID;
 	} else {
-		return 0;
-	}
-}
-
-void itable_foreach_ro(struct itable *h, void (*func)(UINT64_T key, void *value, void *arg), void *arg)
-{
-	struct entry *e;
-	int i;
-
-	int prev_iteration = h->iteration_index;
-
-	for (i = 0; i < h->bucket_count; i++) {
-		e = h->buckets[i];
-		while (e) {
-			if (!e->deleted) {
-				func(e->key, e->value, arg);
-			}
-			e = e->next;
-
-			if (h->iteration_index != prev_iteration) {
-				fatal("cctools bug: the itable iteration has been modified since last call to itable_foreach_ro");
-			}
+		cursor->position = position;
+		struct itable_entry *e = cursor->table->buckets[cursor->position];
+		if (!e || e == ITABLE_TOMBSTONE) {
+			itable_cursor_next(cursor);
 		}
 	}
 }
 
-/* vim: set noexpandtab tabstop=8: */
+/*
+If the cursor points to a valid position,
+give back that key:value and return true.
+Otherwise return false.
+*/
+
+int itable_cursor_get(struct itable_cursor *cursor, UINT64_T *key, void **value)
+{
+	/* If the cursor is already invalid, return false. */
+	if (cursor->position == ITABLE_CURSOR_INVALID) {
+		return 0;
+	}
+
+	/* If the position is off the end, convert it to invalid and return false. */
+	/* This shouldn't happen b/c rehashing is inhibited by cursors. */
+	if (cursor->position >= cursor->table->bucket_count) {
+		cursor->position = ITABLE_CURSOR_INVALID;
+		return 0;
+	}
+
+	/* Grab the bucket at that position, which may be null. */
+	struct itable_entry *e = cursor->table->buckets[cursor->position];
+
+	/* If there is no object at this position, return false.. */
+	/* This would only happen if the object was removed */
+	/* after the cursor advanced to this position. */
+	if (!e || e == ITABLE_TOMBSTONE) {
+		return 0;
+	}
+
+	/* Otherwise, we have a good value and return true. */
+	*key = e->key;
+	*value = e->value;
+	return 1;
+}
+
+/*
+Remove the item at the current cursor position.
+Further gets at this position will return null,
+until the cursor is advanced to the next position.
+*/
+
+void *itable_cursor_remove(struct itable_cursor *cursor)
+{
+	if (cursor->position == ITABLE_CURSOR_INVALID) {
+		return 0;
+	}
+
+	if (cursor->position >= cursor->table->bucket_count) {
+		return 0;
+	}
+
+	return itable_remove_at_position(cursor->table, cursor->position);
+}
+
+/*
+Advance the cursor to the next valid position in the itable
+and return true. If there is no valid next position, then
+return false.
+*/
+
+int itable_cursor_next(struct itable_cursor *cursor)
+{
+	if (cursor->position == ITABLE_CURSOR_INVALID) {
+		return 0;
+	}
+
+	while (1) {
+		cursor->position++;
+
+		if (cursor->position >= cursor->table->bucket_count) {
+			cursor->position = ITABLE_CURSOR_INVALID;
+			return 0;
+		}
+
+		struct itable_entry *e = cursor->table->buckets[cursor->position];
+
+		if (e == ITABLE_TOMBSTONE) {
+			continue;
+		} else if (e) {
+			return 1;
+		} else {
+			continue;
+		}
+	}
+}
+
+void itable_cursor_delete(struct itable_cursor *cursor)
+{
+	cursor->table->active_cursors--;
+	free(cursor);
+}
+
+/* Helper function to assist with the auto-cleanup attribute. */
+
+void itable_cursor_delete_pp(struct itable_cursor **cursor)
+{
+	itable_cursor_delete(*cursor);
+}
+
+/* Utility functions that depend upon cursors for common operations. */
+
+/* Remove the first object that is conveniently available. */
+
+void *itable_remove_any(struct itable *table)
+{
+	struct itable_cursor *cursor = itable_cursor_create(table);
+	void *value = itable_cursor_remove(cursor);
+	itable_cursor_delete(cursor);
+	return value;
+}
+
+/* Remove an object from a random position in the table. */
+
+void *itable_remove_random(struct itable *table)
+{
+	struct itable_cursor *cursor = itable_cursor_create(table);
+
+	/* Put the cursor at the object following a random position. */
+	itable_cursor_seek(cursor, rand() % table->bucket_count);
+
+	/* But if that was already off the end, go back to the beginning */
+	if (cursor->position == ITABLE_CURSOR_INVALID)
+		itable_cursor_seek(cursor, 0);
+
+	/* Now return that value, if any. */
+	void *value = itable_cursor_remove(cursor);
+
+	itable_cursor_delete(cursor);
+
+	return value;
+}
+
+void itable_foreach_ro(struct itable *table, void (*func)(UINT64_T key, void *value, void *arg), void *arg)
+{
+	int iteration;
+	UINT64_T key;
+	void *value;
+	ITABLE_ITERATE(table, iteration, key, value)
+	{
+		func(key, value, arg);
+	}
+}
