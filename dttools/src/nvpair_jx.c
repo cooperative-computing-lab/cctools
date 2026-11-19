@@ -8,6 +8,7 @@ See the file COPYING for details.
 #include "jx_parse.h"
 #include "jx_print.h"
 #include "nvpair.h"
+#include "nvpair_private.h"
 #include "stringtools.h"
 
 /*
@@ -71,8 +72,9 @@ struct jx *nvpair_to_jx(struct nvpair *nv)
 	long long integer_value;
 	double double_value;
 
-	int iteration = nvpair_first_item(nv);
-	while (nvpair_next_item(nv, iteration, &key, &value)) {
+	int iteration;
+	HASH_TABLE_ITERATE(nv->table, iteration, key, value)
+	{
 		if (!strcmp(value, "true")) {
 			jvalue = jx_boolean(1);
 		} else if (!strcmp(value, "false")) {

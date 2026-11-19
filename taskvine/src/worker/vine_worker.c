@@ -303,7 +303,7 @@ void send_complete_tasks(struct link *l)
 	int visited;
 	struct vine_process *p;
 	for (visited = 0; visited < size; visited++) {
-		p = itable_pop(procs_complete);
+		p = itable_remove_any(procs_complete);
 		if (p->output_length <= 1024 && p->output_length > 0) {
 
 			char *output;

@@ -1003,18 +1003,12 @@ static void cleanup_worker_files(struct vine_manager *q, struct vine_worker_info
 
 	/* get the list of cached files before they are removed by worker disconnect */
 	char *cachename = NULL;
-	char **cachenames = hash_table_keys_array(w->current_files);
-	if (!cachenames) {
-		return;
-	}
+	struct vine_file *f;
 
-	/* delete the existing file replicas on the worker */
-	for (int i = 0; (cachename = cachenames[i]); i++) {
-		/* send unlink to worker, handle the replica state transition as a normal case */
-		struct vine_file *f = hash_table_lookup(q->file_table, cachename);
-		if (f) {
-			delete_worker_file(q, w, cachename, f->cache_level, VINE_CACHE_LEVEL_WORKFLOW);
-		}
+	HASH_TABLE_ITERATE_SNAPSHOT(w->current_files, cachename, f)
+	{
+		delete_worker_file(q, w, cachename, f->cache_level, VINE_CACHE_LEVEL_WORKFLOW);
+
 		/* clean up worker replicas from the replica table, because deleting a CREATING replica will result in its
 		 * state being DELETING, and deleting a DELETING replica does not change its state, so we need to manually
 		 * delete the replicas. See definitions for state transition events in vine_file_replica.c for more details. */
@@ -1030,8 +1024,6 @@ static void cleanup_worker_files(struct vine_manager *q, struct vine_worker_info
 			}
 		}
 	}
-
-	hash_table_free_keys_array(cachenames);
 }
 
 /** Release a random worker to simulate a failure. */
@@ -1041,27 +1033,14 @@ int vine_manager_release_random_worker(struct vine_manager *q)
 		return 0;
 	}
 
-	int removed = 0;
-
-	int offset_bookkeep;
-	char *key;
-	struct vine_worker_info *w;
-	int iteration;
-
-	HASH_TABLE_ITERATE_RANDOM_START(q->worker_table, iteration, offset_bookkeep, key, w)
-	{
-		if (!w) {
-			continue;
-		}
-
-		/* evict this worker */
+	struct vine_worker_info *w = hash_table_remove_random(q->worker_table);
+	if (w) {
 		debug(D_VINE | D_NOTICE, "Intentionally evicting worker %s", w->hostname);
 		release_worker(q, w);
-		removed = 1;
-		break;
+		return 1;
+	} else {
+		return 0;
 	}
-
-	return removed;
 }
 
 /*
@@ -6003,7 +5982,7 @@ static void disconnect_all_workers(struct vine_manager *q)
 	struct vine_worker_info *w;
 
 	/* the manager is shutting down, so workers are removed right away. */
-	while ((w = hash_table_pop(q->worker_table))) {
+	while ((w = hash_table_remove_any(q->worker_table))) {
 		vine_manager_send(q, w, "release\n");
 		vine_manager_remove_worker(q, w, VINE_WORKER_DISCONNECT_EXPLICIT);
 		q->stats->workers_released++;

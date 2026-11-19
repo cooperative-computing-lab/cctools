@@ -6445,9 +6445,11 @@ static void fill_deprecated_tasks_stats(struct work_queue_task *t) {
 
 /* Changes task state. Returns old state */
 /* State of the task. One of WORK_QUEUE_TASK(UNKNOWN|READY|RUNNING|WAITING_RETRIEVAL|RETRIEVED|DONE) */
-static work_queue_task_state_t change_task_state( struct work_queue *q, struct work_queue_task *t, work_queue_task_state_t new_state ) {
 
-	work_queue_task_state_t old_state = (uintptr_t) itable_lookup(q->task_state_map, t->taskid);
+static work_queue_task_state_t change_task_state( struct work_queue *q, struct work_queue_task *t, work_queue_task_state_t new_state )
+{
+  /* If there is no entry in the table, (void*)0 is returned, mapping to WORK_QUEUE_TASK_UNKNOWN. */
+	work_queue_task_state_t old_state = (uintptr_t) itable_remove(q->task_state_map, t->taskid);
 	itable_insert(q->task_state_map, t->taskid, (void *) new_state);
 
 	struct category *c = work_queue_category_lookup_or_create(q, t->category);
@@ -7309,7 +7311,7 @@ struct list * work_queue_cancel_all_tasks(struct work_queue *q) {
 void release_all_workers(struct work_queue *q) {
 	struct work_queue_worker *w;
 
-	while ((w = hash_table_pop(q->worker_table))) {
+	while ((w = hash_table_remove_any(q->worker_table))) {
 	    release_worker(q, w);
 	}
 }

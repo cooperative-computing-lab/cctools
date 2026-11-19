@@ -9,7 +9,8 @@ prepare()
 
 run()
 {
-	../src/hash_table_fromkey_test
+	../src/hash_table_test
+	return $?
 }
 
 clean()

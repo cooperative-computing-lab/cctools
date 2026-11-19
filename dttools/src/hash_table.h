@@ -1,6 +1,5 @@
 /*
-Copyright (C) 2003-2004 Douglas Thain and the University of Wisconsin
-Copyright (C) 2022 The University of Notre Dame
+Copyright (C) 2026 The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
@@ -23,7 +22,7 @@ file = hash_table_remove(h,pathname);
 
 </pre>
 
-To list all of the items in a hash table, use @ref hash_table_firstkey and @ref hash_table_nextkey like this:
+Use the following macro to safely iterate over all items in a table:
 
 <pre>
 char *key;
@@ -34,7 +33,14 @@ HASH_TABLE_ITERATE(table, iteration, &key, &value) {
 	printf("table contains: %s\n",key);
 }
 </pre>
+
+Note that iteration has several important properties:
+- @ref HASH_TABLE_ITERATE can be safely nested, because each call uses an independent cursor.
+- @ref hash_table_insert is not permitted during iteration, to avoid a rehash upsetting the iteration order.
+- @ref hash_table_remove is permitted during iteration, and the "key" value remains valid until the end of the loop.
 */
+
+#include "hash_string.h"
 
 /** The type signature for a hash function given to @ref hash_table_create */
 
@@ -46,7 +52,7 @@ typedef unsigned (*hash_func_t) (const char *key);
 @return A pointer to a new hash table.
 */
 
-struct hash_table *hash_table_create(int buckets, hash_func_t func);
+struct hash_table *hash_table_create(unsigned buckets, hash_func_t func);
 
 /** Remove all entries from an hash table.
 @param h The hash table to delete.
@@ -106,44 +112,23 @@ void *hash_table_lookup(struct hash_table *h, const char *key);
 
 void *hash_table_remove(struct hash_table *h, const char *key);
 
-/** Remove any one value.
+/** Remove any one value that is most convenient.
 @param h A pointer to a hash table.
 @return One object removed from the table.
 */
 
-void *hash_table_pop( struct hash_table *h );
+void *hash_table_remove_any( struct hash_table *h );
 
-/** Begin iteration over all keys.
-This function begins a new iteration over a hash table,
-allowing you to visit every key and value in the table.
-Next, invoke @ref hash_table_nextkey to retrieve each value in order.
+/** Remove a value from a random position in the table.
 @param h A pointer to a hash table.
-@return The iteration index.
+@return One object removed from the table.
 */
 
-int hash_table_firstkey(struct hash_table *h);
-
-/** Continue iteration over all keys.
-This function returns the next key and value in the iteration.
-This function should only be called after a call to hash_table_firstkey.
-Warning: It cannot be called after hash_table_insert, hash_table_clear, or a
-table resize during the same iteration. If this is needed, consider
-iterating using manual hash_table_lookup with keys from hash_table_keys_array.
-@param h A pointer to a hash table.
-@param iteration The iteration index since the last call to hash_table_firstkey.
-@param key A pointer to a key pointer.
-@param value A pointer to a value pointer.
-@return Zero if there are no more elements to visit, one otherwise.
-*/
-
-int hash_table_nextkey(struct hash_table *h, int iteration, char **key, void **value);
+void *hash_table_remove_random( struct hash_table *h );
 
 /** Iterate over all entries in a hash table.
 This function invokes a callback on every key and value in the table.
-Unlike @ref HASH_TABLE_ITERATE, this function does not use the table's
-iteration state, so it may be called while another iteration is in
-progress.  The table must not be modified during the call; if an
-insert, compact, clear, or resize occurs, the program will abort.
+The table must not be modified during the call; if an insert occurs, the program will abort.
 @param h A pointer to a hash table.
 @param func A callback invoked once for each entry.
 @param arg An arbitrary pointer passed to each invocation of @a func.
@@ -151,62 +136,66 @@ insert, compact, clear, or resize occurs, the program will abort.
 
 void hash_table_foreach_ro(struct hash_table *h, void (*func)(const char *key, void *value, void *arg), void *arg);
 
-/** Begin iteration over all keys from a random offset.
-This function begins a new iteration over a hash table,
-allowing you to visit every key and value in the table.
-Next, invoke @ref hash_table_nextkey_with_offset to retrieve each value in order.
-@param h A pointer to a hash table.
-@param offset_bookkeep An integer to pointer where the origin to the iteration is recorded.
-@return The iteration index.
-*/
-
-int hash_table_randomkey(struct hash_table *h, int *offset_bookkeep);
-
-/** Continue iteration over all keys from an arbitray offset.
-This function returns the next key and value in the iteration.
-This function should only be called after a call to hash_table_randomkey.
-@param h A pointer to a hash table.
-@param iteration The iteration index since the last call to hash_table_randomkey.
-@param offset_bookkeep The origin for this iteration. See @ref hash_table_randomkey
-@param key A pointer to a key pointer.
-@param value A pointer to a value pointer.
-@return Zero if there are no more elements to visit, one otherwise.
-*/
-
-int hash_table_nextkey_with_offset(struct hash_table *h, int iteration, int offset_bookkeep, char **key, void **value);
-
-/** Begin iteration at the given key.
-Invoke @ref hash_table_nextkey to retrieve each value in order.
-Note that subsequent calls to this functions may result in different iteration orders as the hash_table may have been
-resized.
-@param h A pointer to a hash table.
-@param key A string key to search for, or NULL to reset to the first key.
-@return The iteration index.
-*/
-
-int hash_table_fromkey(struct hash_table *h, const char *key);
-
-/** A default hash function.
-@param s A string to hash.
-@return An integer hash of the string.
-*/
-
-unsigned hash_string(const char *s);
-
-/** Return a NULL-termianted array with a copy of all the current keys.
+/** Return a NULL-terminated array with a copy of all the current keys.
 It is the responsibility of the caller to free this array with
-hash_table_free_keys_array.
+@ref hash_table_keys_delete.
 @param h A pointer to a hash table.
 @return NULL-termianted array of size with a copy of all the current keys.
 */
 
-char **hash_table_keys_array(struct hash_table *h);
+char **hash_table_keys(struct hash_table *h);
 
 
 /** Free an array generated from hash_table_free_keys_array.
-@param keys NULL-termianted array of size with a copy of keys.
+@param keys NULL-terminated array of size with a copy of keys.
 */
-void hash_table_free_keys_array(char **keys);
+void hash_table_keys_delete(char **keys);
+void hash_table_keys_delete_ppp( char ***keys );
+
+/** Create a cursor for iterating over the values of a table.
+@param table A pointer to a hash table.
+@return A pointer to a cursor object.
+*/
+
+struct hash_table_cursor * hash_table_cursor_create( struct hash_table *table );
+
+/** Move a cursor to a specific position in the table.
+The position zero indicates the first available object
+in the table, allowing for iterating over the entire
+set of objects in the table.  Positions other than zero
+are currently undefined.
+@param cursor A pointer to a cursor object.
+@param pos The desired position of the cursor.
+*/
+
+void hash_table_cursor_seek( struct hash_table_cursor *cursor, unsigned pos );
+
+/** Get the item under a cursor.
+If the cursor is positioned over a valid object,
+fill in the key and value and return true.
+If the cursor is invalid, simply return false.
+@param cursor A pointer to a cursor object.
+@param key A pointer to be filled in with the current key.
+@param value A pointer to be filled in with the current value.
+@return True if the cursor was positioned over a valid object.
+*/
+
+int  hash_table_cursor_get( struct hash_table_cursor *cursor, char **key, void **value );
+
+/** Move the cursor to the next object.
+Continue iteration by moving the cursor to the next available object and return true.
+If there are no more objects, move it to the invalid position and return false.
+@param A pointer to a cursor object.
+@return True if the cursor is now positioned over a valid object.
+*/
+int  hash_table_cursor_next( struct hash_table_cursor *cursor );
+
+/** Delete a cursor.
+@param A pointer to a cursor object.
+*/
+
+void hash_table_cursor_delete( struct hash_table_cursor *cursor );
+void hash_table_cursor_delete_pp( struct hash_table_cursor **cursor );
 
 /** Utility macro to simplify common case of iterating over a hash table.
 Use as follows:
@@ -223,23 +212,13 @@ HASH_TABLE_ITERATE(table, iteration, key, value) {
 </pre>
 */
 
-#define HASH_TABLE_ITERATE(table, iteration, key, value) \
-	iteration = hash_table_firstkey(table); \
-	while (hash_table_nextkey(table, iteration, &key, (void **)&value))
+#define HASH_TABLE_ITERATE( table, iteration, key, value ) \
+  (void) iteration; \
+  for( struct hash_table_cursor *__cursor  __attribute__((cleanup(hash_table_cursor_delete_pp))) = hash_table_cursor_create(table), *__keep_going=__cursor; __keep_going; __keep_going=0) \
+    for( hash_table_cursor_seek(__cursor,0); hash_table_cursor_get(__cursor,&key,(void**)&value); hash_table_cursor_next(__cursor) )
 
-#define HASH_TABLE_ITERATE_RANDOM_START(table, iteration, offset_bookkeep, key, value) \
-	iteration = hash_table_randomkey(table, &offset_bookkeep); \
-	while (hash_table_nextkey_with_offset(table, iteration, offset_bookkeep, &key, (void **)&value))
-
-#define HASH_TABLE_ITERATE_FROM_KEY(table, iteration, iter_count_limit, iter_count_var, key_start, key, value) \
-	iter_count_limit = 0; \
-	iter_count_var = 0; \
-	iteration = hash_table_fromkey(table, key_start); \
-	while (iter_count_var < hash_table_size(table) && \
-		(iter_count_var += 1 && \
-		 (hash_table_nextkey(table, iteration, &key, (void **)&value) || \
-		  (!iter_count_limit && (iter_count_limit += 1) && \
-		   (iteration = hash_table_fromkey(table, NULL)) && \
-		   hash_table_nextkey(table, iteration, &key, (void **)&value)))))
+#define HASH_TABLE_ITERATE_SNAPSHOT( table, key, value ) \
+  for( char **__keys __attribute__((cleanup(hash_table_keys_delete_ppp))) = hash_table_keys(table), **__keep_going=__keys; __keep_going; __keep_going=0) \
+    for( int __i=0; key=__keys[__i], value=hash_table_lookup(table,key); __i++ )
 
 #endif
