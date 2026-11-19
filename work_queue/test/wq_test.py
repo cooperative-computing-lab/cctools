@@ -17,7 +17,7 @@ import ndcctools.work_queue as wq
 
 test_dir    = tempfile.mkdtemp(prefix='wq.test', dir=".")
 input_file  = 'input.file'
-exec_file   = 'exec.file'
+exec_file   = 'cat'
 
 def cleanup():
     shutil.rmtree(test_dir)

@@ -146,6 +146,9 @@ static char *cluster_set_resource_string(struct batch_queue *q, const struct rms
 			// expected in minutes, not seconds
 			buffer_printf(&cluster_resources, " --time=%.0f", DIV_INT_ROUND_UP(resources->wall_time, 60));
 		}
+		if (resources->gpus > 0) {
+			buffer_printf(&cluster_resources, " --gpus=%.0f", DIV_INT_ROUND_UP(resources->gpus, 1));
+		}
 
 		/* The value of max_concurrent_processes is set by the .MAKEFLOW MPI_PROCESSES.
 		 * If set, the number of cores should be divisible by max_concurrent_processes. */

@@ -29,7 +29,6 @@ void vine_resources_delete( struct vine_resources *r );
 struct vine_resources* vine_resources_copy( struct vine_resources* r);
 void vine_resources_debug( struct vine_resources *r );
 void vine_resources_measure_locally( struct vine_resources *r, const char *workspace );
-void vine_resources_send( struct link *manager, struct vine_resources *r, time_t stoptime );
 void vine_resources_clear( struct vine_resources *r );
 void vine_resources_add( struct vine_resources *total, struct vine_resources *r );
 void vine_resources_min( struct vine_resources *total, struct vine_resources *r );

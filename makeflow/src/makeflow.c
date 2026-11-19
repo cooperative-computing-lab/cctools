@@ -1240,6 +1240,7 @@ static void show_help_run(const char *cmd)
 	printf(" -N,--project-name=<project>    Set the Work Queue project name.\n");
 	printf("    --cache-mode=never|workflow|forever   Change caching control.\n");
 	printf(" -F,--fast-abort=<#>            Set the Work Queue fast abort multiplier.\n");
+	printf("    --wait-for-workers=<#>      Do not dispatch tasks until <#> workers connect.\n");
 	printf(" -t,--keepalive-timeout=<#>     Work Queue keepalive timeout. (default: 30s)\n");
 	printf(" -u,--keepalive-interval=<#>    Work Queue keepalive interval. (default: 120s)\n");
 	printf(" -W,--schedule=<mode>           Work Queue scheduling algor. (time|files|fcfs)\n");
@@ -1569,6 +1570,7 @@ int main(int argc, char *argv[])
 		{"keepalive-timeout", required_argument, 0, 't'},
 		{"schedule", required_argument, 0, 'W'},
 		{"wait-queue-size", required_argument, 0, LONG_OPT_WAIT_FOR_WORKERS}, // Not advertised
+		{"wait-for-workers", required_argument, 0, LONG_OPT_WAIT_FOR_WORKERS},
 		{"wrapper", required_argument, 0, LONG_OPT_WRAPPER},
 		{"wrapper-input", required_argument, 0, LONG_OPT_WRAPPER_INPUT},
 		{"wrapper-output", required_argument, 0, LONG_OPT_WRAPPER_OUTPUT},
@@ -2324,6 +2326,7 @@ int main(int argc, char *argv[])
 	batch_queue_set_option(remote_queue, "keepalive-timeout", option_keepalive_timeout);
 	batch_queue_set_option(remote_queue, "caching", cache_mode);
 	batch_queue_set_option(remote_queue, "wait-queue-size", option_wait_queue_size);
+	batch_queue_set_option(remote_queue, "wait-for-workers", option_wait_queue_size);
 	batch_queue_set_option(remote_queue, "amazon-config", amazon_config);
 	batch_queue_set_option(remote_queue, "working-dir", working_dir);
 	batch_queue_set_option(remote_queue, "manager-preferred-connection", option_preferred_connection);

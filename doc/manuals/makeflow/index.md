@@ -59,25 +59,32 @@ creates four variations of the image, and then combines them back together
 into an animation. The first and the last task are marked as LOCAL to force
 them to run on the controlling machine.
 
+!!! note
+If you don't already have `convert` (ImageMagick) installed, then
+add it to your current environment with this command:
+```
+conda install ImageMagick
+```
+
 ```make
-CURL=/usr/bin/curl
-CONVERT=/usr/bin/convert
+CURL=curl
+CONVERT=convert    # Change to "magick" for ImageMagick 7.
 URL="https://ccl.cse.nd.edu/images/capitol.jpg"
 
 capitol.anim.gif: capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg
     LOCAL $(CONVERT) -delay 10 -loop 0 capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg capitol.270.jpg capitol.180.jpg capitol.90.jpg capitol.anim.gif
     
 capitol.90.jpg: capitol.jpg
-    $(CONVERT) -swirl 90 capitol.jpg capitol.90.jpg
+    $(CONVERT) capitol.jpg -swirl 90 capitol.90.jpg
     
 capitol.180.jpg: capitol.jpg
-    $(CONVERT) -swirl 180 capitol.jpg capitol.180.jpg
+    $(CONVERT) capitol.jpg -swirl 180 capitol.180.jpg
     
 capitol.270.jpg: capitol.jpg
-    $(CONVERT) -swirl 270 capitol.jpg capitol.270.jpg
+    $(CONVERT) capitol.jpg -swirl 270 capitol.270.jpg
     
 capitol.360.jpg: capitol.jpg
-    $(CONVERT) -swirl 360 capitol.jpg capitol.360.jpg
+    $(CONVERT) capitol.jpg -swirl 360 capitol.360.jpg
     
 capitol.jpg:
     LOCAL $(CURL) -o capitol.jpg $(URL)
@@ -106,12 +113,14 @@ Use the `--clean` option to clean everything up before trying it again:
 $ makeflow --clean example.makeflow
 ```
 
-If you have access to a batch system like Condor, UGE, or Torque, or a cloud
+If you have access to a batch system like Condor, SLURM, UGE, or Torque, or a cloud
 service provider like Amazon, you can direct Makeflow to run your jobs there
 by using the `-T` option:
 
 ```sh
 $ makeflow -T condor example.makeflow
+
+$ makeflow -T slurm example.makeflow
 
 $ makeflow -T uge example.makeflow
 
@@ -683,6 +692,21 @@ Server address are taken from the environment variables **CATALOG_HOST** and
 
 It is also easy to run your own catalog server, if you prefer. For more
 details, see the [Catalog Server Manual](../catalog/index.md).
+
+### Waiting for Workers
+
+By default, Makeflow dispatches the first ready task as soon as any worker
+connects. To hold all tasks until a given number of workers have connected,
+use `--wait-for-workers`:
+
+```sh
+$ makeflow -T condor -N myproject --wait-for-workers 50 example.makeflow
+```
+
+A `work_queue_factory` serving this project will submit at least that
+many workers until the target is reached (subject to its `--max-workers`).
+Once the target is reached, the factory returns to sizing the pool by
+the number of tasks.
 
 ### Setting a Password
 

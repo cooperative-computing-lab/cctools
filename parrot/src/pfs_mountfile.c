@@ -40,13 +40,13 @@ int pfs_mountfile_parse_mode( const char * options ) {
 void pfs_mountfile_parse_string(const char *str) {
 	assert(str);
 	char *e;
-	str = xxstrdup(str);
-	e = strchr(str, '=');
-	if(!e) fatal("badly formed mount string: %s", str);
+	char *strb = xxstrdup(str);
+	e = strchr(strb, '=');
+	if(!e) fatal("badly formed mount string: %s", strb);
 	*e = 0;
 	e++;
-	if (pfs_resolve_mount(str, e, "rwx") < 0) fatal("call to parrot_mount failed: %s", strerror(errno));
-	free((char *) str);
+	if (pfs_resolve_mount(strb, e, "rwx") < 0) fatal("call to parrot_mount failed: %s", strerror(errno));
+	free((char *) strb);
 }
 
 void pfs_mountfile_parse_file(const char *mountfile) {

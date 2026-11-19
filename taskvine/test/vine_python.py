@@ -17,7 +17,7 @@ import ndcctools.taskvine as vine
 
 test_dir = tempfile.mkdtemp(prefix="vine.test", dir=".")
 input_name = "input.file"
-exec_name = "exec.file"
+exec_name = "cat"
 
 error = False
 

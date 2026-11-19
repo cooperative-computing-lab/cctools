@@ -253,7 +253,10 @@ static pfs_resolve_t mount_entry_check( const char *logical_name, const char *pr
 		} else {
 			strcpy(physical_name,redirect);
 			if(llen>plen) {
-				if(logical_name[plen]!='/') {
+				/* Avoid "//" when the redirect is "/", otherwise paths such as
+				 * /proc/self/exe no longer match their special handling. */
+				size_t rlen = strlen(physical_name);
+				if(logical_name[plen]!='/' && !(rlen>0 && physical_name[rlen-1]=='/')) {
 					strcat(physical_name,"/");
 				}
 				strcat(physical_name,&logical_name[plen]);
