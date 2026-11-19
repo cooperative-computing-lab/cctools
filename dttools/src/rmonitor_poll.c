@@ -53,13 +53,12 @@ uint64_t usecs_since_epoch()
 
 void rmonitor_poll_all_processes_once(struct itable *processes, struct rmonitor_process_info *acc)
 {
-	int iteration;
 	uint64_t pid;
 	struct rmonitor_process_info *p;
 
 	bzero(acc, sizeof(struct rmonitor_process_info));
 
-	ITABLE_ITERATE(processes, iteration, pid, p)
+	ITABLE_ITERATE(processes, pid, p)
 	{
 		int status = rmonitor_poll_process_once(p);
 
@@ -80,7 +79,6 @@ void rmonitor_poll_all_processes_once(struct itable *processes, struct rmonitor_
 
 void rmonitor_poll_all_wds_once(struct hash_table *wdirs, struct rmonitor_wdir_info *acc, int max_time_for_measurement)
 {
-	int iteration;
 	struct rmonitor_wdir_info *d;
 	char *path;
 
@@ -92,7 +90,7 @@ void rmonitor_poll_all_wds_once(struct hash_table *wdirs, struct rmonitor_wdir_i
 			max_time_for_measurement = MAX(1, max_time_for_measurement / hash_table_size(wdirs));
 		}
 
-		HASH_TABLE_ITERATE(wdirs, iteration, path, d)
+		HASH_TABLE_ITERATE(wdirs, path, d)
 		{
 			int status = rmonitor_poll_wd_once(d, max_time_for_measurement);
 			/* do not consider directory if some error is found. */
@@ -106,13 +104,12 @@ void rmonitor_poll_all_wds_once(struct hash_table *wdirs, struct rmonitor_wdir_i
 
 void rmonitor_poll_all_fss_once(struct itable *filesysms, struct rmonitor_filesys_info *acc)
 {
-	int iteration;
 	struct rmonitor_filesys_info *f;
 	uint64_t dev_id;
 
 	bzero(acc, sizeof(struct rmonitor_filesys_info));
 
-	ITABLE_ITERATE(filesysms, iteration, dev_id, f)
+	ITABLE_ITERATE(filesysms, dev_id, f)
 	{
 		int status = rmonitor_poll_fs_once(f);
 		/* do not consider fs if some error is found. */
@@ -573,8 +570,7 @@ int rmonitor_poll_maps_once(struct itable *processes, struct rmonitor_mem_info *
 
 	uint64_t pid;
 	struct rmonitor_process_info *pinfo;
-	int iteration;
-	ITABLE_ITERATE(processes, iteration, pid, pinfo)
+	ITABLE_ITERATE(processes, pid, pinfo)
 	{
 		rmonitor_get_mmaps_usage(pid, maps_per_file);
 	}
@@ -602,7 +598,7 @@ int rmonitor_poll_maps_once(struct itable *processes, struct rmonitor_mem_info *
 	char *map_name;
 	struct list *infos;
 
-	HASH_TABLE_ITERATE(maps_per_file, iteration, map_name, infos)
+	HASH_TABLE_ITERATE(maps_per_file, map_name, infos)
 	{
 
 		struct rmonitor_mem_info *info, *next;
@@ -1054,8 +1050,7 @@ struct rmsummary *rmonitor_minimonitor(minimonitor_op op, uint64_t pid)
 	switch (op) {
 	case MINIMONITOR_RESET:
 		if (processes) {
-			int iteration;
-			ITABLE_ITERATE(processes, iteration, pid, p)
+			ITABLE_ITERATE(processes, pid, p)
 			{
 				itable_remove(processes, pid);
 				free(p);

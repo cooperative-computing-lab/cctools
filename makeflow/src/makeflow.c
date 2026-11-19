@@ -403,17 +403,16 @@ Abort the dag by removing all batch jobs from all queues.
 
 static void makeflow_abort_all(struct dag *d)
 {
-	int iteration;
 	uint64_t jobid;
 	struct dag_node *n;
 
 	printf("got abort signal...\n");
 
-	ITABLE_ITERATE(d->local_job_table, iteration, jobid, n) {
+	ITABLE_ITERATE(d->local_job_table, jobid, n) {
 		makeflow_abort_job(d,n,local_queue,jobid,"local");
 	}
 
-	ITABLE_ITERATE(d->remote_job_table, iteration, jobid, n) {
+	ITABLE_ITERATE(d->remote_job_table, jobid, n) {
 		makeflow_abort_job(d,n,remote_queue,jobid,"remote");
 	}
 }
@@ -940,7 +939,6 @@ a prior run that was logged.
 
 static int makeflow_check_files(struct dag *d)
 {
-	int iteration;
 	struct stat buf;
 	struct dag_file *f;
 	char *name;
@@ -949,7 +947,7 @@ static int makeflow_check_files(struct dag *d)
 
 	printf("checking files for unexpected changes...  (use --skip-file-check to skip this step)\n");
 
-	HASH_TABLE_ITERATE(d->files, iteration, name, f) {
+	HASH_TABLE_ITERATE(d->files, name, f) {
 
 		/* Skip special files that are not connected to the DAG nodes. */
 		if(!f->created_by && !list_size(f->needed_by)) continue;
@@ -2546,10 +2544,9 @@ EXIT_WITH_FAILURE:
 	(makeflow_log_aborted_event/makeflow_log_failed_event, etc.) already
 	guards against that; this block didn't. */
 	if(d) {
-		int iteration;
 		struct dag_node *n;
 		uint64_t key;
-		ITABLE_ITERATE(d->node_table, iteration, key, n) {
+		ITABLE_ITERATE(d->node_table, key, n) {
 			if(n->workflow_args) {
 				debug(D_MAKEFLOW_RUN, "deleting tmp file: %s\n", dag_node_nested_workflow_filename(n, "args"));
 				unlink(dag_node_nested_workflow_filename(n, "args"));

@@ -352,16 +352,10 @@ void chirp_alloc_flush()
 
 	debug(D_ALLOC, "flushing allocation states...");
 
-
-	char **paths = hash_table_keys_array(alloc_table);
-	int i = 0;
-	while ((path = paths[i])) {
-	    i++;
-	    s = hash_table_lookup(alloc_table, path);
+	HASH_TABLE_ITERATE_SNAPSHOT(alloc_table,path,s) {
 	    alloc_state_save(path, s);
 	    hash_table_remove(alloc_table, path);
 	}
-	hash_table_free_keys_array(paths);
 
 	hash_table_clear(root_table, free);
 

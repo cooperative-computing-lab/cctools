@@ -310,9 +310,8 @@ static int64_t measure_worker_disk()
 
 		struct work_queue_process *p;
 		uint64_t taskid;
-		int iteration;
 
-		ITABLE_ITERATE(procs_table, iteration, taskid, p) {
+		ITABLE_ITERATE(procs_table, taskid, p) {
 			if(p->sandbox_size > 0) {
 				disk_measured += p->sandbox_size;
 				files_counted += p->sandbox_file_count;
@@ -387,11 +386,10 @@ Send a message to the manager with user defined features.
 
 static void send_features(struct link *manager)
 {
-	int iteration;
 	char *f;
 	void *dummy;
 	char fenc[WORK_QUEUE_LINE_MAX];
-	HASH_TABLE_ITERATE(features, iteration, f, dummy) {
+	HASH_TABLE_ITERATE(features, f, dummy) {
 		url_encode(f, fenc, WORK_QUEUE_LINE_MAX);
 		send_manager_message(manager, "feature %s\n", fenc);
 	}
@@ -701,7 +699,7 @@ static void report_tasks_complete( struct link *manager )
 {
 	struct work_queue_process *p;
 
-	while((p=itable_pop(procs_complete))) {
+	while((p=itable_remove_any(procs_complete))) {
 		report_task_complete(manager,p);
 	}
 
@@ -719,13 +717,12 @@ and send a kill signal.  The actual exit of the process will be detected at a la
 
 static void expire_procs_running()
 {
-	int iteration;
 	struct work_queue_process *p;
 	uint64_t pid;
 
 	double current_time = timestamp_get() / USECOND;
 
-	ITABLE_ITERATE(procs_running, iteration, pid, p) {
+	ITABLE_ITERATE(procs_running, pid, p) {
 		if(p->task->resources_requested->end > 0 && current_time > p->task->resources_requested->end)
 		{
 			p->task_status = WORK_QUEUE_RESULT_TASK_TIMEOUT;
@@ -770,9 +767,8 @@ static int handle_completed_tasks(struct link *manager)
 	struct work_queue_process *p;
 	uint64_t pid;
 	int status;
-	int iteration;
 
-	ITABLE_ITERATE(procs_running, iteration, pid, p) {
+	ITABLE_ITERATE(procs_running, pid, p) {
 		int result = wait4((pid_t)pid, &status, WNOHANG, &p->rusage);
 		if(result==0) {
 			// pid is still going
@@ -1326,11 +1322,10 @@ then we need to abort to clean things up.
 
 static void kill_all_tasks()
 {
-	int iteration;
 	struct work_queue_process *p;
 	uint64_t taskid;
 
-	ITABLE_ITERATE(procs_table, iteration, taskid, p) {
+	ITABLE_ITERATE(procs_table, taskid, p) {
 		do_kill(taskid);
 	}
 
@@ -1368,11 +1363,10 @@ static void finish_running_task(struct work_queue_process *p, work_queue_result_
 
 static void finish_running_tasks(work_queue_result_t result)
 {
-	int iteration;
 	struct work_queue_process *p;
 	uint64_t pid;
 
-	ITABLE_ITERATE(procs_running, iteration, pid, p) {
+	ITABLE_ITERATE(procs_running, pid, p) {
 		finish_running_task(p, result);
 	}
 }
@@ -1397,7 +1391,6 @@ static int enforce_process_limits(struct work_queue_process *p)
 
 static int enforce_processes_limits()
 {
-	int iteration;
 	static time_t last_check_time = 0;
 
 	struct work_queue_process *p;
@@ -1408,7 +1401,7 @@ static int enforce_processes_limits()
 	/* Do not check too often, as it is expensive (particularly disk) */
 	if((time(0) - last_check_time) < check_resources_interval ) return 1;
 
-	ITABLE_ITERATE(procs_table, iteration, pid, p) {
+	ITABLE_ITERATE(procs_table, pid, p) {
 		if(!enforce_process_limits(p) || !work_queue_coprocess_enforce_limit(p->coprocess)) {
 			finish_running_task(p, WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION);
 
@@ -1435,13 +1428,12 @@ as other running tasks should not be affected by a task timeout.
 
 static void enforce_processes_max_running_time()
 {
-	int iteration;
 	struct work_queue_process *p;
 	uint64_t pid;
 
 	timestamp_t now = timestamp_get();
 
-	ITABLE_ITERATE(procs_running, iteration, pid, p) {
+	ITABLE_ITERATE(procs_running, pid, p) {
 		/* If the task did not specify wall_time, return right away. */
 		if(p->task->resources_requested->wall_time < 1)
 			continue;

@@ -234,7 +234,6 @@ void dag_close_over_nodes(struct dag *d)
 }
 
 void dag_close_over_categories(struct dag *d) {
-	int iteration;
 	/* per category, we assign the values found for resources. */
 
 	struct category *c;
@@ -242,7 +241,7 @@ void dag_close_over_categories(struct dag *d) {
 
 	if (!d) return;
 
-	HASH_TABLE_ITERATE(d->categories, iteration, name, c) {
+	HASH_TABLE_ITERATE(d->categories, name, c) {
 		struct rmsummary *rs = rmsummary_create(-1);
 
 		struct dag_variable_lookup_set s = {d, c, NULL, NULL };

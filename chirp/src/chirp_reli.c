@@ -1020,13 +1020,12 @@ INT64_T chirp_reli_bulkio( struct chirp_bulkio *v, int count, time_t stoptime )
 
 void chirp_reli_cleanup_before_fork()
 {
-	int iteration;
 	char *host;
 	char *value;
 
 	if(!table) return;
 
-	HASH_TABLE_ITERATE(table, iteration, host, value) {
+	HASH_TABLE_ITERATE(table, host, value) {
 		chirp_reli_disconnect(host);
 	}
 }

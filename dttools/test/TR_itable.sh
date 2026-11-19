@@ -9,7 +9,8 @@ prepare()
 
 run()
 {
-	../src/hash_table_offset_test
+	../src/itable_test
+	return $?
 }
 
 clean()
