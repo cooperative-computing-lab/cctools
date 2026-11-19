@@ -125,11 +125,10 @@ static int get_ancestor_depth(struct dag_node *n)
 
 void dag_find_ancestor_depth(struct dag *d)
 {
-	int iteration;
 	UINT64_T key;
 	struct dag_node *n;
 
-	ITABLE_ITERATE(d->node_table, iteration, key, n) {
+	ITABLE_ITERATE(d->node_table, key, n) {
 		get_ancestor_depth(n);
 	}
 }

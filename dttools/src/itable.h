@@ -24,26 +24,13 @@ pathname = itable_remove(h,id);
 
 </pre>
 
-To list all of the items in an itable, use @ref itable_firstkey and @ref itable_nextkey like this:
+To list all of the items in an itable, use @ref ITABLE_ITERATE like this:
 
 <pre>
 UINT64_T  key;
 void *value;
-int iteration;
 
-ITABLE_ITERATE(h, iteration, &key, &value)) {
-	printf("table contains: %d\n",key);
-}
-</pre>
-
-Alternatively:
-
-<pre>
-UINT64_T  key;
-void *value;
-int iteration;
-
-ITABLE_ITERATE(h, iteration, key, value) {
+ITABLE_ITERATE(h, key, value) {
 	printf("table contains: %d\n",key);
 }
 </pre>
@@ -183,17 +170,15 @@ Use as follows:
 <pre>
 UINT64_T key;
 void *value;
-int iteration;
 
-ITABLE_ITERATE(table, iteration, key, value) {
+ITABLE_ITERATE(table, key, value) {
 	printf("table contains: %lld\n",key);
 }
 
 </pre>
 */
 
-#define ITABLE_ITERATE( table, iteration, key, value ) \
-  (void) iteration; \
+#define ITABLE_ITERATE( table, key, value ) \
   for( struct itable_cursor *__cursor  __attribute__((cleanup(itable_cursor_delete_pp))) = itable_cursor_create(table), *__keep_going=__cursor; __keep_going; __keep_going=0) \
     for( itable_cursor_seek(__cursor,0); itable_cursor_get(__cursor,&key,(void**)&value); itable_cursor_next(__cursor) )
 
