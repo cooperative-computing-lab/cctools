@@ -21,10 +21,10 @@ struct itable_entry {
 
 struct itable {
 	struct itable_entry **buckets;
-	unsigned bucket_count;	  /* Length of the buckets array. */
-	unsigned live_count;	  /* Number of valid entries in array. */
-	unsigned dead_count;	  /* Number of tombstone entries in array. */
-	unsigned active_cursors;  /* Number of cursors created on this table. */
+	unsigned bucket_count;	 /* Length of the buckets array. */
+	unsigned live_count;	 /* Number of valid entries in array. */
+	unsigned dead_count;	 /* Number of tombstone entries in array. */
+	unsigned active_cursors; /* Number of cursors created on this table. */
 };
 
 struct itable_cursor {
@@ -216,7 +216,7 @@ int itable_insert(struct itable *table, UINT64_T key, const void *value)
 				}
 				continue;
 			}
-			if (key == e->key ) {
+			if (key == e->key) {
 				if (value == e->value) {
 					/* identical key:value exists */
 					return 1;
