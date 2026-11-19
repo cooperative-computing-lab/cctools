@@ -66,14 +66,14 @@ static double bucketing_det_greedy_policy(bucketing_bucket_range_t *range, int b
 	/* Update general statistics */
 	if (total_sig == 0) {
 		fatal("Total significance is zero, cannot divide by zero\n");
-		list_cursor_destroy(iter);
+		list_cursor_delete(iter);
 		return -1;
 	}
 	p1 /= total_sig;
 	p2 /= total_sig;
 	if (total_lo_sig == 0) {
 		fatal("Total significance in the lower bucket is zero, cannot divide by zero\n");
-		list_cursor_destroy(iter);
+		list_cursor_delete(iter);
 		return -1;
 	}
 	exp_cons_lq_break /= total_lo_sig;
@@ -89,7 +89,7 @@ static double bucketing_det_greedy_policy(bucketing_bucket_range_t *range, int b
 	/* Compute final cost */
 	double cost = cost_low_cons + cost_hi_cons;
 
-	list_cursor_destroy(iter);
+	list_cursor_delete(iter);
 
 	return cost;
 }
@@ -276,7 +276,7 @@ static struct list *bucketing_det_greedy_find_break_points(bucketing_state_t *s)
 	}
 
 	/* Destroy bucket range list */
-	list_cursor_destroy(lc);
+	list_cursor_delete(lc);
 	bucketing_bucket_range_list_clear(bucket_range_list, bucketing_bucket_range_delete);
 
 	list_delete(bucket_range_list);
