@@ -219,13 +219,16 @@ static void random_op(struct itable *h, int insert_pct, int remove_pct, int univ
 
 		if (model[k] == NULL) {
 			CHECK(rc == 1, "insert of new key %d failed", k);
-			model[k] = v;
 			model_count++;
 		} else if (model[k] == v) {
 			CHECK(rc == 1, "re-insert of identical key:value %d should succeed", k);
 		} else {
-			CHECK(rc == 0, "insert of existing key %d with new value should fail", k);
+			CHECK(rc == 1, "insert of existing key %d with new value should succeed with warning", k);
 		}
+
+		/* Any way we got here, the model should get the new value. */
+		model[k] = v;
+
 		CHECK(itable_lookup(h, key_of(k)) == model[k], "lookup after insert of key %d is wrong", k);
 
 	} else if (roll < insert_pct + remove_pct) {
@@ -723,6 +726,8 @@ int main(int argc, char **argv)
 	}
 
 	printf("itable_test: seed=%llu ops/config=%ld\n", (unsigned long long)seed, ops);
+
+	printf("NOTE: 10 duplicate key warnings are EXPECTED to follow here.\n");
 
 	run_config("dense keys, default size", 0, 0, KEY_UNIVERSE, ops);
 	run_config("dense keys, 1 bucket", 0, 1, KEY_UNIVERSE, ops);
