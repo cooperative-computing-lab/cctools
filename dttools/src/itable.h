@@ -112,31 +112,12 @@ void *itable_remove(struct itable *h, UINT64_T key);
 
 void * itable_remove_any( struct itable *h );
 
-/** Begin iteration over all keys.
-This function begins a new iteration over an integer table,
-allowing you to visit every key and value in the table.
-Next, invoke @ref itable_nextkey to retrieve each value in order.
-Use ITABLE_ITERATE unless you know what you are doing.
+/** Remove a value at random.
 @param h A pointer to an integer table.
-@return The iteration index.
+@return One object removed from the table.
 */
 
-int itable_firstkey(struct itable *h);
-
-/** Continue iteration over all keys.
-This function returns the next key and value in the iteration.
-This function should only be called after a call to itable_firstkey.
-Use ITABLE_ITERATE unless you know what you are doing.
-Warning: It cannot be called after itable_insert, itable_clear, or a
-table resize during the same iteration.
-@param h A pointer to an integer table.
-@param iteration The iteration index since the last call to itable_firstkey.
-@param key A pointer to a key integer.
-@param value A pointer to a value pointer. (can be NULL)
-@return Zero if there are no more elements to visit, one otherwise.
-*/
-
-int itable_nextkey(struct itable *h, int iteration, UINT64_T * key, void **value);
+void * itable_remove_random( struct itable *h );
 
 /** Iterate over all entries in an integer table.
 This function invokes a callback on every key and value in the table.
