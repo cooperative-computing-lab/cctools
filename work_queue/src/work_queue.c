@@ -1671,8 +1671,7 @@ static work_queue_result_code_t get_output_files( struct work_queue *q, struct w
 	work_queue_result_code_t result = WQ_SUCCESS;
 
 	if(t->output_files) {
-		list_first_item(t->output_files);
-		while((f = list_next_item(t->output_files))) {
+		LIST_ITERATE(t->output_files,f) {
 			// non-file objects are handled by the worker.
 			if(f->type!=WORK_QUEUE_FILE) continue;
 		     
@@ -1709,8 +1708,7 @@ static work_queue_result_code_t get_monitor_output_file( struct work_queue *q, s
 	const char *summary_name = RESOURCE_MONITOR_REMOTE_NAME ".summary";
 
 	if(t->output_files) {
-		list_first_item(t->output_files);
-		while((f = list_next_item(t->output_files))) {
+		LIST_ITERATE(t->output_files,f) {
 			if(!strcmp(summary_name, f->remote_name)) {
 				result = get_output_file(q,w,t,f);
 				break;
@@ -1737,8 +1735,7 @@ static void delete_worker_files( struct work_queue *q, struct work_queue_worker 
 
 	if(!files) return;
 
-	list_first_item(files);
-	while((tf = list_next_item(files))) {
+	LIST_ITERATE(files,tf) {
 		delete_worker_file(q, w, tf->cached_name, tf->flags, except_flags);
 	}
 }
@@ -2136,8 +2133,7 @@ static work_queue_result_code_t get_update( struct work_queue *q, struct work_qu
 	struct work_queue_file *f;
 	const char *local_name = 0;
 
-	list_first_item(t->output_files);
-	while((f=list_next_item(t->output_files))) {
+	LIST_ITERATE(t->output_files,f) {
 		if(!strcmp(path,f->remote_name)) {
 			local_name = f->payload;
 			break;
@@ -2409,13 +2405,10 @@ static struct rmsummary  *total_resources_needed(struct work_queue *q) {
 
 	/* for waiting tasks, we use what they would request if dispatched right now. */
 
-	struct skip_list_cursor *cursor = skip_list_cursor_create(q->ready_list);
-	skip_list_seek(cursor, 0);
-	SKIP_LIST_ITERATE(cursor, t) {
+	SKIP_LIST_ITERATE(q->ready_list, t) {
 		const struct rmsummary *s = task_min_resources(q, t);
 		rmsummary_add(total, s);
 	}
-	skip_list_cursor_delete(cursor);
 
 	/* for running tasks, we use what they have been allocated already. */
 	char *key;
@@ -2696,6 +2689,10 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 	jx_insert_integer(j,"tasks_with_results",info.tasks_with_results);
 	jx_insert_integer(j,"tasks_left",q->num_tasks_left);
 
+	// workers the manager is waiting for before dispatching the first task.
+	// Drops to 0 once reached. Used by work_queue_factory.
+	jx_insert_integer(j,"wait_for_workers",q->wait_for_workers);
+
 	jx_insert_integer(j,"tasks_submitted",info.tasks_submitted);
 	jx_insert_integer(j,"tasks_dispatched",info.tasks_dispatched);
 	jx_insert_integer(j,"tasks_done",info.tasks_done);
@@ -2826,6 +2823,10 @@ static struct jx * queue_lean_to_jx( struct work_queue *q, struct link *foreman_
 	//additional task information for work_queue_factory
 	jx_insert_integer(j,"tasks_on_workers",info.tasks_on_workers);
 	jx_insert_integer(j,"tasks_left",q->num_tasks_left);
+
+	// workers the manager is waiting for before dispatching the first task.
+	// Drops to 0 once reached. Used by work_queue_factory.
+	jx_insert_integer(j,"wait_for_workers",q->wait_for_workers);
 
 	//capacity information the factory needs
 	jx_insert_integer(j,"capacity_tasks",info.capacity_tasks);
@@ -3712,8 +3713,7 @@ static work_queue_result_code_t send_input_files( struct work_queue *q, struct w
 	// Check for existence of each input file first.
 	// If any one fails to exist, set the failure condition and return failure.
 	if(t->input_files) {
-		list_first_item(t->input_files);
-		while((f = list_next_item(t->input_files))) {
+		LIST_ITERATE(t->input_files,f) {
 			if(f->type == WORK_QUEUE_FILE || f->type == WORK_QUEUE_FILE_PIECE) {
 				char * expanded_payload = expand_envnames(w, f->payload);
 				if(!expanded_payload) {
@@ -3734,8 +3734,7 @@ static work_queue_result_code_t send_input_files( struct work_queue *q, struct w
 	// Send each of the input files.
 	// If any one fails to be sent, return failure.
 	if(t->input_files) {
-		list_first_item(t->input_files);
-		while((f = list_next_item(t->input_files))) {
+		LIST_ITERATE(t->input_files,f) {
 			work_queue_result_code_t result = send_input_file(q,w,t,f);
 			if(result != WQ_SUCCESS) {
 				return result;
@@ -3941,15 +3940,13 @@ static work_queue_result_code_t start_one_task(struct work_queue *q, struct work
 	 * CORES, MEMORY, etc. will be set at the worker to the values of
 	 * specify_*, if used. */
 	char *var;
-	list_first_item(t->env_list);
-	while((var=list_next_item(t->env_list))) {
+	LIST_ITERATE(t->env_list,var) {
 		send_worker_msg(q, w,"env %zu\n%s\n", strlen(var), var);
 	}
 
 	if(t->input_files) {
 		struct work_queue_file *tf;
-		list_first_item(t->input_files);
-		while((tf = list_next_item(t->input_files))) {
+		LIST_ITERATE(t->input_files,tf) {
 			if(tf->type == WORK_QUEUE_DIRECTORY) {
 				send_worker_msg(q,w, "dir %s\n", tf->remote_name);
 			} else {
@@ -3962,8 +3959,7 @@ static work_queue_result_code_t start_one_task(struct work_queue *q, struct work
 
 	if(t->output_files) {
 		struct work_queue_file *tf;
-		list_first_item(t->output_files);
-		while((tf = list_next_item(t->output_files))) {
+		LIST_ITERATE(t->output_files,tf) {
 			char remote_name_encoded[PATH_MAX];
 			url_encode(tf->remote_name, remote_name_encoded, PATH_MAX);
 			send_worker_msg(q,w, "outfile %s %s %d\n", tf->cached_name, remote_name_encoded, tf->flags);
@@ -4039,7 +4035,6 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 	struct work_queue_task_report *capacity = calloc(1, sizeof(*capacity));
 	capacity->resources = rmsummary_create(0);
 
-	struct work_queue_task_report *tr;
 	double alpha = 0.05;
 	int count = list_size(q->task_reports);
 	int capacity_instantaneous = 0;
@@ -4060,8 +4055,8 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 		count = 1;
 	} else {
 		// Sum up the task reports available.
-		list_first_item(q->task_reports);
-		while((tr = list_next_item(q->task_reports))) {
+		struct work_queue_task_report *tr;
+		LIST_ITERATE(q->task_reports,tr) {
 			capacity->transfer_time += tr->transfer_time;
 			capacity->exec_time     += tr->exec_time;
 			capacity->manager_time   += tr->manager_time;
@@ -4194,8 +4189,7 @@ static int check_hand_against_task(struct work_queue *q, struct work_queue_worke
 			return 0;
 
 		char *feature;
-		list_first_item(t->features);
-		while((feature = list_next_item(t->features))) {
+		LIST_ITERATE(t->features,feature) {
 			if(!hash_table_lookup(w->features, feature))
 				return 0;
 		}
@@ -4252,8 +4246,7 @@ static struct work_queue_worker *find_worker_by_files(struct work_queue *q, stru
 	HASH_TABLE_ITERATE(q->worker_table, iteration, key, w) {
 		if( check_hand_against_task(q, w, t) ) {
 			task_cached_bytes = 0;
-			list_first_item(t->input_files);
-			while((tf = list_next_item(t->input_files))) {
+			LIST_ITERATE(t->input_files,tf) {
 				if((tf->type == WORK_QUEUE_FILE || tf->type == WORK_QUEUE_FILE_PIECE) && (tf->flags & WORK_QUEUE_CACHE)) {
 					remote_info = hash_table_lookup(w->current_files, tf->cached_name);
 					if(remote_info)
@@ -4586,7 +4579,7 @@ static int send_one_task_with_cr( struct work_queue *q , struct skip_list_cursor
 
 	int iter_count = 0;
 
-	SKIP_LIST_ITERATE(cr, t) {
+	SKIP_LIST_ITERATE_CURSOR(cr,t) {
 		if(iter_count >= iter_depth) {
 			break;
 		}
@@ -4661,9 +4654,7 @@ static void print_large_tasks_warning(struct work_queue *q)
 
 	struct rmsummary *largest_unfit_task = rmsummary_create(-1);
 
-	struct skip_list_cursor *cur = skip_list_cursor_create(q->ready_list);
-	skip_list_seek(cur, 0);
-	SKIP_LIST_ITERATE(cur, t){
+	SKIP_LIST_ITERATE(q->ready_list, t) {
 		// check each task against the queue of connected workers
 		int bit_set = is_task_larger_than_connected_workers(q, t);
 		if(bit_set) {
@@ -4683,7 +4674,6 @@ static void print_large_tasks_warning(struct work_queue *q)
 			unfit_gpu++;
 		}
 	}
-	skip_list_cursor_delete(cur);
 
 	if(unfit_core || unfit_mem || unfit_disk || unfit_gpu){
 		notice(D_WQ,"There are tasks that cannot fit any currently connected worker:\n");
@@ -5002,8 +4992,7 @@ static struct list *work_queue_task_file_list_clone(struct list *list) {
   struct list *new = list_create();
   struct work_queue_file *old_file, *new_file;
 
-  list_first_item(list);
-  while ((old_file = list_next_item(list))) {
+  LIST_ITERATE(list,old_file) {
 	new_file = work_queue_file_clone(old_file);
 	list_push_tail(new, new_file);
   }
@@ -5013,8 +5002,7 @@ static struct list *work_queue_task_file_list_clone(struct list *list) {
 static struct list *work_queue_task_env_list_clone(struct list *env_list) {
 	struct list *new = list_create();
 	char *var;
-	list_first_item(env_list);
-	while((var=list_next_item(env_list))) {
+	LIST_ITERATE(env_list,var) {
 		list_push_tail(new, xxstrdup(var));
 	}
 
@@ -5095,8 +5083,7 @@ struct work_queue_task *work_queue_task_clone(const struct work_queue_task *task
 	if(task->features) {
 		new->features = list_create();
 		char *req;
-		list_first_item(task->features);
-		while((req = list_next_item(task->features))) {
+		LIST_ITERATE(task->features,req) {
 			list_push_tail(new->features, xxstrdup(req));
 		}
 	}
@@ -5311,7 +5298,7 @@ static void delete_feature(struct work_queue_task *t, const char *name)
 		}
 	}
 
-	list_cursor_destroy(c);
+	list_cursor_delete(c);
 }
 
 struct work_queue_file *work_queue_file_create(const char *payload, const char *remote_name, work_queue_file_t type, work_queue_file_flags_t flags)
@@ -5362,16 +5349,14 @@ int work_queue_task_specify_url(struct work_queue_task *t, const char *file_url,
 		files = t->input_files;
 
 		//check if two different urls map to the same remote name for inputs.
-		list_first_item(t->input_files);
-		while((tf = (struct work_queue_file*)list_next_item(files))) {
+		LIST_ITERATE(t->input_files,tf) {
 			if(!strcmp(remote_name, tf->remote_name) && strcmp(file_url, tf->payload)) {
 				fprintf(stderr, "Error: input url %s conflicts with another input pointing to same remote name (%s).\n", file_url, remote_name);
 				return 0;
 			}
 		}
 		//check if there is an output file with the same remote name.
-		list_first_item(t->output_files);
-		while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
+		LIST_ITERATE(t->output_files,tf) {
 			if(!strcmp(remote_name, tf->remote_name)){
 				fprintf(stderr, "Error: input url %s conflicts with an output pointing to same remote name (%s).\n", file_url, remote_name);
 				return 0;
@@ -5417,8 +5402,7 @@ int work_queue_task_specify_file(struct work_queue_task *t, const char *local_na
 		files = t->input_files;
 
 		//check if two different local names map to the same remote name for inputs.
-		list_first_item(t->input_files);
-		while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
+		LIST_ITERATE(t->input_files,tf) {
 			if(!strcmp(remote_name, tf->remote_name) && strcmp(local_name, tf->payload)){
 				fprintf(stderr, "Error: input file %s conflicts with another input pointing to same remote name (%s).\n", local_name, remote_name);
 				return 0;
@@ -5426,8 +5410,7 @@ int work_queue_task_specify_file(struct work_queue_task *t, const char *local_na
 		}
 
 		//check if there is an output file with the same remote name.
-		list_first_item(t->output_files);
-		while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
+		LIST_ITERATE(t->output_files,tf) {
 			if(!strcmp(remote_name, tf->remote_name)){
 				fprintf(stderr, "Error: input file %s conflicts with an output pointing to same remote name (%s).\n", local_name, remote_name);
 				return 0;
@@ -5437,8 +5420,7 @@ int work_queue_task_specify_file(struct work_queue_task *t, const char *local_na
 		files = t->output_files;
 
 		//check if two different different remote names map to the same local name for outputs.
-		list_first_item(files);
-		while((tf = (struct work_queue_file*)list_next_item(files))) {
+		LIST_ITERATE(t->output_files,tf) {
 			if(!strcmp(local_name, tf->payload) && strcmp(remote_name, tf->remote_name)) {
 				fprintf(stderr, "Error: output file %s conflicts with another output pointing to same remote name (%s).\n", local_name, remote_name);
 				return 0;
@@ -5446,8 +5428,7 @@ int work_queue_task_specify_file(struct work_queue_task *t, const char *local_na
 		}
 
 		//check if there is an input file with the same remote name.
-		list_first_item(t->input_files);
-		while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
+		LIST_ITERATE(t->input_files,tf) {
 			if(!strcmp(remote_name, tf->remote_name)){
 				fprintf(stderr, "Error: output file %s conflicts with an input pointing to same remote name (%s).\n", local_name, remote_name);
 				return 0;
@@ -5486,10 +5467,10 @@ int work_queue_task_specify_directory(struct work_queue_task *t, const char *loc
 
 	files = t->input_files;
 
-	list_first_item(files);
-	while((tf = (struct work_queue_file*)list_next_item(files))) {
-		if(!strcmp(remote_name, tf->remote_name))
-		{	return 0;	}
+	LIST_ITERATE(files,tf) {
+		if(!strcmp(remote_name, tf->remote_name)) {
+			return 0;
+		}
 	}
 
 	//KNOWN HACK: Every file passes through make_cached_name() which expects the
@@ -5529,8 +5510,7 @@ int work_queue_task_specify_file_piece(struct work_queue_task *t, const char *lo
 		files = t->input_files;
 
 		//check if two different local names map to the same remote name for inputs.
-		list_first_item(t->input_files);
-		while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
+		LIST_ITERATE(t->input_files,tf) {
 			if(!strcmp(remote_name, tf->remote_name) && strcmp(local_name, tf->payload)){
 				fprintf(stderr, "Error: piece of input file %s conflicts with another input pointing to same remote name (%s).\n", local_name, remote_name);
 				return 0;
@@ -5538,8 +5518,7 @@ int work_queue_task_specify_file_piece(struct work_queue_task *t, const char *lo
 		}
 
 		//check if there is an output file with the same remote name.
-		list_first_item(t->output_files);
-		while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
+		LIST_ITERATE(t->output_files,tf) {
 			if(!strcmp(remote_name, tf->remote_name)){
 				fprintf(stderr, "Error: piece of input file %s conflicts with an output pointing to same remote name (%s).\n", local_name, remote_name);
 				return 0;
@@ -5549,8 +5528,7 @@ int work_queue_task_specify_file_piece(struct work_queue_task *t, const char *lo
 		files = t->output_files;
 
 		//check if two different different remote names map to the same local name for outputs.
-		list_first_item(files);
-		while((tf = (struct work_queue_file*)list_next_item(files))) {
+		LIST_ITERATE(t->output_files,tf) {
 			if(!strcmp(local_name, tf->payload) && strcmp(remote_name, tf->remote_name)) {
 				fprintf(stderr, "Error: piece of output file %s conflicts with another output pointing to same remote name (%s).\n", local_name, remote_name);
 				return 0;
@@ -5558,8 +5536,7 @@ int work_queue_task_specify_file_piece(struct work_queue_task *t, const char *lo
 		}
 
 		//check if there is an input file with the same remote name.
-		list_first_item(t->input_files);
-		while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
+		LIST_ITERATE(t->input_files,tf) {
 			if(!strcmp(remote_name, tf->remote_name)){
 				fprintf(stderr, "Error: piece of output file %s conflicts with an input pointing to same remote name (%s).\n", local_name, remote_name);
 				return 0;
@@ -5591,16 +5568,14 @@ int work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, 
 		fatal("Error: Remote name %s is an absolute path.\n", remote_name);
 	}
 
-	list_first_item(t->input_files);
-	while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
+	LIST_ITERATE(t->input_files,tf) {
 		if(!strcmp(remote_name, tf->remote_name)) {
 			fprintf(stderr, "Error: buffer conflicts with another input pointing to same remote name (%s).\n", remote_name);
 			return 0;
 		}
 	}
 
-	list_first_item(t->output_files);
-	while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
+	LIST_ITERATE(t->output_files,tf) {
 		if(!strcmp(remote_name, tf->remote_name)) {
 			fprintf(stderr, "Error: buffer conflicts with an output pointing to same remote name (%s).\n", remote_name);
 			return 0;
@@ -5644,8 +5619,7 @@ int work_queue_task_specify_file_command(struct work_queue_task *t, const char *
 		files = t->input_files;
 
 		//check if two different local names map to the same remote name for inputs.
-		list_first_item(t->input_files);
-		while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
+		LIST_ITERATE(t->input_files,tf) {
 			if(!strcmp(remote_name, tf->remote_name) && strcmp(cmd, tf->payload)){
 				fprintf(stderr, "Error: input file command %s conflicts with another input pointing to same remote name (%s).\n", cmd, remote_name);
 				return 0;
@@ -5653,8 +5627,7 @@ int work_queue_task_specify_file_command(struct work_queue_task *t, const char *
 		}
 
 		//check if there is an output file with the same remote name.
-		list_first_item(t->output_files);
-		while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
+		LIST_ITERATE(t->output_files,tf) {
 			if(!strcmp(remote_name, tf->remote_name)) {
 				fprintf(stderr, "Error: input file command %s conflicts with an output pointing to same remote name (%s).\n", cmd, remote_name);
 				return 0;
@@ -5749,16 +5722,15 @@ void work_queue_invalidate_cached_file_internal(struct work_queue *q, const char
 
 		ITABLE_ITERATE(w->current_tasks, iteration_tasks, taskid, t) {
 			struct work_queue_file *tf;
-			list_first_item(t->input_files);
 
-			while((tf = list_next_item(t->input_files))) {
+			LIST_ITERATE(t->input_files,tf) {
 				if(strcmp(filename, tf->cached_name) == 0) {
 					cancel_task_on_worker(q, t, WORK_QUEUE_TASK_READY);
 					continue;
 				}
 			}
 
-			while((tf = list_next_item(t->output_files))) {
+			LIST_ITERATE(t->output_files,tf) {
 				if(strcmp(filename, tf->cached_name) == 0) {
 					cancel_task_on_worker(q, t, WORK_QUEUE_TASK_READY);
 					continue;
@@ -6251,11 +6223,7 @@ void work_queue_delete(struct work_queue *q)
 
 		hash_table_delete(q->workers_with_available_results);
 
-		struct work_queue_task_report *tr;
-		list_first_item(q->task_reports);
-		while((tr = list_next_item(q->task_reports))) {
-			task_report_delete(tr);
-		}
+		list_clear(q->task_reports,(void*)task_report_delete);
 		list_delete(q->task_reports);
 
 		free(q->stats);
@@ -7186,15 +7154,12 @@ int work_queue_hungry(struct work_queue *q)
 	int64_t ready_task_gpus		= 0;
 
 	struct work_queue_task *t;
-	struct skip_list_cursor *cursor = skip_list_cursor_create(q->ready_list);
-	skip_list_seek(cursor, 0);
-	SKIP_LIST_ITERATE(cursor, t) {
+	SKIP_LIST_ITERATE(q->ready_list, t) {
 		ready_task_cores  += MAX(1,t->resources_requested->cores);
 		ready_task_memory += t->resources_requested->memory;
 		ready_task_disk   += t->resources_requested->disk;
 		ready_task_gpus   += t->resources_requested->gpus;
 	}
-	skip_list_cursor_delete(cursor);
 
 	//check possible limiting factors
 	//return false if required resources exceed available resources

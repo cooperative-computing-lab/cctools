@@ -142,8 +142,7 @@ int main(int argc, char *argv[])
 	} else if(display_mode==DISPLAY_MODE_TABLE) {
 		/* Display a header with each output expression */
 		struct jx *j;
-		list_first_item(output_exprs);
-		while( (j=list_next_item(output_exprs)) ) {
+		LIST_ITERATE(output_exprs,j) {
 			jx_print_stream(j,stdout);
 			printf("\t");
 		}
@@ -179,8 +178,7 @@ int main(int argc, char *argv[])
 			/* Evaluate each expression and display it. */
 
 			struct jx *j;
-			list_first_item(output_exprs);
-			while( (j=list_next_item(output_exprs)) ) {
+			LIST_ITERATE(output_exprs,j) {
 				struct jx *jvalue = jx_eval(j,jobject);
 				jx_print_stream(jvalue,stdout);
 				printf("\t");

@@ -19,7 +19,7 @@ bucketing_cursor_w_pos_t *bucketing_cursor_w_pos_create(struct list_cursor *lc, 
 void bucketing_cursor_w_pos_delete(bucketing_cursor_w_pos_t *cursor_pos)
 {
 	if (cursor_pos) {
-		list_cursor_destroy(cursor_pos->lc);
+		list_cursor_delete(cursor_pos->lc);
 		free(cursor_pos);
 	}
 }
@@ -37,7 +37,7 @@ bucketing_bucket_range_t *bucketing_bucket_range_create(int lo, int hi, struct l
 	bucketing_cursor_w_pos_t *cursor_pos_lo = bucketing_cursor_w_pos_create(cursor_lo, lo);
 	if (!cursor_pos_lo) {
 		free(range);
-		list_cursor_destroy(cursor_lo);
+		list_cursor_delete(cursor_lo);
 		return 0;
 	}
 
@@ -46,7 +46,7 @@ bucketing_bucket_range_t *bucketing_bucket_range_create(int lo, int hi, struct l
 	struct list_cursor *cursor_hi = list_cursor_create(l);
 	if (!list_seek(cursor_hi, hi)) {
 		free(range);
-		list_cursor_destroy(cursor_lo);
+		list_cursor_delete(cursor_lo);
 		bucketing_cursor_w_pos_delete(cursor_pos_lo);
 		return 0;
 	}
@@ -54,9 +54,9 @@ bucketing_bucket_range_t *bucketing_bucket_range_create(int lo, int hi, struct l
 	bucketing_cursor_w_pos_t *cursor_pos_hi = bucketing_cursor_w_pos_create(cursor_hi, hi);
 	if (!cursor_pos_hi) {
 		free(range);
-		list_cursor_destroy(cursor_lo);
+		list_cursor_delete(cursor_lo);
 		bucketing_cursor_w_pos_delete(cursor_pos_lo);
-		list_cursor_destroy(cursor_hi);
+		list_cursor_delete(cursor_hi);
 		return 0;
 	}
 
@@ -125,7 +125,7 @@ struct list *bucketing_cursor_pos_list_sort(struct list *l, int (*f)(const void 
 	}
 
 	/* Destroy the list but not its elements */
-	list_cursor_destroy(lc);
+	list_cursor_delete(lc);
 	list_delete(l);
 
 	/* Qsort the array */
@@ -138,7 +138,7 @@ struct list *bucketing_cursor_pos_list_sort(struct list *l, int (*f)(const void 
 	for (i = 0; i < size; ++i)
 		list_insert(lc, arr[i]);
 
-	list_cursor_destroy(lc);
+	list_cursor_delete(lc);
 	free(arr);
 
 	return ret;

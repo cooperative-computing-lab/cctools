@@ -80,7 +80,7 @@ static bool jx_canonicalize_object(struct jx_pair *p, buffer_t *b)
 	rc = true;
 
 OUT:
-	list_cursor_destroy(csr);
+	list_cursor_delete(csr);
 	list_delete(pairs);
 	return rc;
 }

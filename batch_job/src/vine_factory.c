@@ -392,8 +392,7 @@ static int count_workers_connected( struct list *managers_list )
 		return connected_workers;
 	}
 
-	list_first_item(managers_list);
-	while((j=list_next_item(managers_list))) {
+	LIST_ITERATE(managers_list,j) {
 		const int workers = jx_lookup_integer(j,"workers");
 		connected_workers += workers;
 	}
@@ -415,9 +414,7 @@ static int count_workers_needed( struct list *managers_list, int only_not_runnin
 		return needed_workers;
 	}
 
-	list_first_item(managers_list);
-	while((j=list_next_item(managers_list))) {
-
+	LIST_ITERATE(managers_list,j) {
 		const char *project =jx_lookup_string(j,"project");
 		const char *host =   jx_lookup_string(j,"name");
 		const int  port =    jx_lookup_integer(j,"port");
@@ -426,6 +423,7 @@ static int count_workers_needed( struct list *managers_list, int only_not_runnin
 		const int tw =       jx_lookup_integer(j,"tasks_waiting");
 		const int tl =       jx_lookup_integer(j,"tasks_left");
 		const int protocol = jx_lookup_integer(j,"protocol");
+		const int able =     jx_lookup_integer(j,"workers_able");
 
 		if(protocol!=VINE_PROTOCOL_VERSION) {
 			printf("WARNING: skipping manager %s (%s:%d) with protocol version %d\n",project, host, port, protocol);
@@ -454,6 +452,18 @@ static int count_workers_needed( struct list *managers_list, int only_not_runnin
 
 		if(consider_capacity && capacity > 0) {
 			need = MIN(need, capacity);
+		}
+
+		// If the manager is holding dispatch until a number of workers connect
+		// (tune "wait-for-workers"), ask for at least that many. Not capped by
+		// capacity, since capacity is meaningless before workers connect.
+		// Older managers do not send this field and look up as 0.
+		const int wfw = jx_lookup_integer(j,"wait_for_workers");
+		if(wfw > need) {
+			if (wfw > able) {
+				debug(D_VINE,"%s %s:%d is waiting for %d more worker(s) before dispatching tasks",project,host,port,wfw-able);
+			}
+			need = wfw;
 		}
 
 		debug(D_VINE,"%s %s:%d %s tasks: %d capacity: %d workers needed: %d tasks running: %d",project,host,port,owner,tw+tl+tr,capacity,need,tr);
@@ -537,9 +547,9 @@ static int submit_worker( struct batch_queue *queue )
 	/* The basic command differs whether using a project name or simple host:port. */
 	
 	if(using_catalog) {
-		cmd = string_format("%s -M %s", worker_command, submission_regex);
+		cmd = string_format("./%s -M %s", worker_command, submission_regex);
 	} else {
-		cmd = string_format("%s %s %d", worker_command, manager_host, manager_port);
+		cmd = string_format("./%s %s %d", worker_command, manager_host, manager_port);
 	}
 
 	/* Add a formatted argument to a string s, reallocating and returning s. */
@@ -629,8 +639,7 @@ static void update_blocked_hosts( struct batch_queue *queue, struct list *manage
 
 	if(managers_list) {
 		struct jx *j;
-		list_first_item(managers_list);
-		while((j=list_next_item(managers_list))) {
+		LIST_ITERATE(managers_list,j) {
 
 			/* Skip if no workers_blocked property */
 			struct jx *blocked = jx_lookup(j,"workers_blocked");
@@ -837,9 +846,7 @@ struct jx *factory_to_jx(struct list *managers, struct list *foremen, int submit
 	if(managers && list_size(managers) > 0)
 	{
 		struct jx *m;
-		list_first_item(managers);
-		while((m = list_next_item(managers)))
-		{
+		LIST_ITERATE(managers,m) {
 			jx_array_append(ms, manager_to_jx(m));
 		}
 	}
@@ -850,11 +857,8 @@ struct jx *factory_to_jx(struct list *managers, struct list *foremen, int submit
 	if(foremen && list_size(foremen) > 0)
 	{
 		struct jx *f;
-		list_first_item(foremen);
-		while((f = list_next_item(foremen)))
-		{
+		LIST_ITERATE(foremen,f) {
 			jx_array_append(fs, manager_to_jx(f));
-
 		}
 	}
 	jx_insert(j, jx_string("foremen"), fs);
@@ -1814,8 +1818,7 @@ int main(int argc, char *argv[])
 	}
 		
 	const char *item = NULL;
-	list_first_item(wrapper_inputs);
-	while((item = list_next_item(wrapper_inputs))) {
+	LIST_ITERATE(wrapper_inputs,item) {
 		char *file_at_scratch_dir = string_format("%s/%s", scratch_dir, path_basename(item));
 		int64_t result = copy_file_to_file(item, file_at_scratch_dir);
 		if(result < 0) {
