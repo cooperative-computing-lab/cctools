@@ -12,6 +12,7 @@ See the file COPYING for details.
 #include "batch_wrapper.h"
 #include "batch_queue.h"
 
+#include "hash_table.h"
 #include "sha1.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
@@ -26,6 +27,8 @@ struct batch_job *batch_job_create(struct batch_queue *queue)
 
 	t->input_files = list_create();
 	t->output_files = list_create();
+	t->input_names = hash_table_create(0, 0);
+	t->output_names = hash_table_create(0, 0);
 
 	t->info = batch_job_info_create();
 
@@ -40,18 +43,14 @@ void batch_job_delete(struct batch_job *t)
 
 	free(t->command);
 
-	struct batch_file *f;
-	list_first_item(t->input_files);
-	while ((f = list_next_item(t->input_files))) {
-		batch_file_delete(f);
-	}
+	list_clear(t->input_files, (void *)batch_file_delete);
 	list_delete(t->input_files);
 
-	list_first_item(t->output_files);
-	while ((f = list_next_item(t->output_files))) {
-		batch_file_delete(f);
-	}
+	list_clear(t->output_files, (void *)batch_file_delete);
 	list_delete(t->output_files);
+
+	hash_table_delete(t->input_names);
+	hash_table_delete(t->output_names);
 
 	rmsummary_delete(t->resources);
 
@@ -62,22 +61,38 @@ void batch_job_delete(struct batch_job *t)
 	free(t);
 }
 
+/* Adds a file to a task's file list, unless the list already has that file.
+ Two different outer names for the same inner name is a fatal error. */
+static struct batch_file *add_file(struct list *files, struct hash_table *names, const char *kind, const char *outer_name, const char *inner_name)
+{
+	const char *inner = inner_name ? inner_name : outer_name;
+
+	struct batch_file *f = hash_table_lookup(names, inner);
+	if (f) {
+		if (strcmp(f->outer_name, outer_name)) {
+			fatal("%s file %s is given twice, from %s and from %s", kind, inner, f->outer_name, outer_name);
+		}
+
+		return f;
+	}
+
+	f = batch_file_create(outer_name, inner_name);
+	list_push_tail(files, f);
+	hash_table_insert(names, f->inner_name, f);
+
+	return f;
+}
+
 /** Creates new batch_file and adds to inputs. */
 struct batch_file *batch_job_add_input_file(struct batch_job *task, const char *outer_name, const char *inner_name)
 {
-	struct batch_file *f = batch_file_create(outer_name, inner_name);
-	list_push_tail(task->input_files, f);
-
-	return f;
+	return add_file(task->input_files, task->input_names, "input", outer_name, inner_name);
 }
 
 /** Creates new batch_file and adds to outputs. */
 struct batch_file *batch_job_add_output_file(struct batch_job *task, const char *outer_name, const char *inner_name)
 {
-	struct batch_file *f = batch_file_create(outer_name, inner_name);
-	list_push_tail(task->output_files, f);
-
-	return f;
+	return add_file(task->output_files, task->output_names, "output", outer_name, inner_name);
 }
 
 /** Free previous command and strdup passed command. */
@@ -184,8 +199,8 @@ char *batch_job_generate_id(struct batch_job *t)
 	list_sort(t->input_files, (void *)batch_file_outer_compare);
 
 	/* add checksum of the node's input files together */
-	struct list_cursor *cur = list_cursor_create(t->input_files);
-	for (list_seek(cur, 0); list_get(cur, (void **)&f); list_next(cur)) {
+	LIST_ITERATE(t->input_files, f)
+	{
 		char *file_id;
 		if (path_is_dir(f->inner_name) == 1) {
 			f->hash = batch_file_generate_id_dir(f->outer_name);
@@ -200,19 +215,17 @@ char *batch_job_generate_id(struct batch_job *t)
 		sha1_update(&context, "\0", 1);
 		free(file_id);
 	}
-	list_cursor_delete(cur);
 
 	/* Sort outputs for consistent hashing */
 	list_sort(t->output_files, (void *)batch_file_outer_compare);
 
 	/* add checksum of the node's output file names together */
-	cur = list_cursor_create(t->output_files);
-	for (list_seek(cur, 0); list_get(cur, (void **)&f); list_next(cur)) {
+	LIST_ITERATE(t->output_files, f)
+	{
 		sha1_update(&context, "O", 1);
 		sha1_update(&context, f->outer_name, strlen(f->outer_name));
 		sha1_update(&context, "\0", 1);
 	}
-	list_cursor_delete(cur);
 
 	sha1_final(hash, &context);
 	t->hash = xxstrdup(sha1_string(hash));
