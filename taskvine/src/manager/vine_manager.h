@@ -115,6 +115,7 @@ struct vine_manager {
 	/* Primary data structures for tracking worker state. */
 
 	struct hash_table *worker_table;     /* Maps link -> vine_worker_info */
+	struct list *zombie_workers;         /* Workers marked for removal. They are not in worker_table, and are removed in disconnect_failed_workers. */
 	struct hash_table *worker_blocklist; /* Maps hostname -> vine_blocklist_info */
 	struct hash_table *factory_table;    /* Maps factory_name -> vine_factory_info */
 	struct hash_table *workers_with_watched_file_updates;  /* Maps link -> vine_worker_info */
@@ -292,6 +293,11 @@ int vine_manager_shut_down_worker(struct vine_manager *q, struct vine_worker_inf
 struct vine_task *vine_manager_no_wait(struct vine_manager *q, const char *tag, int task_id);
 
 void vine_manager_remove_worker(struct vine_manager *q, struct vine_worker_info *w, vine_worker_disconnect_reason_t reason);
+
+/* Take a worker out of worker_table, and remove it at the next disconnect_failed_workers in the wait loop. Use instead of
+ * vine_manager_remove_worker outside of the wait loop, where the caller may still use the worker, or its
+ * link may still be in the poll table. Only the first reason is kept. The reason cannot be VINE_WORKER_DISCONNECT_UNKNOWN. */
+void vine_manager_mark_worker_for_removal(struct vine_manager *q, struct vine_worker_info *w, vine_worker_disconnect_reason_t reason);
 
 /* Check if the worker is able to transfer the necessary files for this task. */
 int vine_manager_transfer_capacity_available(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t);

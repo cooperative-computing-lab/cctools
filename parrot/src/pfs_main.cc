@@ -55,7 +55,6 @@ extern "C" {
 }
 
 #include <fcntl.h>
-#include <termio.h>
 #include <termios.h>
 #include <unistd.h>
 

@@ -166,7 +166,7 @@ static int run_api_tests(void)
 	const char *expected_order[] = {banana, cherry, grape};
 	int iter_count = 0;
 	char *iter_item = NULL;
-	SKIP_LIST_ITERATE(cur, iter_item)
+	SKIP_LIST_ITERATE(sl, iter_item)
 	{
 		if (iter_count >= 3 || iter_item != expected_order[iter_count]) {
 			printf("FAIL: SKIP_LIST_ITERATE order at index %d\n", iter_count);
@@ -245,7 +245,7 @@ double measure_list_operations(struct item **items, int num_elements, int operat
 				}
 				list_next(cur);
 			}
-			list_cursor_destroy(cur);
+			list_cursor_delete(cur);
 		}
 
 		if (list_length(l) != 0) {

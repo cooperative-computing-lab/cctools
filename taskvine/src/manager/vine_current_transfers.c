@@ -119,7 +119,7 @@ void set_throttle(struct vine_manager *m, struct vine_worker_info *w, int is_des
 	if (good <= bad) {
 		/* this worker has failed more often than not, release it. */
 		notice(D_VINE, "Releasing worker %s because of repeated %s transfer failures: %d/%d", dir, w->addrport, bad, bad + good);
-		vine_manager_remove_worker(m, w, VINE_WORKER_DISCONNECT_XFER_ERRORS);
+		vine_manager_mark_worker_for_removal(m, w, VINE_WORKER_DISCONNECT_XFER_ERRORS);
 	}
 }
 
@@ -235,7 +235,6 @@ int vine_current_transfers_wipe_worker(struct vine_manager *q, struct vine_worke
 	}
 
 	// BUG: Inefficient, implement safe remove in hash table
-	list_first_item(ids_to_remove);
 	char *transfer_id;
 	while ((transfer_id = list_pop_head(ids_to_remove))) {
 		vine_current_transfers_remove(q, transfer_id);
