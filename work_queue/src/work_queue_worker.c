@@ -701,7 +701,7 @@ static void report_tasks_complete( struct link *manager )
 {
 	struct work_queue_process *p;
 
-	while((p=itable_pop(procs_complete))) {
+	while((p=itable_remove_any(procs_complete))) {
 		report_task_complete(manager,p);
 	}
 
