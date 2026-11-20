@@ -4,8 +4,9 @@
 # This software is distributed under the GNU General Public License.
 # See the file COPYING for details.
 
-# Executes a command line inside a conda environment.
-# The conda environment can be supplied via a tar file or a directory.
+# Executes a command line inside a portable environment.
+# The environment can be supplied as a conda-pack archive, a pixi-pack
+# archive, or an already expanded conda environment directory.
 #
 # It is assumed that the conda environment can be used in the absence of a
 # local conda installation. This means it should include conda and conda-unpack
@@ -18,7 +19,7 @@ start_time=$(date +'%s%N')
 usage() {
     echo "Usage: poncho_package_run [options] -e <file> command and args ..."
     echo "where options are:"
-    echo " -e, --environment <path>   Conda environment as a tar file or a directory. (Required.)"
+    echo " -e, --environment <path>   Conda environment as a tar file or directory, or a Pixi environment as a tar file. (Required.)"
     echo " -u, --unpack-to <dir>      Directory to unpack the environment. If not given,"
     echo "                            a temporary directory is used. If the argument to"
     echo "                            --environment is a directory, --unpack-to is ignored."
@@ -75,6 +76,42 @@ export -f errmsg
 UNPACK_TO=
 ENV_NAME=
 LOCK_WAIT=300
+PACKAGE_FORMAT=conda-pack
+PIXI_UNPACK=
+
+find_pixi_unpack() {
+	local runner_dir
+	runner_dir=$(dirname "$(realpath "$0")")
+
+	if [[ -n "${PONCHO_PIXI_UNPACK:-}" && -x "${PONCHO_PIXI_UNPACK}" ]]
+	then
+		realpath "${PONCHO_PIXI_UNPACK}"
+	elif [[ -x "${runner_dir}/pixi-unpack" ]]
+	then
+		realpath "${runner_dir}/pixi-unpack"
+	elif [[ -x "./pixi-unpack" ]]
+	then
+		realpath "./pixi-unpack"
+	elif command -v pixi-unpack >/dev/null 2>&1
+	then
+		command -v pixi-unpack
+	else
+		return 1
+	fi
+}
+
+detect_package_format() {
+	if [[ -d "${ENV_NAME}" ]]
+	then
+		echo "expanded-directory"
+	elif tar -tf "${ENV_NAME}" pixi-pack.json >/dev/null 2>&1
+	then
+		echo "pixi-pack"
+	else
+		echo "conda-pack"
+	fi
+}
+
 parse_arguments() {
 
     original_arg_count=$#
@@ -168,6 +205,20 @@ UNPACK_IS_TMP=no
 
 trap cleanup EXIT
 
+PACKAGE_FORMAT=$(detect_package_format)
+logmsg detected package format: "${PACKAGE_FORMAT}"
+
+if [[ "${PACKAGE_FORMAT}" = pixi-pack ]]
+then
+	if ! PIXI_UNPACK=$(find_pixi_unpack)
+	then
+		errmsg "pixi-pack archive detected, but pixi-unpack was not found."
+		errmsg "Stage pixi-unpack beside poncho_package_run or set PONCHO_PIXI_UNPACK."
+		exit 1
+	fi
+	logmsg using pixi-unpack at "${PIXI_UNPACK}"
+fi
+
 if [[ -d "${ENV_NAME}" ]]
 then
     ENV_NAME_IS_DIR=yes
@@ -187,7 +238,7 @@ then
 fi
 
 UNPACK_TO=$(realpath "${UNPACK_TO}")
-logmsg setting up conda environment at "${UNPACK_TO}"
+logmsg setting up portable environment at "${UNPACK_TO}"
 
 if [[ -f "${UNPACK_TO}" ]]
 then
@@ -205,6 +256,30 @@ fi
 
 
 UNTAR_SCRIPT=$(mktemp poncho_package_run.XXXXXX)
+if [[ "${PACKAGE_FORMAT}" = pixi-pack ]]
+then
+cat > "${UNTAR_SCRIPT}" << EOF
+if [[ ! -e "${UNPACK_TO}"/.poncho_package_run_expanded ]]
+then
+	logmsg expanding pixi-pack environment file ${ENV_NAME}
+	rm -rf "${UNPACK_TO}/env"
+	rm -f "${UNPACK_TO}/activate.sh"
+	if ! "${PIXI_UNPACK}" \
+		--output-directory "${UNPACK_TO}" \
+		--env-name env \
+		"${ENV_NAME}"
+	then
+		errmsg could not unpack pixi-pack environment: ${ENV_NAME}
+		exit 1
+	fi
+
+	/bin/date > "${UNPACK_TO}"/.poncho_package_run_expanded
+else
+	logmsg directory ${UNPACK_TO} already contains an expanded environment
+fi
+exit 0
+EOF
+else
 cat > "${UNTAR_SCRIPT}" << EOF
 if [[ ! -e "${UNPACK_TO}"/.poncho_package_run_expanded ]]
 then
@@ -237,6 +312,7 @@ else
 fi
 exit 0
 EOF
+fi
 
 
 if [[ "${ENV_NAME_IS_DIR}" = no ]]
@@ -260,8 +336,17 @@ fi
 logmsg activating environment
 unset PYTHONPATH
 
-# force no args to activate, as it wants to consume "$@" which contains the command line
-source "${UNPACK_TO}/bin/activate" ""
+if [[ "${PACKAGE_FORMAT}" = pixi-pack ]]
+then
+	RUNTIME_PREFIX="${UNPACK_TO}/env"
+	ACTIVATION_SCRIPT="${UNPACK_TO}/activate.sh"
+else
+	RUNTIME_PREFIX="${UNPACK_TO}"
+	ACTIVATION_SCRIPT="${UNPACK_TO}/bin/activate"
+fi
+
+# Force no args for Conda's activation script, as it otherwise consumes "$@".
+source "${ACTIVATION_SCRIPT}" ""
 if [[ "$?" != 0 ]]
 then
     errmsg "could not activate environment: ${ENV_NAME}"
@@ -269,9 +354,9 @@ then
 fi
 
 #set enviornment variables
-if [[ -e "${UNPACK_TO}/poncho/set_env" ]]
+if [[ -e "${RUNTIME_PREFIX}/poncho/set_env" ]]
 then
-    source  "${UNPACK_TO}/poncho/set_env" "${UNPACK_TO}"
+	source "${RUNTIME_PREFIX}/poncho/set_env" "${RUNTIME_PREFIX}"
 
 fi
 
@@ -287,3 +372,4 @@ else
 fi
 
 exit $status
+
