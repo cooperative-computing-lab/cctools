@@ -28,7 +28,4 @@ int hash_cache_insert(struct hash_cache *cache, const char *key, void *value, in
 void *hash_cache_remove(struct hash_cache *cache, const char *key);
 void *hash_cache_lookup(struct hash_cache *cache, const char *key);
 
-int hash_cache_firstkey(struct hash_cache *cache);
-int hash_cache_nextkey(struct hash_cache *cache, int iteration, char **key, void **item);
-
 #endif

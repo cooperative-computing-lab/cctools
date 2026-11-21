@@ -58,6 +58,7 @@ SOURCES = \
 	gpu_info.c \
 	hash_cache.c \
 	hash_table.c \
+	hash_string.c \
 	hdfs_library.c \
 	histogram.c \
 	hmac.c \
@@ -160,6 +161,7 @@ HEADERS_PUBLIC = \
 	full_io.h \
 	getopt_aux.h \
 	hash_table.h \
+	hash_string.h \
 	histogram.h \
 	host_memory_info.h \
 	http_query.h \
@@ -206,13 +208,19 @@ PROGRAMS = $(MOST_PROGRAMS) catalog_query
 
 SCRIPTS = cctools_gpu_autodetect
 TARGETS = $(LIBRARIES) $(PRELOAD_LIBRARIES) $(PROGRAMS) $(TEST_PROGRAMS)
-TEST_PROGRAMS = auth_test disk_alloc_test jx_test microbench multirun jx_count_obj_test jx_canonicalize_test jx_merge_test hash_table_offset_test hash_table_fromkey_test hash_table_benchmark histogram_test category_test jx_binary_test bucketing_base_test bucketing_manager_test priority_queue_test progress_bar_test skip_list_test
+TEST_PROGRAMS = auth_test disk_alloc_test jx_test microbench multirun jx_count_obj_test jx_canonicalize_test jx_merge_test hash_table_benchmark hash_table_test histogram_test category_test jx_binary_test bucketing_base_test bucketing_manager_test priority_queue_test progress_bar_test skip_list_test
 
 all: $(TARGETS) catalog_query
 
 libdttools.a: $(OBJECTS)
 
 $(MOST_PROGRAMS) $(TEST_PROGRAMS): libdttools.a
+
+# Select a few key modules that should be compiled with optimization for speed.
+# We do not enable optimizations for other modules, to improve debuggability.
+
+hash_string.o: hash_string.c
+	$(CCTOOLS_CC) -O3 -o $@ -c $(CCTOOLS_INTERNAL_CCFLAGS) $(LOCAL_CCFLAGS) $<
 
 jx_parse.o: jx_parse.c
 	$(CCTOOLS_CC) -O3 -o $@ -c $(CCTOOLS_INTERNAL_CCFLAGS) $(LOCAL_CCFLAGS) $<
