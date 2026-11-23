@@ -232,14 +232,28 @@ int hash_table_insert(struct hash_table *table, const char *key, const void *val
 					/* identical key:value exists */
 					return 1;
 				} else {
+					/* identical key, different value */
 					static int duplicate_key_warnings = 0;
 					duplicate_key_warnings++;
 					if (duplicate_key_warnings < 10) {
-						notice(D_DEBUG, "key %s already exists in hash table with different value, ignoring new value.", key);
+						notice(D_DEBUG, "hash_table_insert(%s,%p) overwriting existing key in table, this is probably a bug.", key, value);
 					} else if (duplicate_key_warnings == 10) {
 						notice(D_DEBUG, "[additional warnings suppressed]");
 					}
-					return 0;
+					/*
+					Known memory leak: the old entry (and its copy of the key)
+					is overwritten below and never freed. This is deliberate.
+					Inserting over an existing key is a bug in the caller, and
+					a key pointer handed out by an earlier iteration may still
+					be in use, so freeing here could corrupt memory.
+					*/
+
+					/* Compensate for live count change */
+					table->live_count--;
+					/* Forget that we found a tombstone. */
+					found_tombstone = HASH_TABLE_CURSOR_INVALID;
+					/* Insert it here. */
+					break;
 				}
 			} else {
 				/* different key: keep looking */
@@ -530,11 +544,15 @@ int hash_table_cursor_next(struct hash_table_cursor *cursor)
 
 void hash_table_cursor_delete(struct hash_table_cursor *cursor)
 {
-	cursor->table->active_cursors--;
-	if (cursor->table->active_cursors == 0) {
-		hash_table_do_deferred_deletes(cursor->table);
-	}
+	struct hash_table *table = cursor->table;
+	table->active_cursors--;
 	free(cursor);
+
+	if (table->active_cursors == 0) {
+		hash_table_do_deferred_deletes(table);
+		/* Rehashing was suppressed while cursors were active, so catch up now. */
+		hash_table_consider_rehash(table);
+	}
 }
 
 /* Helper function to assist with the auto-cleanup attribute. */

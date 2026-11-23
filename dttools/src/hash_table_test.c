@@ -197,13 +197,16 @@ static void random_op(struct hash_table *h, int insert_pct, int remove_pct)
 
 		if (model[k] == NULL) {
 			CHECK(rc == 1, "insert of new key %s failed", keys[k]);
-			model[k] = v;
 			model_count++;
 		} else if (model[k] == v) {
 			CHECK(rc == 1, "re-insert of identical key:value %s should succeed", keys[k]);
 		} else {
-			CHECK(rc == 0, "insert of existing key %s with new value should fail", keys[k]);
+			CHECK(rc == 1, "insert of existing key %s with new value should succeed", keys[k]);
 		}
+
+		/* Any way we got here should succeed. */
+		model[k] = v;
+
 		CHECK(hash_table_lookup(h, keys[k]) == model[k], "lookup after insert of %s is wrong", keys[k]);
 
 	} else if (roll < insert_pct + remove_pct) {
@@ -453,6 +456,8 @@ int main(int argc, char **argv)
 	}
 
 	printf("hash_table_test: seed=%llu ops/config=%ld\n", (unsigned long long)seed, ops);
+
+	printf("NOTE: 9 duplicate key warnings and an '[additional warnings suppressed]' line are EXPECTED to follow here.\n");
 
 	run_config("default hash, default size", 0, NULL, KEY_UNIVERSE, ops);
 	run_config("default hash, 1 bucket", 1, NULL, KEY_UNIVERSE, ops);
