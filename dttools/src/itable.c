@@ -7,9 +7,6 @@ See the file COPYING for details.
 #include "debug.h"
 #include "itable.h"
 
-#include <stdlib.h>
-#include <string.h>
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
