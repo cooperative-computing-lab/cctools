@@ -44,3 +44,5 @@ hash_table_benchmark
 priority_queue_test
 progress_bar_test
 skip_list_test
+hash_table_test
+itable_test
