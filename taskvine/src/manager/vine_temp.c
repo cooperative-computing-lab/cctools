@@ -132,8 +132,7 @@ static struct vine_worker_info *get_best_dest_worker(struct vine_manager *q, str
 
 	char *key;
 	struct vine_worker_info *w;
-	int iteration;
-	HASH_TABLE_ITERATE(q->worker_table, iteration, key, w)
+	HASH_TABLE_ITERATE(q->worker_table, key, w)
 	{
 		/* skip if the worker cannot participate in peer transfers */
 		if (!worker_can_peer_transfer(w)) {
@@ -377,8 +376,7 @@ void vine_temp_clean_redundant_replicas(struct vine_manager *q, struct vine_file
 
 		uint64_t task_id;
 		struct vine_task *task;
-		int iteration;
-		ITABLE_ITERATE(source_worker->current_tasks, iteration, task_id, task)
+		ITABLE_ITERATE(source_worker->current_tasks, task_id, task)
 		{
 			struct vine_mount *input_mount;
 			LIST_ITERATE(task->input_mounts, input_mount)
@@ -432,8 +430,7 @@ void vine_temp_shift_disk_load(struct vine_manager *q, struct vine_worker_info *
 
 	char *key;
 	struct vine_worker_info *w = NULL;
-	int iteration;
-	HASH_TABLE_ITERATE(q->worker_table, iteration, key, w)
+	HASH_TABLE_ITERATE(q->worker_table, key, w)
 	{
 		/* skip if the worker cannot participate in peer transfers */
 		if (!worker_can_peer_transfer(w)) {

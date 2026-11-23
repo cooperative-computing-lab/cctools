@@ -87,12 +87,11 @@ extern "C" void pfs_process_sigio(int sig)
 {
 	UINT64_T pid;
 	struct pfs_process *p;
-	int iteration;
 
 	assert(sig == SIGIO);
 	debug(D_PROCESS,"SIGIO received");
 
-	ITABLE_ITERATE(pfs_process_table, iteration, pid, p) {
+	ITABLE_ITERATE(pfs_process_table, pid, p) {
 		if(p && p->flags&PFS_PROCESS_FLAGS_ASYNC) {
 			debug(D_PROCESS,"SIGIO forwarded to pid %d",p->pid);
 			kill(p->pid, SIGIO);
@@ -414,10 +413,9 @@ void pfs_process_killall()
 {
 	UINT64_T pid;
 	struct pfs_process *p;
-	int iteration;
 
 	if (pfs_process_table) {
-		ITABLE_ITERATE(pfs_process_table, iteration, pid,p) {
+		ITABLE_ITERATE(pfs_process_table, pid,p) {
 			debug(D_PROCESS,"killing pid %d",p->pid);
 			kill(p->pid,SIGKILL);
 		}

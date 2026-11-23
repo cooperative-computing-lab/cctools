@@ -73,7 +73,7 @@ void makeflow_parse_input_outputs( struct dag *d )
 	struct dag_file *f;
 	char *filename;
 
-	int i, argc, iteration;
+	int i, argc;
 	char **argv;
 
 	char *input_list  = dag_variable_lookup_global_string("MAKEFLOW_INPUTS" , d);
@@ -97,7 +97,7 @@ void makeflow_parse_input_outputs( struct dag *d )
 		debug(D_MAKEFLOW_RUN, "MAKEFLOW_INPUTS is not specified");
 	}
 	/* add all source files */
-	HASH_TABLE_ITERATE(d->files, iteration, filename, f) {
+	HASH_TABLE_ITERATE(d->files, filename, f) {
 		if(dag_file_is_source(f)) {
 			set_insert(d->inputs, f);
 			f->type = DAG_FILE_TYPE_INPUT;
@@ -120,7 +120,7 @@ void makeflow_parse_input_outputs( struct dag *d )
 	} else {
 		debug(D_MAKEFLOW_RUN, "MAKEFLOW_OUTPUTS is not specified");
 		/* add all sink if OUTPUTS not specified */
-		HASH_TABLE_ITERATE(d->files, iteration, filename, f) {
+		HASH_TABLE_ITERATE(d->files, filename, f) {
 			if(dag_file_is_sink(f)) {
 				set_insert(d->outputs, f);
 				f->type = DAG_FILE_TYPE_OUTPUT;
@@ -217,7 +217,6 @@ void makeflow_clean_node(struct dag *d, struct batch_queue *queue, struct dag_no
 
 int makeflow_clean(struct dag *d, struct batch_queue *queue, makeflow_clean_depth clean_depth)
 {
-	int iteration;
 	struct dag_file *f;
 	char *name;
 
@@ -232,7 +231,7 @@ int makeflow_clean(struct dag *d, struct batch_queue *queue, makeflow_clean_dept
 	}
 
 
-	HASH_TABLE_ITERATE(d->files, iteration, name, f) {
+	HASH_TABLE_ITERATE(d->files, name, f) {
 
 		/* We have a record of the file, but it is no longer created or used so delete */
 		if(dag_file_is_source(f) && dag_file_is_sink(f) && !set_lookup(d->inputs, f))
@@ -275,7 +274,6 @@ int makeflow_clean(struct dag *d, struct batch_queue *queue, makeflow_clean_dept
 
 static void makeflow_gc_all( struct dag *d, struct batch_queue *queue, int maxfiles)
 {
-	int iteration;
 	int collected = 0;
 	struct dag_file *f;
 	char *name;
@@ -285,7 +283,7 @@ static void makeflow_gc_all( struct dag *d, struct batch_queue *queue, int maxfi
 	/* This will walk the table of files to collect and will remove any
 	 * that are below or equal to the threshold. */
 	start_time = timestamp_get();
-	HASH_TABLE_ITERATE(d->files, iteration, name, f) {
+	HASH_TABLE_ITERATE(d->files, name, f) {
 		if(collected >= maxfiles)
 			break;
 		if(f->state == DAG_FILE_STATE_COMPLETE

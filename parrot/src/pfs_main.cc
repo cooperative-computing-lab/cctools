@@ -325,8 +325,7 @@ static void show_help( const char *cmd )
 	{
 		char *key;
 		void *value;
-		int iteration;
-		HASH_TABLE_ITERATE(available_services, iteration, key, value) {
+		HASH_TABLE_ITERATE(available_services, key, value) {
 			printf(" %s", key);
 		}
 	}
@@ -1460,8 +1459,7 @@ int main( int argc, char *argv[] )
 	if(namelist_table && namelist_file) {
 		char *key;
 		void *value;
-		int iteration;
-		HASH_TABLE_ITERATE(namelist_table, iteration, key, value) {
+		HASH_TABLE_ITERATE(namelist_table, key, value) {
 			fprintf(namelist_file, "%s|%s\n", key, (char *)value);
 		}
 		hash_table_delete(namelist_table);

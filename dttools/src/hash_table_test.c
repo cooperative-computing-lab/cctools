@@ -139,8 +139,7 @@ static void verify_all(struct hash_table *h)
 		struct verify_ctx *ctx = calloc(1, sizeof(*ctx));
 		char *key;
 		void *value;
-		int iteration = 0;
-		HASH_TABLE_ITERATE(h, iteration, key, value)
+		HASH_TABLE_ITERATE(h, key, value)
 		{
 			int k = key_number(key);
 			CHECK(k >= 0, "iterated over unknown key '%s'", key);
@@ -197,13 +196,16 @@ static void random_op(struct hash_table *h, int insert_pct, int remove_pct)
 
 		if (model[k] == NULL) {
 			CHECK(rc == 1, "insert of new key %s failed", keys[k]);
-			model[k] = v;
 			model_count++;
 		} else if (model[k] == v) {
 			CHECK(rc == 1, "re-insert of identical key:value %s should succeed", keys[k]);
 		} else {
-			CHECK(rc == 0, "insert of existing key %s with new value should fail", keys[k]);
+			CHECK(rc == 1, "insert of existing key %s with new value should succeed", keys[k]);
 		}
+
+		/* Any way we got here should succeed. */
+		model[k] = v;
+
 		CHECK(hash_table_lookup(h, keys[k]) == model[k], "lookup after insert of %s is wrong", keys[k]);
 
 	} else if (roll < insert_pct + remove_pct) {
@@ -341,9 +343,8 @@ static void test_cursor_removal(void)
 	/* Remove every other entry while iterating over the table. */
 	char *key;
 	void *value;
-	int iteration = 0;
 	int flip = 0;
-	HASH_TABLE_ITERATE(h, iteration, key, value)
+	HASH_TABLE_ITERATE(h, key, value)
 	{
 		int k = key_number(key);
 		CHECK(k >= 0, "unknown key during iteration");
@@ -381,13 +382,11 @@ static void test_nested_removal(void)
 	
 	char *key;
 	void *value;
-	int iteration = 0;
-	HASH_TABLE_ITERATE(h, iteration, key, value)
+	HASH_TABLE_ITERATE(h, key, value)
 	{
 		char *inner_key;
 		void *inner_value;
-		int   inner_iteration;
-		HASH_TABLE_ITERATE(h, inner_iteration, inner_key, inner_value)
+		HASH_TABLE_ITERATE(h, inner_key, inner_value)
 		{
 			if(total_count%9==0) {
 				int k = key_number(inner_key);
@@ -453,6 +452,8 @@ int main(int argc, char **argv)
 	}
 
 	printf("hash_table_test: seed=%llu ops/config=%ld\n", (unsigned long long)seed, ops);
+
+        printf("NOTE: 10 duplicate key warnings are EXPECTED to follow here.\n");
 
 	run_config("default hash, default size", 0, NULL, KEY_UNIVERSE, ops);
 	run_config("default hash, 1 bucket", 1, NULL, KEY_UNIVERSE, ops);

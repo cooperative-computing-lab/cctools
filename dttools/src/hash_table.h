@@ -27,9 +27,8 @@ Use the following macro to safely iterate over all items in a table:
 <pre>
 char *key;
 void *value;
-int iteration;
 
-HASH_TABLE_ITERATE(table, iteration, &key, &value) {
+HASH_TABLE_ITERATE(table, key, value) {
 	printf("table contains: %s\n",key);
 }
 </pre>
@@ -203,17 +202,15 @@ Use as follows:
 <pre>
 char *key;
 void *value;
-int iteration;
 
-HASH_TABLE_ITERATE(table, iteration, key, value) {
+HASH_TABLE_ITERATE(table, key, value) {
 	printf("table contains: %s\n",key);
 }
 
 </pre>
 */
 
-#define HASH_TABLE_ITERATE( table, iteration, key, value ) \
-  (void) iteration; \
+#define HASH_TABLE_ITERATE( table, key, value ) \
   for( struct hash_table_cursor *__cursor  __attribute__((cleanup(hash_table_cursor_delete_pp))) = hash_table_cursor_create(table), *__keep_going=__cursor; __keep_going; __keep_going=0) \
     for( hash_table_cursor_seek(__cursor,0); hash_table_cursor_get(__cursor,&key,(void**)&value); hash_table_cursor_next(__cursor) )
 

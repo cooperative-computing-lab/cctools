@@ -201,8 +201,7 @@ static void remove_expired_records()
 
 	struct jx *j;
 	char *key;
-	int iteration;
-	DELTA_DB_ITERATE(table, iteration, key, j) {
+	DELTA_DB_ITERATE(table, key, j) {
 		time_t lastheardfrom = jx_lookup_integer(j,"lastheardfrom");
 
 		int this_lifetime = jx_lookup_integer(j,"lifetime");
@@ -582,8 +581,7 @@ static void handle_query( struct link *ql, time_t st )
 
 	/* Now transform the hashtable into one big array for sorting. */
 	n = 0;
-	int iteration;
-	DELTA_DB_ITERATE(table, iteration, hkey, j) {
+	DELTA_DB_ITERATE(table, hkey, j) {
 		array[n] = j;
 		n++;
 	}

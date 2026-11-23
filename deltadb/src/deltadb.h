@@ -108,6 +108,6 @@ struct jx * deltadb_remove( struct deltadb *db, const char *key );
 /* Hack to extract the hashtable for iteration macro below. */
 struct hash_table * deltadb_internal_table( struct deltadb *db );
 
-#define DELTA_DB_ITERATE(db, iteration, key, j) HASH_TABLE_ITERATE(deltadb_internal_table(db),iteration,key,j)
+#define DELTA_DB_ITERATE(db, key, j) HASH_TABLE_ITERATE(deltadb_internal_table(db),key,j)
 
 #endif

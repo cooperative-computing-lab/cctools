@@ -132,10 +132,9 @@ void wrapper_instance_delete(struct wrapper_instance *w)
 	list_delete(w->output_files);
 
 	if(w->uses_remote_rename){
-		int iteration;
 		uint64_t f;
 		char *remote;
-		ITABLE_ITERATE(w->remote_names, iteration, f, remote) {
+		ITABLE_ITERATE(w->remote_names, f, remote) {
 			free(remote);
 		}
 	}
