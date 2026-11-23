@@ -434,7 +434,7 @@ vine_result_code_t vine_manager_get_output_files(struct vine_manager *q, struct 
 				result_single_file = vine_manager_get_output_file(q, w, t, m, m->file);
 			}
 
-			if(result_single_file==VINE_SUCCESS) {
+			if (result_single_file == VINE_SUCCESS) {
 				// on success, the file officially exists and can be used
 				m->file->state = VINE_FILE_STATE_CREATED;
 				continue;
@@ -449,7 +449,6 @@ vine_result_code_t vine_manager_get_output_files(struct vine_manager *q, struct 
 			} else {
 				/* should not happen */
 			}
-			
 		}
 	}
 
