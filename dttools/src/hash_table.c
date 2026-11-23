@@ -544,11 +544,15 @@ int hash_table_cursor_next(struct hash_table_cursor *cursor)
 
 void hash_table_cursor_delete(struct hash_table_cursor *cursor)
 {
-	cursor->table->active_cursors--;
-	if (cursor->table->active_cursors == 0) {
-		hash_table_do_deferred_deletes(cursor->table);
-	}
+	struct hash_table *table = cursor->table;
+	table->active_cursors--;
 	free(cursor);
+
+	if (table->active_cursors == 0) {
+		hash_table_do_deferred_deletes(table);
+		/* Rehashing was suppressed while cursors were active, so catch up now. */
+		hash_table_consider_rehash(table);
+	}
 }
 
 /* Helper function to assist with the auto-cleanup attribute. */

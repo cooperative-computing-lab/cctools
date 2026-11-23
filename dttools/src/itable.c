@@ -159,7 +159,7 @@ static void itable_grow(struct itable *table)
 
 /* Consider the current size of the table and grow or shrink as necessary. */
 
-int itable_consider_rehash(struct itable *table)
+static int itable_consider_rehash(struct itable *table)
 {
 	/* Never rehash the table while cursors are actively iterating. */
 	if (table->active_cursors > 0)
@@ -483,8 +483,14 @@ int itable_cursor_next(struct itable_cursor *cursor)
 
 void itable_cursor_delete(struct itable_cursor *cursor)
 {
-	cursor->table->active_cursors--;
+	struct itable *table = cursor->table;
+	table->active_cursors--;
 	free(cursor);
+
+	/* Rehashing was suppressed while cursors were active, so catch up now. */
+	if (table->active_cursors == 0) {
+		itable_consider_rehash(table);
+	}
 }
 
 /* Helper function to assist with the auto-cleanup attribute. */
