@@ -535,13 +535,12 @@ int send_catalog_update(struct rmsummary *s, int force)
 
 int itable_addto_count(struct itable *table, void *key, int value)
 {
-	uintptr_t count = (uintptr_t)itable_lookup(table, (uintptr_t)key);
-	count += value; // we get 0 if lookup fails, so that's ok.
+	/* Remove the old count before inserting the new one, so the key is never inserted twice. */
+	uintptr_t count = (uintptr_t)itable_remove(table, (uintptr_t)key);
+	count += value; // we get 0 if the key was not present, so that's ok.
 
 	if (count > 0)
 		itable_insert(table, (uintptr_t)key, (void *)count);
-	else
-		itable_remove(table, (uintptr_t)key);
 
 	return count;
 }
