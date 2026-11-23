@@ -457,7 +457,7 @@ int main(int argc, char **argv)
 
 	printf("hash_table_test: seed=%llu ops/config=%ld\n", (unsigned long long)seed, ops);
 
-        printf("NOTE: 10 duplicate key warnings are EXPECTED to follow here.\n");
+  printf("NOTE: 10 duplicate key warnings are EXPECTED to follow here.\n");
 
 	run_config("default hash, default size", 0, NULL, KEY_UNIVERSE, ops);
 	run_config("default hash, 1 bucket", 1, NULL, KEY_UNIVERSE, ops);
