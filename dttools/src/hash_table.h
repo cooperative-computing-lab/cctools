@@ -85,9 +85,13 @@ vs buckets in the table.
 double hash_table_load(struct hash_table *h);
 
 /** Insert a key and value.
-This call will fail if the table already contains the same key.
-You must call @ref hash_table_remove to remove it.
-Also note that you cannot insert a null value into the table.
+If the table already contains the same key with the same value, nothing changes.
+If the table already contains the same key with a different value,
+the new value replaces the old one and a warning is emitted.
+This is a bug in the caller, and leaks the old entry: call
+@ref hash_table_remove first to replace a value cleanly.
+An insert while a cursor is active on the table is not permitted,
+and the program will abort.
 @param h A pointer to a hash table.
 @param key A pointer to a string key which will be hashed and duplicated.
 @param value A pointer to store with the key.

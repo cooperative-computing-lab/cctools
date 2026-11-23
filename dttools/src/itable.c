@@ -229,6 +229,13 @@ int itable_insert(struct itable *table, UINT64_T key, const void *value)
 					} else if (duplicate_key_warnings == 10) {
 						notice(D_DEBUG, "[additional warnings suppressed]");
 					}
+					/*
+					Known memory leak: the old entry is overwritten below and
+					never freed. This is deliberate. Inserting over an existing
+					key is a bug in the caller, and freeing here could corrupt
+					memory that some other part of the program still refers to.
+					*/
+
 					/* Compensate for live count change */
 					table->live_count--;
 

@@ -240,6 +240,14 @@ int hash_table_insert(struct hash_table *table, const char *key, const void *val
 					} else if (duplicate_key_warnings == 10) {
 						notice(D_DEBUG, "[additional warnings suppressed]");
 					}
+					/*
+					Known memory leak: the old entry (and its copy of the key)
+					is overwritten below and never freed. This is deliberate.
+					Inserting over an existing key is a bug in the caller, and
+					a key pointer handed out by an earlier iteration may still
+					be in use, so freeing here could corrupt memory.
+					*/
+
 					/* Compensate for live count change */
 					table->live_count--;
 					/* Forget that we found a tombstone. */
