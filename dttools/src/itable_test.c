@@ -727,7 +727,7 @@ int main(int argc, char **argv)
 
 	printf("itable_test: seed=%llu ops/config=%ld\n", (unsigned long long)seed, ops);
 
-	printf("NOTE: 10 duplicate key warnings are EXPECTED to follow here.\n");
+	printf("NOTE: 9 duplicate key warnings and an '[additional warnings suppressed]' line are EXPECTED to follow here.\n");
 
 	run_config("dense keys, default size", 0, 0, KEY_UNIVERSE, ops);
 	run_config("dense keys, 1 bucket", 0, 1, KEY_UNIVERSE, ops);

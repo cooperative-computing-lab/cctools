@@ -1653,9 +1653,10 @@ static work_queue_result_code_t get_output_file( struct work_queue *q, struct wo
 	if(result == WQ_SUCCESS && f->flags & WORK_QUEUE_CACHE) {
 		struct stat local_info;
 		if (stat(f->payload,&local_info) == 0) {
-			struct remote_file_info *remote_info = remote_file_info_create(f->type,local_info.st_size,local_info.st_mtime);
-			if(!hash_table_insert(w->current_files, f->cached_name, remote_info)) {
-				free(remote_info);
+			/* Keep any existing record, rather than inserting the same key twice. */
+			if(!hash_table_lookup(w->current_files, f->cached_name)) {
+				struct remote_file_info *remote_info = remote_file_info_create(f->type,local_info.st_size,local_info.st_mtime);
+				hash_table_insert(w->current_files, f->cached_name, remote_info);
 			}
 		} else {
 			debug(D_NOTICE, "Cannot stat file %s: %s", f->payload, strerror(errno));
@@ -3499,10 +3500,9 @@ static work_queue_result_code_t send_item_if_not_cached( struct work_queue *q, s
 		result = send_item(q, w, t, expanded_local_name, tf->cached_name, tf->offset, tf->piece_length, total_bytes, 1 );
 
 		if(result == WQ_SUCCESS && tf->flags & WORK_QUEUE_CACHE) {
+			/* No existing record: this branch is only reached when the lookup above failed. */
 			remote_info = remote_file_info_create(tf->type,local_info.st_size,local_info.st_mtime);
-			if(!hash_table_insert(w->current_files, tf->cached_name, remote_info)) {
-				free(remote_info);
-			}
+			hash_table_insert(w->current_files, tf->cached_name, remote_info);
 		}
 
 		return result;
@@ -3603,10 +3603,9 @@ static work_queue_result_code_t send_special_if_not_cached( struct work_queue *q
 	send_worker_msg(q,w,"%s %s %s %d %o\n",typestring, source_encoded, cached_name_encoded, tf->length, 0777);
 
 	if(tf->flags & WORK_QUEUE_CACHE) {
+		/* No existing record: the function returns early above if the file is already cached. */
 		struct remote_file_info *remote_info = remote_file_info_create(tf->type,tf->length,time(0));
-		if(!hash_table_insert(w->current_files,tf->cached_name,remote_info)) {
-			free(remote_info);
-		}
+		hash_table_insert(w->current_files,tf->cached_name,remote_info);
 	}
 
 	return WQ_SUCCESS;

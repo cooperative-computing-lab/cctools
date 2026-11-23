@@ -90,8 +90,11 @@ Add a file to the cache manager (already created in the proper place) and note i
 
 int work_queue_cache_addfile( struct work_queue_cache *c, int64_t size, const char *cachename )
 {
+	/* Keep any existing entry, rather than inserting the same key twice. */
+	if(hash_table_lookup(c->table,cachename)) return 1;
+
 	struct cache_file *f = cache_file_create(WORK_QUEUE_CACHE_FILE,"manager",size,size,0777,1);
-	if(!hash_table_insert(c->table,cachename,f)) cache_file_delete(f);
+	hash_table_insert(c->table,cachename,f);
 	return 1;
 }
 
@@ -102,8 +105,11 @@ This entry will be materialized later in work_queue_cache_ensure.
 
 int work_queue_cache_queue( struct work_queue_cache *c, work_queue_cache_type_t type, const char *source, const char *cachename, int64_t size, int mode )
 {
+	/* Keep any existing entry, rather than inserting the same key twice. */
+	if(hash_table_lookup(c->table,cachename)) return 1;
+
 	struct cache_file *f = cache_file_create(type,source,size,0,mode,0);
-	if(!hash_table_insert(c->table,cachename,f)) cache_file_delete(f);
+	hash_table_insert(c->table,cachename,f);
 	return 1;
 }
 
