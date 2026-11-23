@@ -1229,7 +1229,16 @@ class LibraryTask(Task):
     # @param library_name       The name of this Library.
     def __init__(self, fn, library_name):
         Task.__init__(self, fn)
+        self._library_files = []
         self.provides_library(library_name)
+
+    def __del__(self):
+        try:
+            for f in self._library_files:
+                self.manager.undeclare_file(f)
+            super().__del__()
+        except TypeError:
+            pass
 
 
 # vim: set sts=4 sw=4 ts=4 expandtab ft=python:
