@@ -20,33 +20,28 @@ t = itable_create(0);
 fd = open(pathname,O_RDONLY,0);
 
 itable_insert(t,fd,pathname);
-pathname = itable_remove(h,id);
+pathname = itable_remove(t,fd);
 
 </pre>
 
-To list all of the items in an itable, use @ref itable_firstkey and @ref itable_nextkey like this:
+To list all of the items in an itable, use @ref ITABLE_ITERATE like this:
 
 <pre>
-UINT64_T  key;
+UINT64_T key;
 void *value;
 int iteration;
 
-ITABLE_ITERATE(h, iteration, &key, &value)) {
-	printf("table contains: %d\n",key);
+ITABLE_ITERATE(t, iteration, key, value) {
+	printf("table contains: %llu\n",(unsigned long long)key);
 }
 </pre>
 
-Alternatively:
-
-<pre>
-UINT64_T  key;
-void *value;
-int iteration;
-
-ITABLE_ITERATE(h, iteration, key, value) {
-	printf("table contains: %d\n",key);
-}
-</pre>
+Iteration uses an independent cursor (see @ref itable_cursor_create),
+so iterations may be nested.  While any cursor is active on a table:
+- @ref itable_remove is safe, including removal of the current item.
+- @ref itable_insert is not permitted, and the program will abort.
+- The table is not rehashed; any pending grow or shrink happens
+  when the last cursor is deleted.
 */
 
 /** Create a new integer table.
@@ -125,10 +120,9 @@ void * itable_remove_random( struct itable *h );
 
 /** Iterate over all entries in an integer table.
 This function invokes a callback on every key and value in the table.
-Unlike @ref ITABLE_ITERATE, this function does not use the table's
-iteration state, so it may be called while another iteration is in
-progress.  The table must not be modified during the call; if an
-insert, compact, clear, or resize occurs, the program will abort.
+It uses its own cursor, so it may be called while another iteration
+is in progress.  The callback must not insert into the table;
+if it does, the program will abort.
 @param h A pointer to an integer table.
 @param func A callback invoked once for each entry.
 @param arg An arbitrary pointer passed to each invocation of @a func.
@@ -137,6 +131,9 @@ insert, compact, clear, or resize occurs, the program will abort.
 void itable_foreach_ro(struct itable *h, void (*func)(UINT64_T key, void *value, void *arg), void *arg);
 
 /** Create a cursor for iterating over the values of a table.
+The cursor starts at the first object in the table.
+While any cursor is active, inserts into the table are not permitted
+and the table is not rehashed. Delete the cursor with @ref itable_cursor_delete.
 @param table A pointer to a itable.
 @return A pointer to a cursor object.
 */
@@ -144,10 +141,11 @@ void itable_foreach_ro(struct itable *h, void (*func)(UINT64_T key, void *value,
 struct itable_cursor * itable_cursor_create( struct itable *table );
 
 /** Move a cursor to a specific position in the table.
+The cursor moves to the first object at or after bucket position @a pos.
 The position zero indicates the first available object
 in the table, allowing for iterating over the entire
-set of objects in the table.  Positions other than zero
-are currently undefined.
+set of objects in the table.  If there is no object at or
+after @a pos, the cursor becomes invalid.
 @param cursor A pointer to a cursor object.
 @param pos The desired position of the cursor.
 */
@@ -174,7 +172,17 @@ If there are no more objects, move it to the invalid position and return false.
 */
 int  itable_cursor_next( struct itable_cursor *cursor );
 
+/** Remove the item under a cursor.
+The cursor stays at the same position, and @ref itable_cursor_get
+returns false there until the cursor is moved with @ref itable_cursor_next.
+@param cursor A pointer to a cursor object.
+@return The removed value, or null if the cursor was not over a valid object.
+*/
+void * itable_cursor_remove( struct itable_cursor *cursor );
+
 /** Delete a cursor.
+If this was the last active cursor on the table, any rehash
+that was deferred while cursors were active happens now.
 @param A pointer to a cursor object.
 */
 
@@ -190,10 +198,14 @@ void *value;
 int iteration;
 
 ITABLE_ITERATE(table, iteration, key, value) {
-	printf("table contains: %lld\n",key);
+	printf("table contains: %llu\n",(unsigned long long)key);
 }
 
 </pre>
+
+The iteration argument is unused and kept only for compatibility.
+The body may remove items (including the current one) and may nest
+other iterations, but it must not insert into the table: the program will abort.
 */
 
 #define ITABLE_ITERATE( table, iteration, key, value ) \
