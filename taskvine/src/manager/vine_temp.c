@@ -217,12 +217,12 @@ message from the manager. However, we do not accept DELETING replicas, as they
 indicate the source worker has already been sent an unlink request—any subsequent
 cache-update or cache-invalid events will lead to deletion.
 
-If the file's state is not CREATED, we need to wait for the producer task to
+If the file's state is not AVAILABLE, we need to wait for the producer task to
 complete before checking for replicas.
 */
 int vine_temp_exists_somewhere(struct vine_manager *q, struct vine_file *f)
 {
-	if (!q || !f || f->type != VINE_TEMP || f->state != VINE_FILE_STATE_CREATED) {
+	if (!q || !f || f->type != VINE_TEMP || f->state != VINE_FILE_STATE_AVAILABLE) {
 		return 0;
 	}
 
@@ -251,7 +251,7 @@ ignored. A lower priority value gives preference to scarcer replicas.
 */
 int vine_temp_queue_for_replication(struct vine_manager *q, struct vine_file *f)
 {
-	if (!q || !f || f->type != VINE_TEMP || f->state != VINE_FILE_STATE_CREATED) {
+	if (!q || !f || f->type != VINE_TEMP || f->state != VINE_FILE_STATE_AVAILABLE) {
 		return 0;
 	}
 
@@ -299,7 +299,7 @@ int vine_temp_start_replication(struct vine_manager *q)
 			break;
 		}
 		/* skip and discard the replication if the file is not valid */
-		if (!f || f->type != VINE_TEMP || f->state != VINE_FILE_STATE_CREATED) {
+		if (!f || f->type != VINE_TEMP || f->state != VINE_FILE_STATE_AVAILABLE) {
 			continue;
 		}
 

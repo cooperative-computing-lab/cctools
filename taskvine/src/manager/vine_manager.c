@@ -475,8 +475,7 @@ static vine_msg_code_t handle_cache_update(struct vine_manager *q, struct vine_w
 
 		struct vine_file *f = hash_table_lookup(q->file_table, cachename);
 		if (f) {
-			/* We know it exists and how large it is now. */
-			f->state = VINE_FILE_STATE_CREATED;
+			/* We now know the size of the file. */
 			f->size = size;
 
 			/* If the replica's type was a URL, it means the manager expected the destination worker to download it
@@ -2766,7 +2765,7 @@ static void vine_manager_compute_input_size(struct vine_manager *q, struct vine_
 	struct vine_mount *m;
 	LIST_ITERATE(t->input_mounts, m)
 	{
-		if (m->file->state == VINE_FILE_STATE_CREATED) {
+		if (m->file->state == VINE_FILE_STATE_AVAILABLE) {
 			input_size += m->file->size;
 		}
 	}
@@ -3587,18 +3586,25 @@ static void vine_manager_consider_recovery_task(struct vine_manager *q, struct v
 }
 
 /*
-Determine whether the input files needed for this task are available in some form.
-Most file types (FILE, URL, BUFFER) we can materialize on demand.
-But TEMP files must have been created by a prior task.
-If they are no longer present, we cannot run this task,
+Determine whether the input files needed for this task are AVAILABLE.
+Most input file types (FILE, URL, BUFFER) we can materialize on demand.
+But some FILEs and all TEMPs are outputs produced by prior tasks.
+If those are not yet AVAILABLE, we cannot run this task,
 and should consider re-creating it via a recovery task.
+
+Note that a TEMP file can be in the strange state of AVAILABLE and yet
+have no replicas, because they were lost due to failure.  This triggers
+the creation of a recovery task to re-generate a replica.
 */
 
 static int vine_manager_check_inputs_available(struct vine_manager *q, struct vine_task *t)
 {
 	struct vine_mount *m;
-	/* all input files are available, if not, consider recovery tasks for them at once */
+
+	/* Iterate over all files (regardless of failure) so that consider_recovery_task gets called on all missing temps */
+
 	int all_available = 1;
+
 	LIST_ITERATE(t->input_mounts, m)
 	{
 		struct vine_file *f = m->file;
@@ -3609,6 +3615,7 @@ static int vine_manager_check_inputs_available(struct vine_manager *q, struct vi
 			all_available = 0;
 		}
 	}
+
 	return all_available;
 }
 

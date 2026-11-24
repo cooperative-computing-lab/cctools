@@ -401,7 +401,6 @@ vine_result_code_t vine_manager_get_output_file(struct vine_manager *q, struct v
 
 vine_result_code_t vine_manager_get_output_files(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
-
 	int task_succeeded = (t->result == VINE_RESULT_SUCCESS && t->exit_code == 0);
 
 	vine_result_code_t result_all_files = VINE_SUCCESS;
@@ -424,9 +423,10 @@ vine_result_code_t vine_manager_get_output_files(struct vine_manager *q, struct 
 
 			vine_result_code_t result_single_file = VINE_SUCCESS;
 			if (m->file->type == VINE_TEMP) {
-				// if temp, check that we got a cache update message.
-				struct vine_file *f = hash_table_lookup(q->file_table, m->file->cached_name);
-				if (!f || f->state != VINE_FILE_STATE_CREATED) {
+				// for temp files, check that we already got a cache-update describing a replica.
+				struct vine_file_replica *r = vine_file_replica_table_lookup(w, m->file->cached_name);
+				if (!r || r->state != VINE_FILE_REPLICA_STATE_READY) {
+					// if we did not, then something went wrong at the worker.
 					result_single_file = VINE_APP_FAILURE;
 				}
 			} else {
@@ -434,13 +434,20 @@ vine_result_code_t vine_manager_get_output_files(struct vine_manager *q, struct 
 				result_single_file = vine_manager_get_output_file(q, w, t, m, m->file);
 			}
 
-			// if success or app-level failure, continue to get other files.
-			// if worker failure, return.
-			if (result_single_file == VINE_WORKER_FAILURE || result_single_file == VINE_MGR_FAILURE) {
+			if (result_single_file == VINE_SUCCESS) {
+				// on success, the file is now available for use by other tasks.
+				m->file->state = VINE_FILE_STATE_AVAILABLE;
+				continue;
+			} else if (result_single_file == VINE_WORKER_FAILURE || result_single_file == VINE_MGR_FAILURE) {
+				// on worker or manager failure, don't handle any more files
 				result_all_files = result_single_file;
 				break;
 			} else if (result_single_file == VINE_APP_FAILURE) {
+				// on app failure, consider the rest of the files for completeness.
 				result_all_files = result_single_file;
+				continue;
+			} else {
+				/* should not happen */
 			}
 		}
 	}

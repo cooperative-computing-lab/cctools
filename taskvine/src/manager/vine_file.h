@@ -17,6 +17,16 @@ As a result, it has several kinds of names:
 - f->source indicates the name of the source file, url, or command that provides the data.
 - f->cached_name indicates the name of the file as it is stored in the worker's cache.
 
+The state of a file is a little subtle:
+- A file is AVAILABLE if the contents of the file are available to be delivered to a task from some source.
+The source could be a local file, a remote URL, a replica on a worker, a mini-task, etc.
+A file in this state does not necessarily have a replica materialized on a worker yet.
+However, a task that needs it can be scheduled, because the file contents can be materialized to create a replica.
+- A file is PENDING if the contents of the file are not yet available,
+because they must be produced as the output of some other task.
+A task that needs this file as input cannot be scheduled because
+the file cannot be materialized on demand.
+
 This module is private to the manager and should not be invoked by the end user.
 */
 
@@ -26,7 +36,7 @@ This module is private to the manager and should not be invoked by the end user.
 
 typedef enum {
   VINE_FILE_STATE_PENDING, /**< This file has not yet been created by a task. */
-  VINE_FILE_STATE_CREATED   /**< This file has been created at some point.  (although it might have been lost!) */
+  VINE_FILE_STATE_AVAILABLE /**< This file is available for use by a task. */
 } vine_file_state_t;
 
 struct vine_file {
