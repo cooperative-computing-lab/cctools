@@ -435,8 +435,8 @@ vine_result_code_t vine_manager_get_output_files(struct vine_manager *q, struct 
 			}
 
 			if (result_single_file == VINE_SUCCESS) {
-				// on success, the file officially exists and can be used
-				m->file->state = VINE_FILE_STATE_CREATED;
+				// on success, the file is now available for use by other tasks.
+				m->file->state = VINE_FILE_STATE_AVAILABLE;
 				continue;
 			} else if (result_single_file == VINE_WORKER_FAILURE || result_single_file == VINE_MGR_FAILURE) {
 				// on worker or manager failure, don't handle any more files

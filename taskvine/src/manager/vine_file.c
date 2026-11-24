@@ -89,7 +89,7 @@ struct vine_file *vine_file_create(const char *source, const char *cached_name, 
 	f->mini_task = mini_task;
 	f->recovery_task = 0;
 	f->original_producer_task_id = 0;
-	f->state = VINE_FILE_STATE_CREATED; /* Assume state created until told otherwise */
+	f->state = VINE_FILE_STATE_AVAILABLE; /* Assume file is in the available state, unless it is connected to a task as an input. */
 	f->cache_level = cache_level;
 	f->flags = flags;
 
